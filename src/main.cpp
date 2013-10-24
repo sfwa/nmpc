@@ -27,6 +27,7 @@ SOFTWARE.
 
 #include "state.h"
 #include "dynamics.h"
+#include "integrator.h"
 
 #include <iostream>
 
@@ -68,7 +69,8 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.acceleration() << a[0], a[1], a[2];
 	s.angular_acceleration() << a[3], a[4], a[5];
 
-	StateVectorDerivative dot = s.model();
+	IntegratorRK4 integrator;
+	StateVector dot = integrator.integrate(s, SIM_TIMESTEP);
 
 	/* Copy results to output vector. */
 	for(i=0; i<3; ++i) f[i] = dot[i];
@@ -107,8 +109,7 @@ int main()
 		-0.208, -0.587, -0.004, 4.119, 0.143).finished());
 	dynamics_model.set_drag_coeffs((Vector5r() <<
 		73.641, -5.365, -1.614, 0.153, 0.0176).finished());
-	dynamics_model.set_side_coeffs((Vector8r() <<
-		0.0, 0.0, 0.0, 0.0,
+	dynamics_model.set_side_coeffs((Vector4r() <<
 		0.220, 0.01, 0.0, 0.0).finished(),
 		(ControlVector(4) << 0.0, 0.0, 0.0, 0.0).finished());
 	dynamics_model.set_pitch_moment_coeffs(
@@ -135,13 +136,7 @@ int main()
 	/* Define the differential equation. */
 	CFunction flight_model(13, dynamics);
 	flight_model.setUserData(&dynamics_model);
-	DifferentialEquation f;
-	f << flight_model(is);
-
-	/* Set up the simulation process. */
-	OutputFcn identity;
-	DynamicSystem dynamicSystem(f, identity);
-	Process process(dynamicSystem, INT_RK78);
+	DiscretizedDifferentialEquation f(SIM_TIMESTEP);
 
 	/* Define the optimal control problem. */
 	Function h;
@@ -159,22 +154,37 @@ int main()
 	Q(3, 3) = 1.0;
 	Q(4, 4) = 1.0;
 	Q(5, 5) = 1.0;
-	Q(6, 6) = 5.0;
-	Q(7, 7) = 5.0;
-	Q(8, 8) = 5.0;
-	Q(9, 9) = 5.0;
-	Q(10, 10) = 0.0;
-	Q(11, 11) = 0.0;
-	Q(12, 12) = 0.0;
+	Q(6, 6) = 0.0;
+	Q(7, 7) = 0.0;
+	Q(8, 8) = 0.0;
+	Q(9, 9) = 0.0;
+	Q(10, 10) = 1.0;
+	Q(11, 11) = 1.0;
+	Q(12, 12) = 1.0;
 
-	Vector r(13);
-	r.setAll(0.0);
+	/* Set up controller and load reference trajectory. */
+	VariablesGrid ref_data("data/reference.txt");
+	StaticReferenceTrajectory reference(ref_data);
+	Vector initial_state = ref_data.getFirstVector();
 
 	OCP ocp(0.0, HORIZON_LENGTH, 50);
 
-	ocp.minimizeLSQ(Q, h, r);
+	ocp.minimizeLSQ(Q, h, ref_data);
 
-	ocp.subjectTo(f);
+	ocp.subjectTo(AT_START, position(0) == initial_state(0));
+	ocp.subjectTo(AT_START, position(1) == initial_state(1));
+	ocp.subjectTo(AT_START, position(2) == initial_state(2));
+	ocp.subjectTo(AT_START, velocity(0) == initial_state(3));
+	ocp.subjectTo(AT_START, velocity(1) == initial_state(4));
+	ocp.subjectTo(AT_START, velocity(2) == initial_state(5));
+	ocp.subjectTo(AT_START, attitude(0) == initial_state(6));
+	ocp.subjectTo(AT_START, attitude(1) == initial_state(7));
+	ocp.subjectTo(AT_START, attitude(2) == initial_state(8));
+	ocp.subjectTo(AT_START, attitude(3) == initial_state(9));
+	ocp.subjectTo(AT_START, angular_velocity(0) == initial_state(10));
+	ocp.subjectTo(AT_START, angular_velocity(1) == initial_state(11));
+	ocp.subjectTo(AT_START, angular_velocity(2) == initial_state(12));
+	ocp.subjectTo(f << flight_model(is));
 
 	/* Flight envelope constraints. */
 	ocp.subjectTo(-M_PI <= angular_velocity <= M_PI);
@@ -184,57 +194,10 @@ int main()
 	ocp.subjectTo(-0.8 <= elevon <= 0.8);
 
 	/* Set up the realtime algorithm. */
-	RealTimeAlgorithm alg(ocp, SIM_TIMESTEP);
-	alg.set(INTEGRATOR_TYPE, INT_RK78);
-
-	/* Set up controller and load reference trajectory. */
-	VariablesGrid ref_data("data/reference.txt");
-	StaticReferenceTrajectory reference(ref_data);
-	Controller controller(alg, reference);
-
-	/* Initialise and run the simulation. */
-	SimulationEnvironment sim(0.0, SIM_LENGTH, process, controller);
-
-	Vector x0(13);
-	x0 = ref_data.getFirstVector();
-	sim.init(x0);
-	sim.run();
-
-	/* Plot the results. */
-	VariablesGrid diffStates;
-	sim.getProcessDifferentialStates(diffStates);
-
-	VariablesGrid feedbackControl;
-	sim.getFeedbackControl(feedbackControl);
-
-	OutputFcn plot_fn;
-	plot_fn << position(2);
-	plot_fn << velocity;
-	plot_fn << angular_velocity;
-	VariablesGrid plot_out;
-	plot_fn.evaluate(&diffStates, NULL, NULL, NULL, NULL, &plot_out);
-
-	GnuplotWindow window;
-	window.addSubplot(plot_out(0), "Altitude [m]");
-	window.addSubplot(plot_out(1), "Velocity X [m/s]");
-	window.addSubplot(plot_out(2), "Velocity Y [m/s]");
-	window.addSubplot(plot_out(3), "Velocity Z [m/s]");
-	window.addSubplot(plot_out(4), "Angular Rate P [rad/s]");
-	window.addSubplot(plot_out(5), "Angular Rate Q [rad/s]");
-	window.addSubplot(plot_out(6), "Angular Rate R [rad/s]");
-	window.addSubplot(feedbackControl(0), "Throttle");
-	window.addSubplot(feedbackControl(1), "Elevon 1 Deflection [rad]");
-	window.addSubplot(feedbackControl(2), "Elevon 2 Deflection [rad]");
-	window.plot();
-
-	OutputFcn xplane_fn;
-	xplane_fn << position;
-	xplane_fn << attitude;
-	VariablesGrid xplane_out;
-	xplane_fn.evaluate(&diffStates, NULL, NULL, NULL, NULL, &xplane_out);
-	Grid xplane_grid(0.0, SIM_LENGTH-SIM_TIMESTEP, SIM_LENGTH / SIM_TIMESTEP);
-	xplane_out.coarsenGrid(xplane_grid);
-	xplane_out.print("", "", "", DEFAULT_WIDTH, DEFAULT_PRECISION, "\t", "\n");
+	OptimizationAlgorithm alg(ocp);
+	alg.set(MAX_NUM_ITERATIONS, 5);
+	alg.set(KKT_TOLERANCE, 1e0);
+	alg.solve();
 
     return 0;
 }
