@@ -138,6 +138,11 @@ int main()
 	flight_model.setUserData(&dynamics_model);
 	DiscretizedDifferentialEquation f(SIM_TIMESTEP);
 
+	/* Set up the simulation process. */
+	OutputFcn identity;
+	DynamicSystem dynamicSystem(f, identity);
+	Process process(dynamicSystem, INT_RK78);
+
 	/* Define the optimal control problem. */
 	Function h;
 
@@ -181,7 +186,7 @@ int main()
 	/* Set up the realtime algorithm. */
 	RealTimeAlgorithm alg(ocp, SIM_TIMESTEP);
 	alg.set(INTEGRATOR_TYPE, INT_RK78);
-	alg.set(INTEGRATOR_PRINTLEVEL, HIGH);
+	//alg.set(INTEGRATOR_PRINTLEVEL, HIGH);
 
 	/* Set up controller and load reference trajectory. */
 	VariablesGrid ref_data("data/reference.txt");
