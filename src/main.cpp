@@ -162,28 +162,13 @@ int main()
 	Q(11, 11) = 1.0;
 	Q(12, 12) = 1.0;
 
-	/* Set up controller and load reference trajectory. */
-	VariablesGrid ref_data("data/reference.txt");
-	StaticReferenceTrajectory reference(ref_data);
-	Vector initial_state = ref_data.getFirstVector();
-
 	OCP ocp(0.0, HORIZON_LENGTH, 50);
 
-	ocp.minimizeLSQ(Q, h, ref_data);
+	Vector r(13);
+	r.setZero();
 
-	ocp.subjectTo(AT_START, position(0) == initial_state(0));
-	ocp.subjectTo(AT_START, position(1) == initial_state(1));
-	ocp.subjectTo(AT_START, position(2) == initial_state(2));
-	ocp.subjectTo(AT_START, velocity(0) == initial_state(3));
-	ocp.subjectTo(AT_START, velocity(1) == initial_state(4));
-	ocp.subjectTo(AT_START, velocity(2) == initial_state(5));
-	ocp.subjectTo(AT_START, attitude(0) == initial_state(6));
-	ocp.subjectTo(AT_START, attitude(1) == initial_state(7));
-	ocp.subjectTo(AT_START, attitude(2) == initial_state(8));
-	ocp.subjectTo(AT_START, attitude(3) == initial_state(9));
-	ocp.subjectTo(AT_START, angular_velocity(0) == initial_state(10));
-	ocp.subjectTo(AT_START, angular_velocity(1) == initial_state(11));
-	ocp.subjectTo(AT_START, angular_velocity(2) == initial_state(12));
+	ocp.minimizeLSQ(Q, h, r);
+
 	ocp.subjectTo(f << flight_model(is));
 
 	/* Flight envelope constraints. */
@@ -194,10 +179,49 @@ int main()
 	ocp.subjectTo(-0.8 <= elevon <= 0.8);
 
 	/* Set up the realtime algorithm. */
-	OptimizationAlgorithm alg(ocp);
-	alg.set(MAX_NUM_ITERATIONS, 5);
-	alg.set(KKT_TOLERANCE, 1e0);
-	alg.solve();
+	RealTimeAlgorithm alg(ocp, SIM_TIMESTEP);
+	alg.set(INTEGRATOR_TYPE, INT_RK78);
+	alg.set(INTEGRATOR_PRINTLEVEL, HIGH);
+
+	/* Set up controller and load reference trajectory. */
+	VariablesGrid ref_data("data/reference.txt");
+	StaticReferenceTrajectory reference(ref_data);
+	Controller controller(alg, reference);
+
+	/* Initialise and run the simulation. */
+	SimulationEnvironment sim(0.0, SIM_LENGTH, process, controller);
+
+	Vector x0(13);
+	x0 = ref_data.getFirstVector();
+	sim.init(x0);
+	sim.run();
+
+	/* Plot the results. */
+	VariablesGrid diffStates;
+	sim.getProcessDifferentialStates(diffStates);
+
+	VariablesGrid feedbackControl;
+	sim.getFeedbackControl(feedbackControl);
+
+	OutputFcn plot_fn;
+	plot_fn << position(2);
+	plot_fn << velocity;
+	plot_fn << angular_velocity;
+	VariablesGrid plot_out;
+	plot_fn.evaluate(&diffStates, NULL, NULL, NULL, NULL, &plot_out);
+
+	GnuplotWindow window;
+	window.addSubplot(plot_out(0), "Altitude [m]");
+	window.addSubplot(plot_out(1), "Velocity X [m/s]");
+	window.addSubplot(plot_out(2), "Velocity Y [m/s]");
+	window.addSubplot(plot_out(3), "Velocity Z [m/s]");
+	window.addSubplot(plot_out(4), "Angular Rate P [rad/s]");
+	window.addSubplot(plot_out(5), "Angular Rate Q [rad/s]");
+	window.addSubplot(plot_out(6), "Angular Rate R [rad/s]");
+	window.addSubplot(feedbackControl(0), "Throttle");
+	window.addSubplot(feedbackControl(1), "Elevon 1 Deflection [rad]");
+	window.addSubplot(feedbackControl(2), "Elevon 2 Deflection [rad]");
+	window.plot();
 
     return 0;
 }
