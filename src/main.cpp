@@ -44,9 +44,6 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.velocity() << x[3], x[4], x[5];
 	s.acceleration() << 0, 0, 0;
 	s.attitude() << x[6], x[7], x[8], x[9];
-	Quaternionr q(s.attitude());
-	q.normalize();
-	s.attitude() << q.vec(), q.w();
 	s.angular_velocity() << x[10], x[11], x[12];
 	s.angular_acceleration() << 0, 0, 0;
 	s.wind_velocity() << 0, 0, 0;
@@ -70,13 +67,16 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.angular_acceleration() << a[3], a[4], a[5];
 
 	IntegratorRK4 integrator;
-	StateVector dot = integrator.integrate(s, SIM_TIMESTEP);
+	State dot = integrator.integrate(s, SIM_TIMESTEP);
+	Quaternionr q(dot.attitude());
+	q.normalize();
+	dot.attitude() << q.vec(), q.w();
 
 	/* Copy results to output vector. */
-	for(i=0; i<3; ++i) f[i] = dot[i];
-	for(i=0; i<3; ++i) f[i+3] = dot[i+3];
-	for(i=0; i<4; ++i) f[i+6] = dot[i+9];
-	for(i=0; i<3; ++i) f[i+10] = dot[i+13];
+	for(i=0; i<3; ++i) f[i] = dot.position()[i];
+	for(i=0; i<3; ++i) f[i+3] = dot.velocity()[i];
+	for(i=0; i<4; ++i) f[i+6] = dot.attitude()[i];
+	for(i=0; i<3; ++i) f[i+10] = dot.angular_velocity()[i];
 }
 
 int main()
