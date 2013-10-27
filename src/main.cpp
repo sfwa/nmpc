@@ -28,6 +28,7 @@ SOFTWARE.
 #include "state.h"
 #include "dynamics.h"
 #include "integrator.h"
+#include "debug.h"
 
 #include <iostream>
 
@@ -49,6 +50,9 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.wind_velocity() << 0, 0, 0;
 	s.gyro_bias() << 0, 0, 0;
 
+	//std::cout << "state:\n" << s << std::endl << std::endl;
+	for(i=0; i<13; i++) { AssertNotNaN(x[i]); }
+
 	ControlVector c(4);
 	c << x[13], x[14], x[15], 0;
 
@@ -56,6 +60,9 @@ void dynamics(double *x, double *f, void *user_data) {
 	FixedWingFlightDynamicsModel *d =
 		static_cast<FixedWingFlightDynamicsModel *>(user_data);
 	AccelerationVector a = d->evaluate(s, c);
+
+	//std::cout << "accel:\n" << a << std::endl << std::endl;
+	for(i=0; i<6; i++) { AssertNotNaN(a[i]); }
 
 	/* Evaluate the process model using state and dynamics outputs. */
 	s.acceleration() << a[0], a[1], a[2];
@@ -66,6 +73,9 @@ void dynamics(double *x, double *f, void *user_data) {
 	Quaternionr q(dot.attitude());
 	q.normalize();
 	dot.attitude() << q.vec(), q.w();
+
+	//std::cout << "dot:\n" << dot << std::endl << std::endl;
+	for(i=0; i<13; i++) { AssertNotNaN(dot[i]); }
 
 	/* Copy results to output vector. */
 	for(i=0; i<3; ++i) f[i] = dot.position()[i];
@@ -143,13 +153,13 @@ int main()
 	Q(3, 3) = 1.0;
 	Q(4, 4) = 1.0;
 	Q(5, 5) = 1.0;
-	Q(6, 6) = 0.0;
-	Q(7, 7) = 0.0;
-	Q(8, 8) = 0.0;
-	Q(9, 9) = 0.0;
-	Q(10, 10) = 1.0;
-	Q(11, 11) = 1.0;
-	Q(12, 12) = 1.0;
+	Q(6, 6) = 1.0;
+	Q(7, 7) = 1.0;
+	Q(8, 8) = 1.0;
+	Q(9, 9) = 1.0;
+	Q(10, 10) = 5.0;
+	Q(11, 11) = 5.0;
+	Q(12, 12) = 5.0;
 
 	OCP ocp(0.0, HORIZON_LENGTH, 50);
 
@@ -222,6 +232,20 @@ int main()
 	window.addSubplot(feedbackControl(1), "Elevon 1 Deflection [rad]");
 	window.addSubplot(feedbackControl(2), "Elevon 2 Deflection [rad]");
 	window.plot();
+
+	OutputFcn xplane_fn;
+	xplane_fn << state_vector(0);
+	xplane_fn << state_vector(1);
+	xplane_fn << state_vector(2);
+	xplane_fn << state_vector(6);
+	xplane_fn << state_vector(7);
+	xplane_fn << state_vector(8);
+	xplane_fn << state_vector(9);
+	VariablesGrid xplane_out;
+	xplane_fn.evaluate(&diffStates, NULL, NULL, NULL, NULL, &xplane_out);
+	Grid xplane_grid(0.0, SIM_LENGTH-SIM_TIMESTEP, SIM_LENGTH / SIM_TIMESTEP);
+	xplane_out.coarsenGrid(xplane_grid);
+	xplane_out.print("", "", "", DEFAULT_WIDTH, DEFAULT_PRECISION, "\t", "\n");
 
     return 0;
 }
