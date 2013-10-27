@@ -50,18 +50,21 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.wind_velocity() << 0, 0, 0;
 	s.gyro_bias() << 0, 0, 0;
 
-	//std::cout << "state:\n" << s << std::endl << std::endl;
+	std::cout << "state:\n" << s << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(x[i]); }
 
 	ControlVector c(4);
 	c << x[13], x[14], x[15], 0;
+
+	std::cout << "control:\n" << c << std::endl << std::endl;
+	for(i=0; i<4; i++) { AssertNotNaN(c[i]); }
 
 	/* Evaluate the dynamics model. */
 	FixedWingFlightDynamicsModel *d =
 		static_cast<FixedWingFlightDynamicsModel *>(user_data);
 	AccelerationVector a = d->evaluate(s, c);
 
-	//std::cout << "accel:\n" << a << std::endl << std::endl;
+	std::cout << "accel:\n" << a << std::endl << std::endl;
 	for(i=0; i<6; i++) { AssertNotNaN(a[i]); }
 
 	/* Evaluate the process model using state and dynamics outputs. */
@@ -74,7 +77,7 @@ void dynamics(double *x, double *f, void *user_data) {
 	q.normalize();
 	dot.attitude() << q.vec(), q.w();
 
-	//std::cout << "dot:\n" << dot << std::endl << std::endl;
+	std::cout << "dot:\n" << dot << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(dot[i]); }
 
 	/* Copy results to output vector. */
