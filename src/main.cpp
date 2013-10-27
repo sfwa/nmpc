@@ -48,7 +48,6 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.angular_acceleration() << 0, 0, 0;
 	s.wind_velocity() << 0, 0, 0;
 	s.gyro_bias() << 0, 0, 0;
-	s.acceleration() << 0, 0, 0;
 
 	ControlVector c(4);
 	c << x[13], x[14], x[15], 0;
@@ -57,11 +56,7 @@ void dynamics(double *x, double *f, void *user_data) {
 	FixedWingFlightDynamicsModel *d =
 		static_cast<FixedWingFlightDynamicsModel *>(user_data);
 	AccelerationVector a = d->evaluate(s, c);
-/*
-	std::cout << a << std::endl << std::endl;
-	std::cout << s << std::endl;
-	std::cout << "--------------" << std::endl << std::endl;
-*/
+
 	/* Evaluate the process model using state and dynamics outputs. */
 	s.acceleration() << a[0], a[1], a[2];
 	s.angular_acceleration() << a[3], a[4], a[5];
@@ -86,10 +81,7 @@ int main()
 	int i;
 
 	/* State vector. */
-	DifferentialState position(3);
-	DifferentialState velocity(3);
-	DifferentialState attitude(4);
-	DifferentialState angular_velocity(3);
+	DifferentialState state_vector(13);
 
 	/* Control vector. */
 	Control motor;
@@ -126,10 +118,10 @@ int main()
 	/* Combine the above vectors into one to pass to the dynamics function. */
 	IntermediateState is(16);
 
-	for(i=0; i<3; ++i) is(i) = position(i);
-	for(i=0; i<3; ++i) is(i+3) = velocity(i);
-	for(i=0; i<4; ++i) is(i+6) = attitude(i);
-	for(i=0; i<3; ++i) is(i+10) = angular_velocity(i);
+	for(i=0; i<3; ++i) is(i) = state_vector(i);
+	for(i=0; i<3; ++i) is(i+3) = state_vector(i+3);
+	for(i=0; i<4; ++i) is(i+6) = state_vector(i+6);
+	for(i=0; i<3; ++i) is(i+10) = state_vector(i+10);
 	is(13) = motor;
 	for(i=0; i<2; ++i) is(i+14) = elevon(i);
 
@@ -138,18 +130,10 @@ int main()
 	flight_model.setUserData(&dynamics_model);
 	DiscretizedDifferentialEquation f(SIM_TIMESTEP);
 
-	/* Set up the simulation process. */
-	OutputFcn identity;
-	DynamicSystem dynamicSystem(f, identity);
-	Process process(dynamicSystem, INT_RK78);
-
 	/* Define the optimal control problem. */
 	Function h;
 
-	h << position;
-	h << velocity;
-	h << attitude;
-	h << angular_velocity;
+	h << state_vector;
 
 	/* Least-squares weighting matrix. */
 	Matrix Q = zeros(13, 13);
@@ -177,11 +161,18 @@ int main()
 	ocp.subjectTo(f << flight_model(is));
 
 	/* Flight envelope constraints. */
-	ocp.subjectTo(-M_PI <= angular_velocity <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(10) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(11) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(12) <= M_PI);
 
 	/* Control constraints. */
 	ocp.subjectTo(0.0 <= motor <= 19000.0);
 	ocp.subjectTo(-0.8 <= elevon <= 0.8);
+
+	/* Set up the simulation process. */
+	OutputFcn identity;
+	DynamicSystem dynamicSystem(f, identity);
+	Process process(dynamicSystem, INT_RK78);
 
 	/* Set up the realtime algorithm. */
 	RealTimeAlgorithm alg(ocp, SIM_TIMESTEP);
@@ -209,9 +200,13 @@ int main()
 	sim.getFeedbackControl(feedbackControl);
 
 	OutputFcn plot_fn;
-	plot_fn << position(2);
-	plot_fn << velocity;
-	plot_fn << angular_velocity;
+	plot_fn << state_vector(2);
+	plot_fn << state_vector(3);
+	plot_fn << state_vector(4);
+	plot_fn << state_vector(5);
+	plot_fn << state_vector(10);
+	plot_fn << state_vector(11);
+	plot_fn << state_vector(12);
 	VariablesGrid plot_out;
 	plot_fn.evaluate(&diffStates, NULL, NULL, NULL, NULL, &plot_out);
 
