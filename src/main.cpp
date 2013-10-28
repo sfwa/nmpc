@@ -156,10 +156,10 @@ int main()
 	Q(3, 3) = 1.0;
 	Q(4, 4) = 1.0;
 	Q(5, 5) = 1.0;
-	Q(6, 6) = 0.0;
-	Q(7, 7) = 0.0;
-	Q(8, 8) = 0.0;
-	Q(9, 9) = 0.0;
+	Q(6, 6) = 2.0;
+	Q(7, 7) = 2.0;
+	Q(8, 8) = 2.0;
+	Q(9, 9) = 2.0;
 	Q(10, 10) = 1.0;
 	Q(11, 11) = 1.0;
 	Q(12, 12) = 1.0;
@@ -181,9 +181,9 @@ int main()
 	ocp.subjectTo(-40 <= state_vector(5) <= 40);
 
 	/* Angular velocity. */
-	ocp.subjectTo(-M_PI_4 <= state_vector(10) <= M_PI_4);
-	ocp.subjectTo(-M_PI_4 <= state_vector(11) <= M_PI_4);
-	ocp.subjectTo(-M_PI_4 <= state_vector(12) <= M_PI_4);
+	ocp.subjectTo(-M_PI_2 <= state_vector(10) <= M_PI_2);
+	ocp.subjectTo(-M_PI_2 <= state_vector(11) <= M_PI_2);
+	ocp.subjectTo(-M_PI_2 <= state_vector(12) <= M_PI_2);
 
 	/* Control constraints. */
 	ocp.subjectTo(0.0 <= motor <= 19000.0);
