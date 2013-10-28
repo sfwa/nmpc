@@ -50,13 +50,13 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.wind_velocity() << 0, 0, 0;
 	s.gyro_bias() << 0, 0, 0;
 
-	std::cout << "state:\n" << s << std::endl << std::endl;
+	//std::cout << "state:\n" << s << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(x[i]); }
 
 	ControlVector c(4);
 	c << x[13], x[14], x[15], 0;
 
-	std::cout << "control:\n" << c << std::endl << std::endl;
+	//std::cout << "control:\n" << c << std::endl << std::endl;
 	for(i=0; i<4; i++) { AssertNotNaN(c[i]); }
 
 	/* Evaluate the dynamics model. */
@@ -64,7 +64,7 @@ void dynamics(double *x, double *f, void *user_data) {
 		static_cast<FixedWingFlightDynamicsModel *>(user_data);
 	AccelerationVector a = d->evaluate(s, c);
 
-	std::cout << "accel:\n" << a << std::endl << std::endl;
+	//std::cout << "accel:\n" << a << std::endl << std::endl;
 	for(i=0; i<6; i++) { AssertNotNaN(a[i]); }
 
 	/* Evaluate the process model using state and dynamics outputs. */
@@ -77,7 +77,7 @@ void dynamics(double *x, double *f, void *user_data) {
 	q.normalize();
 	dot.attitude() << q.vec(), q.w();
 
-	std::cout << "dot:\n" << dot << std::endl << std::endl;
+	//std::cout << "dot:\n" << dot << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(dot[i]); }
 
 	/* Copy results to output vector. */
@@ -109,13 +109,13 @@ int main()
 		2.59e-1, 0, -0.334e-1,
 		0, 1.47e-1, 0,
 		-0.334e-1, 0, 4.05e-1).finished());
-	dynamics_model.set_prop_coeffs(0.0246, 0.00300);
+	dynamics_model.set_prop_coeffs(0.025, 0.00250);
 	dynamics_model.set_lift_coeffs((Vector5r() <<
-		-0.208, -0.587, -0.004, 4.119, 0.143).finished());
+		-3.7, -5.4, 1.3, 1.7, 0.0).finished());
 	dynamics_model.set_drag_coeffs((Vector5r() <<
-		73.641, -5.365, -1.614, 0.153, 0.0176).finished());
+		0.11, 0.00075, 0.4, 0.025, 0.005).finished());
 	dynamics_model.set_side_coeffs((Vector4r() <<
-		0.220, 0.01, 0.0, 0.0).finished(),
+		-1.87e-03, 4.53e-04, -1.1e-02, 0.0).finished(),
 		(ControlVector(4) << 0.0, 0.0, 0.0, 0.0).finished());
 	dynamics_model.set_pitch_moment_coeffs(
 		(Vector2r() << -0.001, -0.014).finished(),
@@ -124,7 +124,7 @@ int main()
 		(Vector1r() << -0.002).finished(),
 		(ControlVector(4) << 0.0, -0.03, 0.03, 0.0).finished());
 	dynamics_model.set_yaw_moment_coeffs(
-		(Vector2r() << 0.0, -0.005).finished(),
+		(Vector2r() << 0, -0.005).finished(),
 		(ControlVector(4) << 0.0, 0.0, 0.0, 0.0).finished());
 	dynamics_model.set_motor_index(0);
 
@@ -156,13 +156,13 @@ int main()
 	Q(3, 3) = 1.0;
 	Q(4, 4) = 1.0;
 	Q(5, 5) = 1.0;
-	Q(6, 6) = 1.0;
-	Q(7, 7) = 1.0;
-	Q(8, 8) = 1.0;
-	Q(9, 9) = 1.0;
-	Q(10, 10) = 5.0;
-	Q(11, 11) = 5.0;
-	Q(12, 12) = 5.0;
+	Q(6, 6) = 0.0;
+	Q(7, 7) = 0.0;
+	Q(8, 8) = 0.0;
+	Q(9, 9) = 0.0;
+	Q(10, 10) = 1.0;
+	Q(11, 11) = 1.0;
+	Q(12, 12) = 1.0;
 
 	OCP ocp(0.0, HORIZON_LENGTH, 50);
 
@@ -174,9 +174,16 @@ int main()
 	ocp.subjectTo(f << flight_model(is));
 
 	/* Flight envelope constraints. */
-	ocp.subjectTo(-M_PI <= state_vector(10) <= M_PI);
-	ocp.subjectTo(-M_PI <= state_vector(11) <= M_PI);
-	ocp.subjectTo(-M_PI <= state_vector(12) <= M_PI);
+
+	/* Velocity. */
+	ocp.subjectTo(-40 <= state_vector(3) <= 40);
+	ocp.subjectTo(-40 <= state_vector(4) <= 40);
+	ocp.subjectTo(-40 <= state_vector(5) <= 40);
+
+	/* Angular velocity. */
+	ocp.subjectTo(-M_PI_4 <= state_vector(10) <= M_PI_4);
+	ocp.subjectTo(-M_PI_4 <= state_vector(11) <= M_PI_4);
+	ocp.subjectTo(-M_PI_4 <= state_vector(12) <= M_PI_4);
 
 	/* Control constraints. */
 	ocp.subjectTo(0.0 <= motor <= 19000.0);
