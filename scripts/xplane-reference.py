@@ -45,22 +45,9 @@ def convert_metric(fields, values):
 
 
 def euler_to_q(yaw, pitch, roll):
-    return (vectors.Q.rotate("Z", yaw) *
-            vectors.Q.rotate("Y", pitch) *
-            vectors.Q.rotate("X", roll))
-
-
-def ecef2ned(lat_ref, lng_ref, dx, dy, dz):
-    # dx, dy and dz are the offset from lat_ref/lng_ref to the desired point,
-    # in ECEF coordinates.
-    lat_ref = math.radians(lat_ref)
-    lng_ref = math.radians(lng_ref)
-
-    e = -1.0 * math.sin(lng_ref) * dx + math.cos(lng_ref) * dy
-    n = -1.0 * math.sin(lat_ref) * math.cos(lng_ref) * dx + -1.0 * math.sin(lat_ref) * math.sin(lng_ref) * dy + math.cos(lat_ref) * dz
-    u = math.cos(lat_ref) * math.cos(lng_ref) * dx + math.cos(lat_ref) * math.sin(lng_ref) * dy + math.sin(lat_ref) * dz
-
-    return (n, e, -u)
+    return (vectors.Q.rotate("X", -roll) *
+            vectors.Q.rotate("Y", -pitch) *
+            vectors.Q.rotate("Z", -yaw))
 
 
 # Load the data
@@ -84,10 +71,10 @@ for line in sys.stdin:
             math.radians(float(data["hding,_true"])),
             math.radians(float(data["pitch,__deg"])),
             math.radians(float(data["_roll,__deg"])))
-        velocity = ecef2ned(float(data["__lat,__deg"]), float(data["__lon,__deg"]),
+        velocity = (
+            -float(data["___vZ,__m/s"]),
             float(data["___vX,__m/s"]),
-            float(data["___vY,__m/s"]),
-            float(data["___vZ,__m/s"]))
+            -float(data["___vY,__m/s"]))
         out = [
             float(data["_real,_time"]) - initial_time,
             math.radians(float(data["__lat,__deg"])),

@@ -34,7 +34,7 @@ SOFTWARE.
 
 #define SIM_TIMESTEP	0.02
 #define SIM_LENGTH		10
-#define HORIZON_LENGTH	10
+#define HORIZON_LENGTH	1
 
 void dynamics(double *x, double *f, void *user_data) {
 	int i;
@@ -156,10 +156,10 @@ int main()
 	Q(3, 3) = 1.0;
 	Q(4, 4) = 1.0;
 	Q(5, 5) = 1.0;
-	Q(6, 6) = 2.0;
-	Q(7, 7) = 2.0;
-	Q(8, 8) = 2.0;
-	Q(9, 9) = 2.0;
+	Q(6, 6) = 1.0;
+	Q(7, 7) = 1.0;
+	Q(8, 8) = 1.0;
+	Q(9, 9) = 1.0;
 	Q(10, 10) = 1.0;
 	Q(11, 11) = 1.0;
 	Q(12, 12) = 1.0;
@@ -176,17 +176,17 @@ int main()
 	/* Flight envelope constraints. */
 
 	/* Velocity. */
-	ocp.subjectTo(-40 <= state_vector(3) <= 40);
-	ocp.subjectTo(-40 <= state_vector(4) <= 40);
-	ocp.subjectTo(-40 <= state_vector(5) <= 40);
+	ocp.subjectTo(-50 <= state_vector(3) <= 50);
+	ocp.subjectTo(-50 <= state_vector(4) <= 50);
+	ocp.subjectTo(-50 <= state_vector(5) <= 50);
 
 	/* Angular velocity. */
-	ocp.subjectTo(-M_PI_2 <= state_vector(10) <= M_PI_2);
-	ocp.subjectTo(-M_PI_2 <= state_vector(11) <= M_PI_2);
-	ocp.subjectTo(-M_PI_2 <= state_vector(12) <= M_PI_2);
+	ocp.subjectTo(-M_PI <= state_vector(10) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(11) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(12) <= M_PI);
 
 	/* Control constraints. */
-	ocp.subjectTo(0.0 <= motor <= 19000.0);
+	ocp.subjectTo(0.0 <= motor <= 40000.0);
 	ocp.subjectTo(-0.8 <= elevon <= 0.8);
 
 	/* Set up the simulation process. */
