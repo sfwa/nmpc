@@ -25,16 +25,17 @@ SOFTWARE.
 #include <acado_toolkit.hpp>
 #include <include/acado_gnuplot/gnuplot_window.hpp>
 
-#include "state.h"
-#include "dynamics.h"
-#include "integrator.h"
+#include "nmpc/state.h"
+#include "nmpc/dynamics.h"
+#include "nmpc/integrator.h"
+#include "nmpc/types.h"
 #include "debug.h"
 
 #include <iostream>
 
 #define SIM_TIMESTEP	0.02
 #define SIM_LENGTH		10
-#define HORIZON_LENGTH	1
+#define HORIZON_LENGTH	10
 
 void dynamics(double *x, double *f, void *user_data) {
 	int i;

@@ -8,12 +8,10 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 # Set default ExternalProject root directory
 SET_DIRECTORY_PROPERTIES(PROPERTIES EP_PREFIX .)
 
-SET(CMAKE_CXX_FLAGS "-O3")
-
-# Add ukf
+# Add eigen3.2
 ExternalProject_Add(
-ukf
-URL https://github.com/sfwa/ukf/archive/master.zip
+eigen3
+URL https://bitbucket.org/eigen/eigen/get/3.2.0.tar.gz
 TIMEOUT 30
 # Disable install step
 INSTALL_COMMAND ""
@@ -22,11 +20,10 @@ LOG_DOWNLOAD ON
 LOG_CONFIGURE ON
 LOG_BUILD ON)
 
-ExternalProject_Get_Property(ukf source_dir)
-SET(ukf_dir ${source_dir})
+ExternalProject_Get_Property(eigen3 source_dir)
+SET(eigen_dir ${source_dir})
 
-ExternalProject_Get_Property(ukf binary_dir)
-SET(ukf_lib_dir ${binary_dir})
+INCLUDE_DIRECTORIES(include ${eigen_dir})
 
 #
 # Prerequisites
@@ -38,11 +35,15 @@ FIND_PACKAGE(ACADO REQUIRED)
 #
 INCLUDE_DIRECTORIES(
 	include
-	${ACADO_INCLUDE_DIRS}
-	${ukf_dir}/include
-	${ukf_lib_dir}/src/eigen3)
+	${ACADO_INCLUDE_DIRS})
 
-ADD_LIBRARY(ukflib STATIC IMPORTED)
+ADD_LIBRARY(nmpclib STATIC
+	src/nmpc/state.cpp
+	src/nmpc/dynamics.cpp)
+
+ADD_DEPENDENCIES(nmpclib eigen3)
+
+ADD_SUBDIRECTORY(c EXCLUDE_FROM_ALL)
 
 #
 # Build an executable
@@ -52,5 +53,5 @@ ADD_EXECUTABLE(acado_nmpc
 TARGET_LINK_LIBRARIES(acado_nmpc ${ACADO_SHARED_LIBRARIES})
 SET_TARGET_PROPERTIES(acado_nmpc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-ADD_DEPENDENCIES(acado_nmpc ukf)
-TARGET_LINK_LIBRARIES(acado_nmpc ${ukf_lib_dir}/libukf.a)
+ADD_DEPENDENCIES(acado_nmpc nmpclib)
+TARGET_LINK_LIBRARIES(acado_nmpc nmpclib)
