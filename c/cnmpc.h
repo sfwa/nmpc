@@ -49,6 +49,8 @@ struct nmpc_state_t {
     real_t gyro_bias[3];
 };
 
+void nmpc_init();
+
 /* Functions for setting different parts of the state vector. */
 void nmpc_set_position(real_t lat, real_t lon, real_t alt);
 void nmpc_set_velocity(real_t x, real_t y, real_t z);

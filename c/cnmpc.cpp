@@ -38,6 +38,10 @@ static State current;
     IntegratorEuler integrator;
 #endif
 
+void nmpc_init() {
+    
+}
+
 void nmpc_set_position(real_t lat, real_t lon, real_t alt) {
     current.position() << lat, lon, alt;
 }
