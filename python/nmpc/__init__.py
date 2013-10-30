@@ -29,7 +29,7 @@ class _State(Structure):
 
 
 # Public interface
-def iterate(dt, control=None):
+def integrate(dt, control=None):
     global _cnmpc, state
 
     if not _cnmpc:
@@ -42,7 +42,7 @@ def iterate(dt, control=None):
                          _CONTROL_DIM)
 
     _cnmpc.nmpc_set_state(state)
-    _cnmpc.nmpc_iterate(dt, (_REAL_T * _CONTROL_DIM)(*control))
+    _cnmpc.nmpc_integrate(dt, (_REAL_T * _CONTROL_DIM)(*control))
     _cnmpc.nmpc_get_state(state)
 
 
