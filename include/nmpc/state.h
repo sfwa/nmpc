@@ -36,7 +36,6 @@ Contents are as follows:
     - Angular Velocity (3-vector, rad/s, body frame)
     - Angular Acceleration (3-vector, rad/s^2, body frame)
     - Wind Velocity (3-vector, m/s, NED frame)
-    - Gyro bias (3-vector, rad/s, body frame)
 */
 class State: public StateVector {
 public:
@@ -84,10 +83,6 @@ public:
         return segment<3>(19);
     }
 
-    const Vector3r gyro_bias() const {
-        return segment<3>(22);
-    }
-
     /* Mutable accessors */
     Eigen::VectorBlock<StateVector, 3> position() {
         return segment<3>(0);
@@ -115,10 +110,6 @@ public:
 
     Eigen::VectorBlock<StateVector, 3> wind_velocity() {
         return segment<3>(19);
-    }
-
-    Eigen::VectorBlock<StateVector, 3> gyro_bias() {
-        return segment<3>(22);
     }
 };
 

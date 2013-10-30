@@ -39,7 +39,7 @@ static State current;
 #endif
 
 void nmpc_init() {
-    
+
 }
 
 void nmpc_set_position(real_t lat, real_t lon, real_t alt) {
@@ -70,10 +70,6 @@ void nmpc_set_wind_velocity(real_t x, real_t y, real_t z) {
     current.wind_velocity() << x, y, z;
 }
 
-void nmpc_set_gyro_bias(real_t x, real_t y, real_t z) {
-    current.gyro_bias() << x, y, z;
-}
-
 void nmpc_get_state(struct nmpc_state_t *in) {
     in->position[0] = current.position()[0];
     in->position[1] = current.position()[1];
@@ -97,9 +93,6 @@ void nmpc_get_state(struct nmpc_state_t *in) {
     in->wind_velocity[0] = current.wind_velocity()[0];
     in->wind_velocity[1] = current.wind_velocity()[1];
     in->wind_velocity[2] = current.wind_velocity()[2];
-    in->gyro_bias[0] = current.gyro_bias()[0];
-    in->gyro_bias[1] = current.gyro_bias()[1];
-    in->gyro_bias[2] = current.gyro_bias()[2];
 }
 
 void nmpc_set_state(struct nmpc_state_t *in) {
@@ -125,10 +118,7 @@ void nmpc_set_state(struct nmpc_state_t *in) {
         in->angular_acceleration[2],
         in->wind_velocity[0],
         in->wind_velocity[1],
-        in->wind_velocity[2],
-        in->gyro_bias[0],
-        in->gyro_bias[1],
-        in->gyro_bias[2];
+        in->wind_velocity[2];
 }
 
 void nmpc_integrate(float dt, real_t control_vector[NMPC_CONTROL_DIM]) {

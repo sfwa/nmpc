@@ -46,7 +46,6 @@ struct nmpc_state_t {
     real_t angular_velocity[3];
     real_t angular_acceleration[3];
     real_t wind_velocity[3];
-    real_t gyro_bias[3];
 };
 
 void nmpc_init();
@@ -59,7 +58,6 @@ void nmpc_set_attitude(real_t w, real_t x, real_t y, real_t z);
 void nmpc_set_angular_velocity(real_t x, real_t y, real_t z);
 void nmpc_set_angular_acceleration(real_t x, real_t y, real_t z);
 void nmpc_set_wind_velocity(real_t x, real_t y, real_t z);
-void nmpc_set_gyro_bias(real_t x, real_t y, real_t z);
 
 /* Functions for getting the state vector and covariance. */
 void nmpc_set_state(struct nmpc_state_t *in);

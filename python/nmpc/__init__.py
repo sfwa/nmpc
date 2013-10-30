@@ -23,8 +23,7 @@ class _State(Structure):
             "attitude": tuple(self.attitude),
             "angular_velocity": tuple(self.angular_velocity),
             "angular_acceleration": tuple(self.angular_acceleration),
-            "wind_velocity": tuple(self.wind_velocity),
-            "gyro_bias": tuple(self.gyro_bias)
+            "wind_velocity": tuple(self.wind_velocity)
         }
         return str(fields)
 
@@ -109,8 +108,7 @@ def init(implementation="c"):
         ("attitude", _REAL_T * 4),
         ("angular_velocity", _REAL_T * 3),
         ("angular_acceleration", _REAL_T * 3),
-        ("wind_velocity", _REAL_T * 3),
-        ("gyro_bias", _REAL_T * 3)
+        ("wind_velocity", _REAL_T * 3)
     ]
 
     # Set up the function prototypes
@@ -134,9 +132,6 @@ def init(implementation="c"):
 
     _cnmpc.nmpc_set_wind_velocity.argtypes = [_REAL_T, _REAL_T, _REAL_T]
     _cnmpc.nmpc_set_wind_velocity.restype = None
-
-    _cnmpc.nmpc_set_gyro_bias.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_gyro_bias.restype = None
 
     _cnmpc.nmpc_get_state.argtypes = [POINTER(_State)]
     _cnmpc.nmpc_get_state.restype = None
