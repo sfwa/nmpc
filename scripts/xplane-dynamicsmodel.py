@@ -56,7 +56,7 @@ while 1:
            math.degrees(state.position[1]),
            state.position[2])
 
-    q = (state.attitude[3], -state.attitude[1], -state.attitude[2], -state.attitude[3])
+    q = (state.attitude[3], -state.attitude[0], -state.attitude[1], -state.attitude[2])
     yaw = math.atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] ** 2.0 + q[3] ** 2.0))
     pitch = math.asin(2.0 * (q[0] * q[2] - q[3] * q[1]))
     roll = math.atan2(2.0 * (q[0] * q[1] + q[2] * q[3]), 1.0 - 2.0 * (q[1] ** 2.0 + q[2] ** 2.0))
