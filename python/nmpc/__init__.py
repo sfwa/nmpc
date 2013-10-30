@@ -2,28 +2,16 @@ import os
 from ctypes import *
 
 
-# Taken from c/cukf.h
-UKF_PRECISION_FLOAT = 0
-UKF_PRECISION_DOUBLE = 1
-UKF_MODEL_NONE = 0
-UKF_MODEL_CENTRIPETAL = 1
-UKF_MODEL_FIXED_WING = 2
-
+# Taken from c/cnmpc.h
+NMPC_PRECISION_FLOAT = 0
+NMPC_PRECISION_DOUBLE = 1
 
 state = None
-covariance = None
-model = UKF_MODEL_NONE
-
 
 # Internal globals, set during init
-_cukf = None
+_cnmpc = None
 _REAL_T = None
 _CONTROL_DIM = None
-
-
-# Internal classes, wrapping cukf structs directly
-class _IOBoardParams(Structure):
-    pass
 
 
 class _State(Structure):

@@ -27,71 +27,50 @@ SOFTWARE.
 
 #include "cnmpc.h"
 
-static IOBoardModel model = IOBoardModel(
-    Quaternionr(1, 0, 0, 0),
-    Vector3r(0, 0, 0),
-    Quaternionr(1, 0, 0, 0),
-    Quaternionr(1, 0, 0, 0),
-    Vector3r(1, 0, 0));
-static UnscentedKalmanFilter ukf = UnscentedKalmanFilter(model);
-static CentripetalModel centripetal_model = CentripetalModel();
 static FixedWingFlightDynamicsModel fixed_wing_model =
     FixedWingFlightDynamicsModel();
+static State current;
+#if defined(NMPC_INTEGRATOR_RK4)
+    IntegratorRK4 integrator;
+#elif defined(NMPC_INTEGRATOR_HEUN)
+    IntegratorHeun integrator;
+#elif defined(NMPC_INTEGRATOR_EULER)
+    IntegratorEuler integrator;
+#endif
 
-void ukf_init(void) {
-
+void nmpc_set_position(real_t lat, real_t lon, real_t alt) {
+    current.position() << lat, lon, alt;
 }
 
-void ukf_set_position(real_t lat, real_t lon, real_t alt) {
-    State temp = ukf.get_state();
-    temp.position() << lat, lon, alt;
-    ukf.set_state(temp);
+void nmpc_set_velocity(real_t x, real_t y, real_t z) {
+    current.velocity() << x, y, z;
 }
 
-void ukf_set_velocity(real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.velocity() << x, y, z;
-    ukf.set_state(temp);
+void nmpc_set_acceleration(real_t x, real_t y, real_t z) {
+    current.acceleration() << x, y, z;
 }
 
-void ukf_set_acceleration(real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.acceleration() << x, y, z;
-    ukf.set_state(temp);
+void nmpc_set_attitude(real_t w, real_t x, real_t y, real_t z) {
+    current.attitude() << x, y, z, w;
 }
 
-void ukf_set_attitude(real_t w, real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.attitude() << x, y, z, w;
-    ukf.set_state(temp);
+void nmpc_set_angular_velocity(real_t x, real_t y, real_t z) {
+    current.angular_velocity() << x, y, z;
 }
 
-void ukf_set_angular_velocity(real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.angular_velocity() << x, y, z;
-    ukf.set_state(temp);
+void nmpc_set_angular_acceleration(real_t x, real_t y, real_t z) {
+    current.angular_acceleration() << x, y, z;
 }
 
-void ukf_set_angular_acceleration(real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.angular_acceleration() << x, y, z;
-    ukf.set_state(temp);
+void nmpc_set_wind_velocity(real_t x, real_t y, real_t z) {
+    current.wind_velocity() << x, y, z;
 }
 
-void ukf_set_wind_velocity(real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.wind_velocity() << x, y, z;
-    ukf.set_state(temp);
+void nmpc_set_gyro_bias(real_t x, real_t y, real_t z) {
+    current.gyro_bias() << x, y, z;
 }
 
-void ukf_set_gyro_bias(real_t x, real_t y, real_t z) {
-    State temp = ukf.get_state();
-    temp.gyro_bias() << x, y, z;
-    ukf.set_state(temp);
-}
-
-void ukf_get_state(struct ukf_state_t *in) {
-    State current = ukf.get_state();
+void nmpc_get_state(struct nmpc_state_t *in) {
     in->position[0] = current.position()[0];
     in->position[1] = current.position()[1];
     in->position[2] = current.position()[2];
@@ -119,9 +98,8 @@ void ukf_get_state(struct ukf_state_t *in) {
     in->gyro_bias[2] = current.gyro_bias()[2];
 }
 
-void ukf_set_state(struct ukf_state_t *in) {
-    State temp = ukf.get_state();
-    temp <<
+void nmpc_set_state(struct nmpc_state_t *in) {
+    current <<
         in->position[0],
         in->position[1],
         in->position[2],
@@ -147,177 +125,73 @@ void ukf_set_state(struct ukf_state_t *in) {
         in->gyro_bias[0],
         in->gyro_bias[1],
         in->gyro_bias[2];
-    ukf.set_state(temp);
 }
 
-void ukf_get_state_covariance(
-real_t state_covariance[UKF_STATE_DIM*UKF_STATE_DIM]) {
-    Eigen::Map<StateCovariance> covariance_map(state_covariance);
-    covariance_map = ukf.get_state_covariance();
+void nmpc_integrate(float dt, real_t control_vector[NMPC_CONTROL_DIM]) {
+    AccelerationVector temp = fixed_wing_model.evaluate(current, 
+        Eigen::Matrix<real_t, NMPC_CONTROL_DIM, 1>(control_vector));
+    current.acceleration() << temp.segment<3>(0);
+    current.angular_acceleration() << temp.segment<3>(3);
+    current = integrator.integrate(current, dt);
 }
 
-void ukf_sensor_clear() {
-    model.clear();
-}
-
-void ukf_sensor_set_accelerometer(real_t x, real_t y, real_t z) {
-    model.set_accelerometer(Vector3r(x, y, z));
-}
-
-void ukf_sensor_set_gyroscope(real_t x, real_t y, real_t z) {
-    model.set_gyroscope(Vector3r(x, y, z));
-}
-
-void ukf_sensor_set_magnetometer(real_t x, real_t y, real_t z) {
-    model.set_magnetometer(Vector3r(x, y, z));
-}
-
-void ukf_sensor_set_gps_position(real_t lat, real_t lon, real_t alt) {
-    model.set_gps_position(Vector3r(lat, lon, alt));
-}
-
-void ukf_sensor_set_gps_velocity(real_t x, real_t y, real_t z) {
-    model.set_gps_velocity(Vector3r(x, y, z));
-}
-
-void ukf_sensor_set_pitot_tas(real_t tas) {
-    model.set_pitot_tas(tas);
-}
-
-void ukf_sensor_set_barometer_amsl(real_t amsl) {
-    model.set_barometer_amsl(amsl);
-}
-
-void ukf_set_params(struct ukf_ioboard_params_t *in) {
-    model = IOBoardModel(
-        Quaternionr(
-            in->accel_orientation[3],
-            in->accel_orientation[0],
-            in->accel_orientation[1],
-            in->accel_orientation[2]),
-        Vector3r(
-            in->accel_offset[0],
-            in->accel_offset[1],
-            in->accel_offset[2]),
-        Quaternionr(
-            in->gyro_orientation[3],
-            in->gyro_orientation[0],
-            in->gyro_orientation[1],
-            in->gyro_orientation[2]),
-        Quaternionr(
-            in->mag_orientation[3],
-            in->mag_orientation[0],
-            in->mag_orientation[1],
-            in->mag_orientation[2]),
-        Vector3r(
-            in->mag_field[0],
-            in->mag_field[1],
-            in->mag_field[2]));
-
-    MeasurementVector covariance(17);
-    covariance <<
-        in->accel_covariance[0], in->accel_covariance[1],
-            in->accel_covariance[2],
-        in->gyro_covariance[0], in->gyro_covariance[1],
-            in->gyro_covariance[2],
-        in->mag_covariance[0], in->mag_covariance[1], in->mag_covariance[2],
-        in->gps_position_covariance[0], in->gps_position_covariance[1],
-            in->gps_position_covariance[2],
-        in->gps_velocity_covariance[0], in->gps_velocity_covariance[1],
-            in->gps_velocity_covariance[2],
-        in->pitot_covariance,
-        in->barometer_amsl_covariance;
-    model.set_covariance(covariance);
-}
-
-void ukf_choose_dynamics(enum ukf_model_t t) {
-    switch(t) {
-        case UKF_MODEL_NONE:
-            ukf.set_dynamics_model((DynamicsModel *)NULL);
-            break;
-        case UKF_MODEL_CENTRIPETAL:
-            ukf.set_dynamics_model(&centripetal_model);
-            break;
-        case UKF_MODEL_FIXED_WING:
-            ukf.set_dynamics_model(&fixed_wing_model);
-            break;
-    }
-}
-
-void ukf_iterate(float dt, real_t control_vector[UKF_CONTROL_DIM]) {
-    ukf.iterate(dt,
-        Eigen::Matrix<real_t, UKF_CONTROL_DIM, 1>(control_vector));
-}
-
-void ukf_set_process_noise(real_t process_noise_covariance[UKF_STATE_DIM]) {
-    Eigen::Map< Eigen::Matrix<real_t, UKF_STATE_DIM, 1> > covariance_map =
-        Eigen::Map< Eigen::Matrix<real_t, UKF_STATE_DIM, 1>
-            >(process_noise_covariance);
-    ProcessCovariance covariance = covariance_map;
-    ukf.set_process_noise(covariance);
-}
-
-void ukf_fixedwingdynamics_set_mass(real_t mass) {
+void nmpc_fixedwingdynamics_set_mass(real_t mass) {
     fixed_wing_model.set_mass(mass);
 }
 
-void ukf_fixedwingdynamics_set_inertia_tensor(real_t inertia_tensor[9]) {
+void nmpc_fixedwingdynamics_set_inertia_tensor(real_t inertia_tensor[9]) {
     fixed_wing_model.set_inertia_tensor(Matrix3x3r(inertia_tensor));
 }
 
-void ukf_fixedwingdynamics_set_prop_coeffs(real_t in_prop_area,
+void nmpc_fixedwingdynamics_set_prop_coeffs(real_t in_prop_area,
 real_t in_prop_cve){
     fixed_wing_model.set_prop_coeffs(in_prop_area, in_prop_cve);
 }
 
-void ukf_fixedwingdynamics_set_drag_coeffs(real_t coeffs[5]) {
+void nmpc_fixedwingdynamics_set_drag_coeffs(real_t coeffs[5]) {
     fixed_wing_model.set_drag_coeffs(Vector5r(coeffs));
 }
 
-void ukf_fixedwingdynamics_set_lift_coeffs(real_t coeffs[5]) {
+void nmpc_fixedwingdynamics_set_lift_coeffs(real_t coeffs[5]) {
     fixed_wing_model.set_lift_coeffs(Vector5r(coeffs));
 }
 
-void ukf_fixedwingdynamics_set_side_coeffs(real_t coeffs[4],
-real_t control[UKF_CONTROL_DIM]) {
+void nmpc_fixedwingdynamics_set_side_coeffs(real_t coeffs[4],
+real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_side_coeffs(Vector4r(coeffs),
         Vector4r(control));
 }
 
-void ukf_fixedwingdynamics_set_pitch_moment_coeffs(real_t coeffs[2],
-real_t control[UKF_CONTROL_DIM]) {
+void nmpc_fixedwingdynamics_set_pitch_moment_coeffs(real_t coeffs[2],
+real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_pitch_moment_coeffs(Vector2r(coeffs),
         Vector4r(control));
 }
 
-void ukf_fixedwingdynamics_set_roll_moment_coeffs(real_t coeffs[1],
-real_t control[UKF_CONTROL_DIM]) {
+void nmpc_fixedwingdynamics_set_roll_moment_coeffs(real_t coeffs[1],
+real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_roll_moment_coeffs(Vector1r(coeffs),
         Vector4r(control));
 }
 
-void ukf_fixedwingdynamics_set_yaw_moment_coeffs(real_t coeffs[2],
-real_t control[UKF_CONTROL_DIM]) {
+void nmpc_fixedwingdynamics_set_yaw_moment_coeffs(real_t coeffs[2],
+real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_yaw_moment_coeffs(Vector2r(coeffs),
         Vector4r(control));
 }
 
-uint32_t ukf_config_get_state_dim() {
-    return UKF_STATE_DIM;
+uint32_t nmpc_config_get_state_dim() {
+    return NMPC_STATE_DIM;
 }
 
-uint32_t ukf_config_get_measurement_dim() {
-    return UKF_MEASUREMENT_DIM;
+uint32_t nmpc_config_get_control_dim() {
+    return NMPC_CONTROL_DIM;
 }
 
-uint32_t ukf_config_get_control_dim() {
-    return UKF_CONTROL_DIM;
-}
-
-enum ukf_precision_t ukf_config_get_precision() {
-#ifdef UKF_SINGLE_PRECISION
-    return UKF_PRECISION_FLOAT;
+enum nmpc_precision_t nmpc_config_get_precision() {
+#ifdef NMPC_SINGLE_PRECISION
+    return NMPC_PRECISION_FLOAT;
 #else
-    return UKF_PRECISION_DOUBLE;
+    return NMPC_PRECISION_DOUBLE;
 #endif
 }

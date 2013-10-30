@@ -5,6 +5,6 @@ INCLUDE_DIRECTORIES(../include)
 
 ADD_LIBRARY(cnmpc SHARED cnmpc.cpp)
 
-ADD_DEPENDENCIES(cnmpc nmpc)
+ADD_DEPENDENCIES(cnmpc nmpclib)
 
-TARGET_LINK_LIBRARIES(cnmpc nmpc)
+TARGET_LINK_LIBRARIES(cnmpc nmpclib)
