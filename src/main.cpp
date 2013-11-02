@@ -46,17 +46,18 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.velocity() << x[3], x[4], x[5];
 	s.acceleration() << 0, 0, 0;
 	s.attitude() << x[6], x[7], x[8], x[9];
+	Quaternionr q_1(s.attitude());
+	q_1.normalize();
+	s.attitude() << q_1.vec(), q_1.w();
 	s.angular_velocity() << x[10], x[11], x[12];
 	s.angular_acceleration() << 0, 0, 0;
 	s.wind_velocity() << 0, 0, 0;
 
-	//std::cout << "state:\n" << s << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(x[i]); }
 
 	ControlVector c(4);
 	c << x[13], x[14], x[15], 0;
 
-	//std::cout << "control:\n" << c << std::endl << std::endl;
 	for(i=0; i<4; i++) { AssertNotNaN(c[i]); }
 
 	/* Evaluate the dynamics model. */
@@ -64,8 +65,13 @@ void dynamics(double *x, double *f, void *user_data) {
 		static_cast<FixedWingFlightDynamicsModel *>(user_data);
 	AccelerationVector a = d->evaluate(s, c);
 
-	//std::cout << "accel:\n" << a << std::endl << std::endl;
-	for(i=0; i<6; i++) { AssertNotNaN(a[i]); }
+	for(i=0; i<6; i++) {
+		AssertNotNaN(a[i]);
+		if(abs(a[i]) > 50) {
+			std::cout << "state:\n" << s << std::endl << std::endl;
+			std::cout << "accel:\n" << a << std::endl << std::endl;
+		}
+	}
 
 	/* Evaluate the process model using state and dynamics outputs. */
 	s.acceleration() << a[0], a[1], a[2];
@@ -73,11 +79,10 @@ void dynamics(double *x, double *f, void *user_data) {
 
 	IntegratorRK4 integrator;
 	State dot = integrator.integrate(s, SIM_TIMESTEP);
-	Quaternionr q(dot.attitude());
-	q.normalize();
-	dot.attitude() << q.vec(), q.w();
+	Quaternionr q_2(dot.attitude());
+	q_2.normalize();
+	dot.attitude() << q_2.vec(), q_2.w();
 
-	//std::cout << "dot:\n" << dot << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(dot[i]); }
 
 	/* Copy results to output vector. */
@@ -111,12 +116,12 @@ int main()
 		-0.334e-1, 0, 4.05e-1).finished());
 	dynamics_model.set_prop_coeffs(0.025, 0.00250);
 	dynamics_model.set_lift_coeffs((Vector5r() <<
-		-3.7, -5.4, 1.3, 1.7, 0.0).finished());
+		-3.7, -5.4, 1.3, 1.7, 0.05).finished());
 	dynamics_model.set_drag_coeffs((Vector5r() <<
 		0.11, 0.00075, 0.4, 0.025, 0.005).finished());
 	dynamics_model.set_side_coeffs((Vector4r() <<
-		-1.87e-03, 4.53e-04, -1.1e-02, 0.0).finished(),
-		(ControlVector(4) << 0.0, 0.0, 0.0, 0.0).finished());
+		0, 2.35e-01, -1.87e-03, 4.53e-04).finished(),
+		(ControlVector(4) << 0.0, 1.1e-02, -1.1e-02, 0.0).finished());
 	dynamics_model.set_pitch_moment_coeffs(
 		(Vector2r() << -0.001, -0.014).finished(),
 		(ControlVector(4) << 0.0, -0.03, -0.03, 0.0).finished());
