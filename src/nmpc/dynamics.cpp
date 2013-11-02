@@ -83,11 +83,10 @@ const State &in, const ControlVector &control) const {
     v = airflow.norm();
 
     if (v < NMPC_DYNAMICS_MIN_V) {
-        /* Airflow too slow for any of this to work */
+        /* Airflow too slow or too fast for any of this to work */
         AccelerationVector output;
         output.segment<3>(0) = attitude * Vector3r(0, 0, G_ACCEL);
         output.segment<3>(3) << 0, 0, 0;
-        return output;
     }
 
     v_inv = (real_t)1.0 / v;
@@ -112,11 +111,16 @@ const State &in, const ControlVector &control) const {
     real_t lift = alpha_coeffs.dot(c_lift_alpha),
            drag = alpha_coeffs.dot(c_drag_alpha);
 
+    /*
+    Assume lift is somewhat well-behaved for alpha in the range [-0.25, 0.25].
+    If outside that range, clamp it to 0 so that the polynomial doesn't have
+    to model the full possible range.
+    */
     if (std::abs(alpha) > 1.0) {
         lift = 0.0;
-    } else if (alpha > 0.0) {
+    } else if (alpha > 0.25) {
         lift = std::max(lift, 0.0);
-    } else if (alpha < 0.0) {
+    } else if (alpha < -0.25) {
         lift = std::min(lift, 0.0);
     }
 

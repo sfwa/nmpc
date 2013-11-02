@@ -12,7 +12,7 @@ SET_DIRECTORY_PROPERTIES(PROPERTIES EP_PREFIX .)
 ExternalProject_Add(
 eigen3
 URL https://bitbucket.org/eigen/eigen/get/3.2.0.tar.gz
-TIMEOUT 30
+TIMEOUT 300
 # Disable install step
 INSTALL_COMMAND ""
 # Wrap download, configure and build steps in a script to log output

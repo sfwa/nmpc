@@ -40,7 +40,7 @@ TIMESTEP = 1.0/50.0  # 50Hz updates.
 _cnmpc.nmpc_set_position(math.radians(-37.8136), math.radians(144.9), 200)
 _cnmpc.nmpc_set_velocity(20, 0, 0)
 _cnmpc.nmpc_set_acceleration(0, 0, 0)
-_cnmpc.nmpc_set_attitude(1, 0, 0, 0)
+_cnmpc.nmpc_set_attitude(0.707, 0.707, 0, 0)
 _cnmpc.nmpc_set_angular_velocity(0, 0, 0)
 _cnmpc.nmpc_set_angular_acceleration(0, 0, 0)
 _cnmpc.nmpc_set_wind_velocity(0, 0, 0)
