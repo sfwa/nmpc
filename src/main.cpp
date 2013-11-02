@@ -34,7 +34,7 @@ SOFTWARE.
 #include <iostream>
 
 #define SIM_TIMESTEP	0.02
-#define SIM_LENGTH		10
+#define SIM_LENGTH		27
 #define HORIZON_LENGTH	10
 
 void dynamics(double *x, double *f, void *user_data) {
@@ -67,7 +67,7 @@ void dynamics(double *x, double *f, void *user_data) {
 
 	for(i=0; i<6; i++) {
 		AssertNotNaN(a[i]);
-		if(abs(a[i]) > 50) {
+		if(abs(a[i]) > 80) {
 			std::cout << "state:\n" << s << std::endl << std::endl;
 			std::cout << "accel:\n" << a << std::endl << std::endl;
 		}
@@ -120,13 +120,13 @@ int main()
 	dynamics_model.set_lift_coeffs((Vector5r() <<
 		-3.7, -5.4, 1.3, 1.7, 0.05).finished());
 	dynamics_model.set_drag_coeffs((Vector5r() <<
-		0.11, 0.00075, 0.4, 0.025, 0.005).finished());
+		0.0, 0.0, 0.2, 0.0, 0.05).finished());
 	dynamics_model.set_side_coeffs((Vector4r() <<
 		0, 2.35e-01, -1.87e-03, 4.53e-04).finished(),
 		(ControlVector(4) << 0.0, 1.1e-02, -1.1e-02, 0.0).finished());
 	dynamics_model.set_pitch_moment_coeffs(
-		(Vector2r() << -0.001, -0.014).finished(),
-		(ControlVector(4) << 0.0, -0.003, -0.003, 0.0).finished());
+		(Vector2r() << -0.01, -0.0018).finished(),
+		(ControlVector(4) << 0.0, -0.001, -0.001, 0.0).finished());
 	dynamics_model.set_roll_moment_coeffs(
 		(Vector1r() << -0.002).finished(),
 		(ControlVector(4) << 0.0, -0.003, 0.003, 0.0).finished());
@@ -197,9 +197,9 @@ int main()
 	ocp.subjectTo(-80 <= state_vector(8) <= 80);
 
 	/* Angular acceleration. */
-	ocp.subjectTo(-10 <= state_vector(16) <= 10);
-	ocp.subjectTo(-10 <= state_vector(17) <= 10);
-	ocp.subjectTo(-10 <= state_vector(18) <= 10);
+	ocp.subjectTo(-30 <= state_vector(16) <= 30);
+	ocp.subjectTo(-30 <= state_vector(17) <= 30);
+	ocp.subjectTo(-30 <= state_vector(18) <= 30);
 
 	/* Angular velocity. */
 	ocp.subjectTo(-M_PI <= state_vector(13) <= M_PI);
@@ -207,8 +207,8 @@ int main()
 	ocp.subjectTo(-M_PI <= state_vector(15) <= M_PI);
 
 	/* Control constraints. */
-	ocp.subjectTo(0.0 <= motor <= 40000.0);
-	ocp.subjectTo(-0.8 <= elevon <= 0.8);
+	ocp.subjectTo(0.0 <= motor <= 100000.0);
+	ocp.subjectTo(-1.0 <= elevon <= 1.0);
 
 	/* Set up the simulation process. */
 	OutputFcn identity;
@@ -283,10 +283,10 @@ int main()
 	xplane_fn << state_vector(0);
 	xplane_fn << state_vector(1);
 	xplane_fn << state_vector(2);
-	xplane_fn << state_vector(6);
-	xplane_fn << state_vector(7);
-	xplane_fn << state_vector(8);
 	xplane_fn << state_vector(9);
+	xplane_fn << state_vector(10);
+	xplane_fn << state_vector(11);
+	xplane_fn << state_vector(12);
 	VariablesGrid xplane_out;
 	xplane_fn.evaluate(&diffStates, NULL, NULL, NULL, NULL, &xplane_out);
 	Grid xplane_grid(0.0, SIM_LENGTH-SIM_TIMESTEP, SIM_LENGTH / SIM_TIMESTEP);
