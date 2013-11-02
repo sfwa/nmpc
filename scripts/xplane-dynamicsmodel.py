@@ -30,7 +30,7 @@ nmpc.configure_airframe(
     drag_coeffs=[0.11, 0.00075, 0.4, 0.025, 0.005],
     lift_coeffs=[-3.7, -5.4, 1.3, 1.7, 0.05],
     side_coeffs=[
-        0, -2.35e-01, -1.87e-03, 4.53e-04,
+        0, 2.35e-01, -1.87e-03, 4.53e-04,
         0.0, 1.1e-02, -1.1e-02, 0.0],
     pitch_moment_coeffs=[-0.001, -0.014, 0.0, -0.03, -0.03, 0.0],
     roll_moment_coeffs=[-0.002, 0.0, -0.03, 0.03, 0.0],
@@ -40,13 +40,13 @@ TIMESTEP = 1.0/50.0  # 50Hz updates.
 _cnmpc.nmpc_set_position(math.radians(-37.8136), math.radians(144.9), 200)
 _cnmpc.nmpc_set_velocity(20, 0, 0)
 _cnmpc.nmpc_set_acceleration(0, 0, 0)
-_cnmpc.nmpc_set_attitude(0.707, 0.707, 0, 0)
+_cnmpc.nmpc_set_attitude(1, 0, 0, 0)
 _cnmpc.nmpc_set_angular_velocity(0, 0, 0)
 _cnmpc.nmpc_set_angular_acceleration(0, 0, 0)
 _cnmpc.nmpc_set_wind_velocity(0, 0, 0)
 _cnmpc.nmpc_get_state(state)
 
-control_vec = [0, 0, 0, 0]
+control_vec = [10000, 0, 0, 0]
 
 while 1:
     nmpc.integrate(TIMESTEP, (ctypes.c_double * 4)(*control_vec))

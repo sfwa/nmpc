@@ -49,7 +49,6 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.angular_velocity() << x[10], x[11], x[12];
 	s.angular_acceleration() << 0, 0, 0;
 	s.wind_velocity() << 0, 0, 0;
-	s.gyro_bias() << 0, 0, 0;
 
 	//std::cout << "state:\n" << s << std::endl << std::endl;
 	for(i=0; i<13; i++) { AssertNotNaN(x[i]); }
