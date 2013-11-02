@@ -8,6 +8,14 @@ import nmpc
 nmpc.init()
 from nmpc import _cnmpc, state
 
+import pygame
+pygame.init()
+
+pygame.joystick.init()
+print pygame.joystick.get_count()
+joystick = pygame.joystick.Joystick(0)
+joystick.init()
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(('127.0.0.1', 51000))
 sock.sendall("sub sim/operation/override/override_planepath\n")
@@ -27,13 +35,13 @@ nmpc.configure_airframe(
         0, 1.47e-1, 0,
         -0.334e-1, 0, 4.05e-1],
     prop_coeffs=[0.025, 0.00250],
-    drag_coeffs=[0.11, 0.00075, 0.4, 0.025, 0.005],
+    drag_coeffs=[0.0, 0.0, 0.2, 0.0, 0.05],
     lift_coeffs=[-3.7, -5.4, 1.3, 1.7, 0.05],
     side_coeffs=[
         0, 2.35e-01, -1.87e-03, 4.53e-04,
         0.0, 1.1e-02, -1.1e-02, 0.0],
-    pitch_moment_coeffs=[-0.001, -0.014, 0.0, -0.03, -0.03, 0.0],
-    roll_moment_coeffs=[-0.002, 0.0, -0.03, 0.03, 0.0],
+    pitch_moment_coeffs=[-0.01, -0.0018, 0.0, -0.001, -0.001, 0.0],
+    roll_moment_coeffs=[-0.002, 0.0, -0.003, 0.003, 0.0],
     yaw_moment_coeffs=[0, -0.005, 0.0, 0.0, 0.0, 0.0])
 
 TIMESTEP = 1.0/50.0  # 50Hz updates.
@@ -46,9 +54,19 @@ _cnmpc.nmpc_set_angular_acceleration(0, 0, 0)
 _cnmpc.nmpc_set_wind_velocity(0, 0, 0)
 _cnmpc.nmpc_get_state(state)
 
-control_vec = [10000, 0, 0, 0]
+control_vec = [0, 0, 0, 0]
 
 while 1:
+    keys = pygame.event.get()
+    axes = [joystick.get_axis(i) for i in range(joystick.get_numaxes())]
+    axes[0] = -2.0*(axes[0]+0.239)
+    axes[1] = -2.0*(axes[1]+0.239)
+    control_vec = [
+        (-(axes[3] - 0.35) * 0.8) * 19000,
+        axes[1] + axes[0],
+        axes[1] - axes[0],
+        0]
+
     nmpc.integrate(TIMESTEP, (ctypes.c_double * 4)(*control_vec))
 
     update = "world-set %.9f %.9f %.9f\n" \
@@ -56,6 +74,7 @@ while 1:
            math.degrees(state.position[1]),
            state.position[2])
 
+    print repr(state)
     q = (state.attitude[3], -state.attitude[0], -state.attitude[1], -state.attitude[2])
     yaw = math.atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] ** 2.0 + q[3] ** 2.0))
     pitch = math.asin(2.0 * (q[0] * q[2] - q[3] * q[1]))
