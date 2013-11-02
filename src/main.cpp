@@ -45,18 +45,18 @@ void dynamics(double *x, double *f, void *user_data) {
 	s.position() << x[0], x[1], x[2];
 	s.velocity() << x[3], x[4], x[5];
 	s.acceleration() << 0, 0, 0;
-	s.attitude() << x[6], x[7], x[8], x[9];
+	s.attitude() << x[9], x[10], x[11], x[12];
 	Quaternionr q_1(s.attitude());
 	q_1.normalize();
 	s.attitude() << q_1.vec(), q_1.w();
-	s.angular_velocity() << x[10], x[11], x[12];
+	s.angular_velocity() << x[13], x[14], x[15];
 	s.angular_acceleration() << 0, 0, 0;
 	s.wind_velocity() << 0, 0, 0;
 
-	for(i=0; i<13; i++) { AssertNotNaN(x[i]); }
+	for(i=0; i<19; i++) { AssertNotNaN(x[i]); }
 
 	ControlVector c(4);
-	c << x[13], x[14], x[15], 0;
+	c << x[19], x[20], x[21], 0;
 
 	for(i=0; i<4; i++) { AssertNotNaN(c[i]); }
 
@@ -83,13 +83,15 @@ void dynamics(double *x, double *f, void *user_data) {
 	q_2.normalize();
 	dot.attitude() << q_2.vec(), q_2.w();
 
-	for(i=0; i<13; i++) { AssertNotNaN(dot[i]); }
+	for(i=0; i<19; i++) { AssertNotNaN(dot[i]); }
 
 	/* Copy results to output vector. */
 	for(i=0; i<3; ++i) f[i] = dot.position()[i];
 	for(i=0; i<3; ++i) f[i+3] = dot.velocity()[i];
-	for(i=0; i<4; ++i) f[i+6] = dot.attitude()[i];
-	for(i=0; i<3; ++i) f[i+10] = dot.angular_velocity()[i];
+	for(i=0; i<3; ++i) f[i+6] = dot.acceleration()[i];
+	for(i=0; i<4; ++i) f[i+9] = dot.attitude()[i];
+	for(i=0; i<3; ++i) f[i+13] = dot.angular_velocity()[i];
+	for(i=0; i<3; ++i) f[i+16] = dot.angular_acceleration()[i];
 }
 
 int main()
@@ -99,7 +101,7 @@ int main()
 	int i;
 
 	/* State vector. */
-	DifferentialState state_vector(13);
+	DifferentialState state_vector(19);
 
 	/* Control vector. */
 	Control motor;
@@ -124,34 +126,43 @@ int main()
 		(ControlVector(4) << 0.0, 1.1e-02, -1.1e-02, 0.0).finished());
 	dynamics_model.set_pitch_moment_coeffs(
 		(Vector2r() << -0.001, -0.014).finished(),
-		(ControlVector(4) << 0.0, -0.03, -0.03, 0.0).finished());
+		(ControlVector(4) << 0.0, -0.003, -0.003, 0.0).finished());
 	dynamics_model.set_roll_moment_coeffs(
 		(Vector1r() << -0.002).finished(),
-		(ControlVector(4) << 0.0, -0.03, 0.03, 0.0).finished());
+		(ControlVector(4) << 0.0, -0.003, 0.003, 0.0).finished());
 	dynamics_model.set_yaw_moment_coeffs(
 		(Vector2r() << 0, -0.005).finished(),
 		(ControlVector(4) << 0.0, 0.0, 0.0, 0.0).finished());
 	dynamics_model.set_motor_index(0);
 
 	/* Combine the above vectors into one to pass to the dynamics function. */
-	IntermediateState is(16);
+	IntermediateState is(22);
 
-	for(i=0; i<3; ++i) is(i) = state_vector(i);
-	for(i=0; i<3; ++i) is(i+3) = state_vector(i+3);
-	for(i=0; i<4; ++i) is(i+6) = state_vector(i+6);
-	for(i=0; i<3; ++i) is(i+10) = state_vector(i+10);
-	is(13) = motor;
-	for(i=0; i<2; ++i) is(i+14) = elevon(i);
+	for(i=0; i<19; ++i) is(i) = state_vector(i);
+	is(19) = motor;
+	for(i=0; i<2; ++i) is(i+20) = elevon(i);
 
 	/* Define the differential equation. */
-	CFunction flight_model(13, dynamics);
+	CFunction flight_model(19, dynamics);
 	flight_model.setUserData(&dynamics_model);
 	DiscretizedDifferentialEquation f(SIM_TIMESTEP);
 
 	/* Define the optimal control problem. */
 	Function h;
 
-	h << state_vector;
+	h << state_vector(0);
+	h << state_vector(1);
+	h << state_vector(2);
+	h << state_vector(3);
+	h << state_vector(4);
+	h << state_vector(5);
+	h << state_vector(9);
+	h << state_vector(10);
+	h << state_vector(11);
+	h << state_vector(12);
+	h << state_vector(13);
+	h << state_vector(14);
+	h << state_vector(15);
 
 	/* Least-squares weighting matrix. */
 	Matrix Q = zeros(13, 13);
@@ -180,15 +191,20 @@ int main()
 
 	/* Flight envelope constraints. */
 
-	/* Velocity. */
-	ocp.subjectTo(-50 <= state_vector(3) <= 50);
-	ocp.subjectTo(-50 <= state_vector(4) <= 50);
-	ocp.subjectTo(-50 <= state_vector(5) <= 50);
+	/* Acceleration. */
+	ocp.subjectTo(-80 <= state_vector(6) <= 80);
+	ocp.subjectTo(-80 <= state_vector(7) <= 80);
+	ocp.subjectTo(-80 <= state_vector(8) <= 80);
+
+	/* Angular acceleration. */
+	ocp.subjectTo(-10 <= state_vector(16) <= 10);
+	ocp.subjectTo(-10 <= state_vector(17) <= 10);
+	ocp.subjectTo(-10 <= state_vector(18) <= 10);
 
 	/* Angular velocity. */
-	ocp.subjectTo(-M_PI <= state_vector(10) <= M_PI);
-	ocp.subjectTo(-M_PI <= state_vector(11) <= M_PI);
-	ocp.subjectTo(-M_PI <= state_vector(12) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(13) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(14) <= M_PI);
+	ocp.subjectTo(-M_PI <= state_vector(15) <= M_PI);
 
 	/* Control constraints. */
 	ocp.subjectTo(0.0 <= motor <= 40000.0);
@@ -212,8 +228,23 @@ int main()
 	/* Initialise and run the simulation. */
 	SimulationEnvironment sim(0.0, SIM_LENGTH, process, controller);
 
-	Vector x0(13);
-	x0 = ref_data.getFirstVector();
+	Vector r0(13);
+	r0 = ref_data.getFirstVector();
+	Vector x0(19);
+	x0.setZero();
+	x0(0) = r0(0);
+	x0(1) = r0(1);
+	x0(2) = r0(2);
+	x0(3) = r0(3);
+	x0(4) = r0(4);
+	x0(5) = r0(5);
+	x0(9) = r0(6);
+	x0(10) = r0(7);
+	x0(11) = r0(8);
+	x0(12) = r0(9);
+	x0(13) = r0(10);
+	x0(14) = r0(11);
+	x0(15) = r0(12);
 	sim.init(x0);
 	sim.run();
 
