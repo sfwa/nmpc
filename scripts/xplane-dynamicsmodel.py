@@ -79,11 +79,11 @@ while 1:
     axes[1] = -2.0*(axes[1]+0.239)
     control_vec = [
         (-(axes[3] - 0.35) * 0.8) * 19000,
-        axes[1] + axes[0],
         axes[1] - axes[0],
+        axes[1] + axes[0],
         0]
 
-    control_vec = [0, 0, 0, 0]
+    #control_vec = [0, 0, 0, 0]
 
     nmpc.integrate(TIMESTEP, (ctypes.c_double * 4)(*control_vec))
 
