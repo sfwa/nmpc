@@ -52,7 +52,7 @@ def euler_to_q(yaw, pitch, roll):
 
 # Load the data
 headers = None
-time_initialised = False
+initialised = False
 initial_time = 0.0
 
 # Load all the X-Plane data in one go
@@ -64,9 +64,13 @@ for line in sys.stdin:
         headers = fields
     else:
         data = values_to_dict(headers, fields)
-        if not time_initialised:
+        if not initialised:
             initial_time = float(data["_real,_time"])
-            time_initialised = True
+            position_offset = [
+                float(data["____X,____m"]),
+                float(data["____Y,____m"]),
+                float(data["____Z,____m"])]
+            initialised = True
         attitude = euler_to_q(
             math.radians(float(data["hding,_true"])),
             math.radians(float(data["pitch,__deg"])),
@@ -77,9 +81,9 @@ for line in sys.stdin:
             -float(data["___vY,__m/s"]))
         out = [
             float(data["_real,_time"]) - initial_time,
-            math.radians(float(data["__lat,__deg"])),
-            math.radians(float(data["__lon,__deg"])),
-            float(data["__alt,ftmsl"]) * 0.3048,
+            -(float(data["____Z,____m"]) - position_offset[2]),
+            (float(data["____X,____m"]) - position_offset[0]),
+            -(float(data["____Y,____m"]) - position_offset[1]),
             velocity[0],
             velocity[1],
             velocity[2],

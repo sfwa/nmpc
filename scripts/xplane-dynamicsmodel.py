@@ -44,8 +44,23 @@ nmpc.configure_airframe(
     roll_moment_coeffs=[-0.002, 0.0, -0.003, 0.003, 0.0],
     yaw_moment_coeffs=[0, -0.005, 0.0, 0.0, 0.0, 0.0])
 
+sock.recv(1024)
+sock.sendall("world-set -37.8136 144.9 200\n")
+position_offset = [0, 0, 0]
+time.sleep(1.0)
+response = sock.recv(1024)
+for line in response.split("\n"):
+    if line.find("local_x") >= 0:
+        position_offset[1] = float(line.split(" ")[-1])
+    elif line.find("local_y") >= 0:
+        position_offset[2] = -float(line.split(" ")[-1])
+    elif line.find("local_z") >= 0:
+        position_offset[0] = -float(line.split(" ")[-1])
+
+print position_offset
+
 TIMESTEP = 1.0/50.0  # 50Hz updates.
-_cnmpc.nmpc_set_position(math.radians(-37.8136), math.radians(144.9), 200)
+_cnmpc.nmpc_set_position(0, 0, 0)
 _cnmpc.nmpc_set_velocity(20, 0, 0)
 _cnmpc.nmpc_set_acceleration(0, 0, 0)
 _cnmpc.nmpc_set_attitude(1, 0, 0, 0)
@@ -57,6 +72,7 @@ _cnmpc.nmpc_get_state(state)
 control_vec = [0, 0, 0, 0]
 
 while 1:
+
     keys = pygame.event.get()
     axes = [joystick.get_axis(i) for i in range(joystick.get_numaxes())]
     axes[0] = -2.0*(axes[0]+0.239)
@@ -67,12 +83,17 @@ while 1:
         axes[1] - axes[0],
         0]
 
+    control_vec = [0, 0, 0, 0]
+
     nmpc.integrate(TIMESTEP, (ctypes.c_double * 4)(*control_vec))
 
-    update = "world-set %.9f %.9f %.9f\n" \
-        % (math.degrees(state.position[0]),
-           math.degrees(state.position[1]),
-           state.position[2])
+    update = ""
+    update += "set sim/flightmodel/position/local_x %.9f\n" \
+        % (state.position[1] + position_offset[1])
+    update += "set sim/flightmodel/position/local_y %.9f\n" \
+        % -(state.position[2] + position_offset[2])
+    update += "set sim/flightmodel/position/local_z %.9f\n" \
+        % -(state.position[0] + position_offset[0])
 
     print repr(state)
     q = (state.attitude[3], -state.attitude[0], -state.attitude[1], -state.attitude[2])

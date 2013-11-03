@@ -28,7 +28,7 @@ SOFTWARE.
 /*
 Definition for filter state vector.
 Contents are as follows:
-    - Position (3-vector, latitude (rad), longitude (rad), altitude (m))
+    - Position (3-vector, m, NED frame)
     - Linear Velocity (3-vector, m/s, NED frame)
     - Linear Acceleration (3-vector, m/s^2, body frame)
     - Attitude (quaternion (x, y, z, w), describes rotation from local NED
