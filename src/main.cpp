@@ -33,7 +33,7 @@ SOFTWARE.
 
 #include <iostream>
 
-#define SIM_TIMESTEP	0.01
+#define SIM_TIMESTEP	0.02
 #define SIM_LENGTH		25
 #define HORIZON_LENGTH	10
 
@@ -68,9 +68,9 @@ void dynamics(double *x, double *f, void *user_data) {
 	for(i=0; i<6; i++) {
 		AssertNotNaN(a[i]);
 		if(abs(a[i]) > 80) {
-			std::cout << "control:\n" << c << std::endl << std::endl;
-			std::cout << "state:\n" << s << std::endl << std::endl;
-			std::cout << "accel:\n" << a << std::endl << std::endl;
+//			std::cout << "control:\n" << c << std::endl << std::endl;
+//			std::cout << "state:\n" << s << std::endl << std::endl;
+//			std::cout << "accel:\n" << a << std::endl << std::endl;
 		}
 	}
 
@@ -95,6 +95,34 @@ void dynamics(double *x, double *f, void *user_data) {
 	for(i=0; i<3; ++i) f[i+16] = dot.angular_acceleration()[i];
 }
 
+void alpha(double *x, double *f, void *user_data) {
+	Quaternionr attitude(x[12], x[9], x[10], x[11]);
+
+	Vector3r airflow;
+	airflow = attitude * -Vector3r(x[3], x[4], x[5]);
+
+	f[0] = std::atan2(-airflow.z(), -airflow.x());
+}
+
+void beta(double *x, double *f, void *user_data) {
+	Quaternionr attitude(x[12], x[9], x[10], x[11]);
+
+	Vector3r airflow;
+	airflow = attitude * -Vector3r(x[3], x[4], x[5]);
+	real_t v = airflow.norm();
+
+	f[0] = std::asin(airflow.y() * ((real_t)1.0 / v));
+}
+
+void airspeed(double *x, double *f, void *user_data) {
+	Quaternionr attitude(x[12], x[9], x[10], x[11]);
+
+	Vector3r airspeed;
+	airspeed = attitude * Vector3r(x[3], x[4], x[5]);
+
+	f[0] = airspeed.x();
+}
+
 int main()
 {
     USING_NAMESPACE_ACADO
@@ -114,8 +142,8 @@ int main()
 	/* Dynamics model parameters. */
 	dynamics_model.set_mass(3.8);
 	dynamics_model.set_inertia_tensor((Matrix3x3r() <<
-		2.59e-1, 0, -0.334e-1,
-		0, 1.47e-1, 0,
+		3.0e-1, 0, -0.334e-1,
+		0, 1.7e-1, 0,
 		-0.334e-1, 0, 4.05e-1).finished());
 	dynamics_model.set_prop_coeffs(0.025, 0.00250);
 	dynamics_model.set_lift_coeffs((Vector5r() <<
@@ -170,16 +198,16 @@ int main()
 	Q(0, 0) = 0.1;
 	Q(1, 1) = 0.1;
 	Q(2, 2) = 0.1;
-	Q(3, 3) = 1.0;
-	Q(4, 4) = 1.0;
-	Q(5, 5) = 1.0;
-	Q(6, 6) = 5.0;
-	Q(7, 7) = 5.0;
-	Q(8, 8) = 5.0;
-	Q(9, 9) = 5.0;
-	Q(10, 10) = 1.0;
-	Q(11, 11) = 1.0;
-	Q(12, 12) = 1.0;
+	Q(3, 3) = 0.1;
+	Q(4, 4) = 0.1;
+	Q(5, 5) = 0.1;
+	Q(6, 6) = 0.0;
+	Q(7, 7) = 0.0;
+	Q(8, 8) = 0.0;
+	Q(9, 9) = 0.0;
+	Q(10, 10) = 0.1;
+	Q(11, 11) = 0.1;
+	Q(12, 12) = 0.1;
 
 	OCP ocp(0.0, HORIZON_LENGTH, 50);
 
@@ -191,9 +219,17 @@ int main()
 	ocp.subjectTo(f << flight_model(is));
 
 	/* Flight envelope constraints. */
+	CFunction alpha_constraint(1, alpha);
+	CFunction beta_constraint(1, beta);
+	CFunction airspeed_constraint(1, airspeed);
+
+	/* Alpha, beta, airspeed. */
+	ocp.subjectTo(-0.3 <= alpha_constraint(is) <= 0.3);
+	ocp.subjectTo(-0.3 <= beta_constraint(is) <= 0.3);
+	ocp.subjectTo(10 <= airspeed_constraint(is) <= 50);
 
 	/* Acceleration. */
-	ocp.subjectTo(-80 <= state_vector(6) <= 80);
+	ocp.subjectTo(-10 <= state_vector(6) <= 10);
 	ocp.subjectTo(-10 <= state_vector(7) <= 10);
 	ocp.subjectTo(-80 <= state_vector(8) <= 80);
 
@@ -203,17 +239,17 @@ int main()
 	ocp.subjectTo(-M_PI_4 <= state_vector(15) <= M_PI_4);
 
 	/* Control constraints. */
-	ocp.subjectTo(0.0 <= motor <= 30000.0);
+	ocp.subjectTo(0.0 <= motor <= 50000.0);
 	ocp.subjectTo(-1.0 <= elevon <= 1.0);
 
 	/* Set up the simulation process. */
 	OutputFcn identity;
 	DynamicSystem dynamicSystem(f, identity);
-	Process process(dynamicSystem, INT_RK78);
+	Process process(dynamicSystem, INT_RK45);
 
 	/* Set up the realtime algorithm. */
 	RealTimeAlgorithm alg(ocp, SIM_TIMESTEP);
-	alg.set(INTEGRATOR_TYPE, INT_RK78);
+	alg.set(INTEGRATOR_TYPE, INT_RK45);
 	//alg.set(INTEGRATOR_PRINTLEVEL, HIGH);
 
 	/* Set up controller and load reference trajectory. */
