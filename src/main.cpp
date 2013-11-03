@@ -34,7 +34,7 @@ SOFTWARE.
 #include <iostream>
 
 #define SIM_TIMESTEP	0.02
-#define SIM_LENGTH		43
+#define SIM_LENGTH		25
 #define HORIZON_LENGTH	10
 
 void dynamics(double *x, double *f, void *user_data) {
@@ -166,16 +166,16 @@ int main()
 
 	/* Least-squares weighting matrix. */
 	Matrix Q = zeros(13, 13);
-	Q(0, 0) = 0.0;
-	Q(1, 1) = 0.0;
+	Q(0, 0) = 0.1;
+	Q(1, 1) = 0.1;
 	Q(2, 2) = 0.1;
-	Q(3, 3) = 0.1;
-	Q(4, 4) = 0.1;
-	Q(5, 5) = 0.1;
-	Q(6, 6) = 1.0;
-	Q(7, 7) = 1.0;
-	Q(8, 8) = 1.0;
-	Q(9, 9) = 1.0;
+	Q(3, 3) = 1.0;
+	Q(4, 4) = 1.0;
+	Q(5, 5) = 1.0;
+	Q(6, 6) = 5.0;
+	Q(7, 7) = 5.0;
+	Q(8, 8) = 5.0;
+	Q(9, 9) = 5.0;
 	Q(10, 10) = 1.0;
 	Q(11, 11) = 1.0;
 	Q(12, 12) = 1.0;
@@ -193,13 +193,13 @@ int main()
 
 	/* Acceleration. */
 	ocp.subjectTo(-80 <= state_vector(6) <= 80);
-	ocp.subjectTo(-80 <= state_vector(7) <= 80);
+	ocp.subjectTo(-10 <= state_vector(7) <= 10);
 	ocp.subjectTo(-80 <= state_vector(8) <= 80);
 
 	/* Angular velocity. */
 	ocp.subjectTo(-M_PI <= state_vector(13) <= M_PI);
 	ocp.subjectTo(-M_PI <= state_vector(14) <= M_PI);
-	ocp.subjectTo(-M_PI <= state_vector(15) <= M_PI);
+	ocp.subjectTo(-M_PI_4 <= state_vector(15) <= M_PI_4);
 
 	/* Control constraints. */
 	ocp.subjectTo(0.0 <= motor <= 100000.0);
