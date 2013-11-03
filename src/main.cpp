@@ -33,7 +33,7 @@ SOFTWARE.
 
 #include <iostream>
 
-#define SIM_TIMESTEP	0.02
+#define SIM_TIMESTEP	0.01
 #define SIM_LENGTH		25
 #define HORIZON_LENGTH	10
 
@@ -68,6 +68,7 @@ void dynamics(double *x, double *f, void *user_data) {
 	for(i=0; i<6; i++) {
 		AssertNotNaN(a[i]);
 		if(abs(a[i]) > 80) {
+			std::cout << "control:\n" << c << std::endl << std::endl;
 			std::cout << "state:\n" << s << std::endl << std::endl;
 			std::cout << "accel:\n" << a << std::endl << std::endl;
 		}
@@ -202,7 +203,7 @@ int main()
 	ocp.subjectTo(-M_PI_4 <= state_vector(15) <= M_PI_4);
 
 	/* Control constraints. */
-	ocp.subjectTo(0.0 <= motor <= 100000.0);
+	ocp.subjectTo(0.0 <= motor <= 30000.0);
 	ocp.subjectTo(-1.0 <= elevon <= 1.0);
 
 	/* Set up the simulation process. */
