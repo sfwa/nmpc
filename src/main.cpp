@@ -34,7 +34,7 @@ SOFTWARE.
 #include <iostream>
 
 #define SIM_TIMESTEP	0.02
-#define SIM_LENGTH		27
+#define SIM_LENGTH		43
 #define HORIZON_LENGTH	10
 
 void dynamics(double *x, double *f, void *user_data) {
@@ -168,10 +168,10 @@ int main()
 	Matrix Q = zeros(13, 13);
 	Q(0, 0) = 0.0;
 	Q(1, 1) = 0.0;
-	Q(2, 2) = 1.0;
-	Q(3, 3) = 1.0;
-	Q(4, 4) = 1.0;
-	Q(5, 5) = 1.0;
+	Q(2, 2) = 0.1;
+	Q(3, 3) = 0.1;
+	Q(4, 4) = 0.1;
+	Q(5, 5) = 0.1;
 	Q(6, 6) = 1.0;
 	Q(7, 7) = 1.0;
 	Q(8, 8) = 1.0;
@@ -195,11 +195,6 @@ int main()
 	ocp.subjectTo(-80 <= state_vector(6) <= 80);
 	ocp.subjectTo(-80 <= state_vector(7) <= 80);
 	ocp.subjectTo(-80 <= state_vector(8) <= 80);
-
-	/* Angular acceleration. */
-	ocp.subjectTo(-30 <= state_vector(16) <= 30);
-	ocp.subjectTo(-30 <= state_vector(17) <= 30);
-	ocp.subjectTo(-30 <= state_vector(18) <= 30);
 
 	/* Angular velocity. */
 	ocp.subjectTo(-M_PI <= state_vector(13) <= M_PI);
