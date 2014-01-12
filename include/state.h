@@ -30,29 +30,30 @@ Definition for filter state vector.
 Contents are as follows:
     - Position (3-vector, m, NED frame)
     - Linear Velocity (3-vector, m/s, NED frame)
-    - Linear Acceleration (3-vector, m/s^2, body frame)
     - Attitude (quaternion (x, y, z, w), describes rotation from local NED
       frame to body frame.)
     - Angular Velocity (3-vector, rad/s, body frame)
-    - Angular Acceleration (3-vector, rad/s^2, body frame)
     - Wind Velocity (3-vector, m/s, NED frame)
 */
 class State: public StateVector {
+    const DynamicsModel &dynamics;
+
 public:
-    State(void) : StateVector() {}
+    State(const DynamicsModel& d) : StateVector(), dynamics(d) {}
 
     template<typename OtherDerived>
-    State(const Eigen::MatrixBase<OtherDerived>& other)
-        : StateVector(other) { }
+    State(const Eigen::MatrixBase<OtherDerived>& other,
+        const DynamicsModel& d) : StateVector(other), dynamics(d) { }
 
     template<typename OtherDerived>
     State & operator= (const Eigen::MatrixBase<OtherDerived>& other)
     {
         StateVector::operator=(other);
+        dynamics = other.dynamics;
         return *this;
     }
 
-    const StateVectorDerivative model();
+    const StateVectorDerivative model(ControlVector c);
 
     /* Read-only accessors */
     const Vector3r position() const {
@@ -63,24 +64,16 @@ public:
         return segment<3>(3);
     }
 
-    const Vector3r acceleration() const {
-        return segment<3>(6);
-    }
-
     const Vector4r attitude() const {
-        return segment<4>(9);
+        return segment<4>(6);
     }
 
     const Vector3r angular_velocity() const {
-        return segment<3>(13);
-    }
-
-    const Vector3r angular_acceleration() const {
-        return segment<3>(16);
+        return segment<3>(10);
     }
 
     const Vector3r wind_velocity() const {
-        return segment<3>(19);
+        return segment<3>(13);
     }
 
     /* Mutable accessors */
@@ -92,24 +85,16 @@ public:
         return segment<3>(3);
     }
 
-    Eigen::VectorBlock<StateVector, 3> acceleration() {
-        return segment<3>(6);
-    }
-
     Eigen::VectorBlock<StateVector, 4> attitude() {
-        return segment<4>(9);
+        return segment<4>(6);
     }
 
     Eigen::VectorBlock<StateVector, 3> angular_velocity() {
-        return segment<3>(13);
-    }
-
-    Eigen::VectorBlock<StateVector, 3> angular_acceleration() {
-        return segment<3>(16);
+        return segment<3>(10);
     }
 
     Eigen::VectorBlock<StateVector, 3> wind_velocity() {
-        return segment<3>(19);
+        return segment<3>(13);
     }
 };
 

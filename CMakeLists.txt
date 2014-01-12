@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-PROJECT(acado_nmpc CXX)
+PROJECT(nmpc CXX)
 INCLUDE(ExternalProject)
 
 # CMake module(s) path
@@ -26,32 +26,16 @@ SET(eigen_dir ${source_dir})
 INCLUDE_DIRECTORIES(include ${eigen_dir})
 
 #
-# Prerequisites
-#
-FIND_PACKAGE(ACADO REQUIRED)
-
-#
 # Include directories
 #
-INCLUDE_DIRECTORIES(
-	include
-	${ACADO_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(include)
 
 ADD_LIBRARY(nmpclib STATIC
-	src/nmpc/state.cpp
-	src/nmpc/dynamics.cpp)
+	src/state.cpp
+	src/dynamics.cpp
+	src/nmpc.cpp
+	src/ocp.cpp)
 
 ADD_DEPENDENCIES(nmpclib eigen3)
 
 ADD_SUBDIRECTORY(c EXCLUDE_FROM_ALL)
-
-#
-# Build an executable
-#
-ADD_EXECUTABLE(acado_nmpc
-	src/main.cpp)
-TARGET_LINK_LIBRARIES(acado_nmpc ${ACADO_SHARED_LIBRARIES})
-SET_TARGET_PROPERTIES(acado_nmpc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-ADD_DEPENDENCIES(acado_nmpc nmpclib)
-TARGET_LINK_LIBRARIES(acado_nmpc nmpclib)

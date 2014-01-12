@@ -34,38 +34,55 @@ template<typename Derived>
 class Integrator {
 public:
     template<typename StateModel>
-    StateModel integrate(StateModel in, real_t delta) const {
-        static_cast<Derived *>(this)->integrate(in, delta);
+    StateModel integrate(
+        StateModel in,
+        ControlVector control,
+        real_t delta) const {
+        static_cast<Derived *>(this)->integrate(in, control, delta);
     }
 };
 
 class IntegratorRK4: Integrator<IntegratorRK4> {
 public:
     template<typename StateModel>
-    const StateModel integrate(StateModel in, real_t delta) const {
-        StateModel a = in.model();
-        StateModel b = static_cast<StateModel>(in + (real_t)0.5 * delta * a).model();
-        StateModel c = static_cast<StateModel>(in + (real_t)0.5 * delta * b).model();
-        StateModel d = static_cast<StateModel>(in + delta * c).model();
-        return in + (delta / (real_t)6.0) * (a + (b * (real_t)2.0) + (c * (real_t)2.0) + d);
+    const StateModel integrate(
+        StateModel in,
+        ControlVector ccontrol,
+        real_t delta) const {
+        StateModel a = in.model(control);
+        StateModel b = static_cast<StateModel>(
+            in + (real_t)0.5 * delta * a).model(control;
+        StateModel c = static_cast<StateModel>(
+            in + (real_t)0.5 * delta * b).model(control);
+        StateModel d = static_cast<StateModel>(
+            in + delta * c).model(control);
+        return in + (delta / (real_t)6.0) *
+            (a + (b * (real_t)2.0) + (c * (real_t)2.0) + d);
     }
 };
 
 class IntegratorHeun: Integrator<IntegratorHeun> {
 public:
     template<typename StateModel>
-    const StateModel integrate(StateModel in, real_t delta) const {
-        StateModel initial = in.model();
+    const StateModel integrate(
+        StateModel in,
+        ControlVector ccontrol,
+        real_t delta) const {
+        StateModel initial = in.model(control);
         StateModel predictor = in + delta * initial;
-        return in + (delta * (real_t)0.5) * (initial + predictor.model());
+        return in + (delta * (real_t)0.5) *
+            (initial + predictor.model(control));
     }
 };
 
 class IntegratorEuler: Integrator<IntegratorEuler> {
 public:
     template<typename StateModel>
-    const StateModel integrate(StateModel in, real_t delta) const {
-        return in + delta * in.model();
+    const StateModel integrate(
+        StateModel in,
+        ControlVector ccontrol,
+        real_t delta) const {
+        return in + delta * in.model(control);
     }
 };
 

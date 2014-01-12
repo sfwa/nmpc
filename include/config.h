@@ -39,7 +39,18 @@ Choose the integration method here:
 /* #define NMPC_INTEGRATOR_EULER */
 
 /* NMPC vector dimensioning. */
-#define NMPC_CONTROL_DIM 4
-#define NMPC_STATE_DIM 22
+#define NMPC_CONTROL_DIM 3
+#define NMPC_STATE_DIM 16
+#define NMPC_DELTA_DIM (NMPC_STATE_DIM - 1)
+#define NMPC_REFERENCE_DIM (NMPC_STATE_DIM + NMPC_CONTROL_DIM)
+#define NMPC_GRADIENT_DIM (NMPC_REFERENCE_DIM - 1)
+
+/*
+Definitions for parameters used to calculated MRP vectors.
+*/
+#define NMPC_MRP_A ((real_t)1.0)
+#define NMPC_MRP_A_2 (NMPC_MRP_A*NMPC_MRP_A)
+#define NMPC_MRP_F ((real_t)2.0*(NMPC_MRP_A + 1))
+#define NMPC_MRP_F_2 (NMPC_MRP_F*NMPC_MRP_F)
 
 #endif

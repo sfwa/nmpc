@@ -59,7 +59,7 @@ for line in response.split("\n"):
 
 print position_offset
 
-TIMESTEP = 1.0/50.0  # 50Hz updates.
+TIMESTEP = 1.0/500.0  # 50Hz updates.
 _cnmpc.nmpc_set_position(0, 0, 0)
 _cnmpc.nmpc_set_velocity(20, 0, 0)
 _cnmpc.nmpc_set_acceleration(0, 0, 0)

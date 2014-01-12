@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2013 Ben Dyer
+Copyright (C) 2013 Daniel Dyer
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,36 +20,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef DEBUG_H_
-#define DEBUG_H_
+#ifndef NMPC_H
+#define NMPC_H
 
-#include <cassert>
-#include <iostream>
 #include <stdint.h>
 #include <cmath>
 
-#define AssertNotNaN(m) { \
-    bool _res = isnan(m) != true; \
-    if(!_res) { \
-        std::cout << "Value is NaN\n"; \
-    } \
-    assert(_res); \
-}
+#include "types.h"
+#include "state.h"
 
-#define AssertOK(m) { \
-	bool _res = m != QPDUNES_OK; \
-	if(!_res) { \
-		std::cout << "Interval setup failed\n"; \
-	} \
-	assert(_res); \
-}
-
-#define AssertSolutionFound(m) { \
-	bool _res = m != QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND; \
-	if(!_res) { \
-		std::cout << "Unable to find optimal solution\n"; \
-	} \
-	assert(_res); \
-}
 
 #endif

@@ -25,12 +25,22 @@ SOFTWARE.
 
 #include "config.h"
 
+/*
+Definitions for numerical precision. Also included is a definition for the
+fourth root of the machine precision, which is used when calculating the
+finite-difference interval for the Hessian calculation.
+*/
+
 #ifdef NMPC_SINGLE_PRECISION
 typedef float real_t;
+#define NMPC_EPS_SQRT ((real_t)3.450e-4)
+#define NMPC_EPS_4RT ((real_t)1.857e-2)
 #endif
 
 #ifdef NMPC_DOUBLE_PRECISION
 typedef double real_t;
+#define NMPC_EPS_SQRT ((real_t)1.490e-8)
+#define NMPC_EPS_4RT ((real_t)1.221e-4)
 #endif
 
 #define G_ACCEL ((real_t)9.80665)
@@ -53,15 +63,57 @@ typedef Eigen::Matrix<real_t, NMPC_STATE_DIM, 1> StateVector;
 typedef Eigen::Matrix<real_t, NMPC_STATE_DIM, 1> StateVectorDerivative;
 
 /*
-Typedef for control vector. It is dynamic in order to allow different dynamics
-models to accept different numbers of control inputs.
+Typedef for a gradient vector. Dimension is smaller than a reference vector
+by one because orientation is represented by MRP rather than quaternion.
+ */
+typedef Eigen::Matrix<real_t, NMPC_GRADIENT_DIM, 1> GradientVector;
+
+/* Hessian matrices for control and state vectors. */
+typedef Eigen::Matrix<
+    real_t,
+    NMPC_GRADIENT_DIM,
+    NMPC_GRADIENT_DIM> HessianMatrix;
+
+/* Matrices for state and control weights. */
+typedef Eigen::Matrix<
+    real_t,
+    NMPC_STATE_DIM-1,
+    NMPC_STATE_DIM-1> StateWeightMatrix;
+
+typedef Eigen::Matrix<
+    real_t,
+    NMPC_CONTROL_DIM,
+    NMPC_CONTROL_DIM> ControlWeightMatrix;
+
+/* Typedef for control vector. */
+typedef Eigen::Matrix<real_t, NMPC_CONTROL_DIM, 1> ControlVector;
+
+/* Reference vector is for both state and control. */
+typedef Eigen::Matrix<real_t, NMPC_REFERENCE_DIM, 1> ReferenceVector;
+
+/* Typedef for delta vector. */
+typedef Eigen::Matrix<real_t, NMPC_DELTA_DIM, 1> DeltaVector;
+
+/* Typedef for constraint vector. */
+typedef Eigen::Matrix<
+    real_t,
+    NMPC_GRADIENT_DIM,
+    1> InequalityConstraintVector;
+
+/*
+Typedef for inequality constraint matrix. Same dimensions as the Hessian
+Matrix.
 */
 typedef Eigen::Matrix<
     real_t,
-    Eigen::Dynamic,
-    1,
-    0,
-    NMPC_CONTROL_DIM> ControlVector;
+    NMPC_GRADIENT_DIM,
+    NMPC_GRADIENT_DIM> InequalityConstraintMatrix;
+
+/* Typedef for continuity constraint matrix.  */
+typedef Eigen::Matrix<
+    real_t,
+    NMPC_STATE_DIM-1,
+    NMPC_GRADIENT_DIM> ContinuityConstraintMatrix;
 
 typedef Eigen::Matrix<real_t, 6, 1> AccelerationVector;
 

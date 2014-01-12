@@ -22,8 +22,8 @@ SOFTWARE.
 
 #include <cmath>
 
-#include "nmpc/types.h"
-#include "nmpc/state.h"
+#include "types.h"
+#include "state.h"
 
 /*
 Runs the kinematics model on the state vector and returns a vector with the
@@ -32,43 +32,35 @@ calculated directly using a dynamics model).
 Contents are as follows:
     - Rate of change in position (3-vector, m/s, NED frame)
     - Rate of change in linear velocity (3-vector, m/s^2, NED frame)
-    - Rate of change in linear acceleration (3-vector, m/s^3, body frame)
     - Rate of change in attitude (quaternion (x, y, z, w), 1/s, body frame)
     - Rate of change in angular velocity (3-vector, rad/s^2, body frame)
-    - Rate of change in angular acceleration (3-vector, rad/s^3, body frame)
     - Rate of change in wind velocity (3-vector, m/s, NED frame)
 */
-const StateVectorDerivative State::model() {
+const StateVectorDerivative State::model(ControlVector c) {
     StateVectorDerivative output;
 
-    /*
-    Calculate change in position.
-    */
+    AccelerationVector a = dynamics.evaluate(*this, c);
+
+    /* Calculate change in position. */
     output.segment<3>(0) << velocity();
 
     /* Calculate change in velocity. */
     Quaternionr attitude_q = Quaternionr(attitude());
-    output.segment<3>(3) = attitude_q.conjugate() * acceleration();
-
-    /* Change in linear acceleration is zero. */
-    output.segment<3>(6) << 0, 0, 0;
+    output.segment<3>(3) = attitude_q.conjugate() * a.segment<3>(0);
 
     /* Calculate change in attitude. */
     Eigen::Matrix<real_t, 4, 1> omega_q;
     omega_q << angular_velocity(), 0;
 
     attitude_q = Quaternionr(omega_q).conjugate() * attitude_q;
-    output.segment<4>(9) << attitude_q.vec(), attitude_q.w();
-    output.segment<4>(9) *= 0.5;
+    output.segment<4>(6) << attitude_q.vec(), attitude_q.w();
+    output.segment<4>(6) *= 0.5;
 
     /* Calculate change in angular velocity (just angular acceleration). */
-    output.segment<3>(13) = angular_acceleration();
-
-    /* Change in angular acceleration is zero. */
-    output.segment<3>(16) << 0, 0, 0;
+    output.segment<3>(10) = a.segment<3>(3);
 
     /* Change in wind velocity is zero. */
-    output.segment<3>(19) << 0, 0, 0;
+    output.segment<3>(13) << 0, 0, 0;
 
     return output;
 }
