@@ -50,7 +50,6 @@ class OptimalControlProblem {
 #endif
     
     DynamicsModel *dynamics;
-    ObjectiveFunction *objective;
 
     ReferenceVector reference_trajectory[OCP_HORIZON_LENGTH];
     ControlVector control_horizon[OCP_HORIZON_LENGTH];
@@ -108,7 +107,6 @@ class OptimalControlProblem {
     /* Data structures for use by qpDUNES. */
     qpData_t qp_data;
     qpOptions_t qp_options;
-    real_t H[*OCP_HORIZON_LENGTH]
 
     GradientVector state_to_delta(
         const StateVector s, const ControlVector c, const ReferenceVector r);

@@ -23,7 +23,22 @@ LOG_BUILD ON)
 ExternalProject_Get_Property(eigen3 source_dir)
 SET(eigen_dir ${source_dir})
 
-INCLUDE_DIRECTORIES(include ${eigen_dir})
+# Add qpDUNES
+ExternalProject_Add(
+qpDUNES
+URL https://github.com/jfrasch/qpDUNES/archive/master.zip
+TIMEOUT 300
+# Disable install step
+INSTALL_COMMAND ""
+# Wrap download, configure and build steps in a script to log output
+LOG_DOWNLOAD ON
+LOG_CONFIGURE ON
+LOG_BUILD ON)
+
+ExternalProject_Get_Property(qpDUNES source_dir)
+SET(qpDUNES_dir ${source_dir})
+
+INCLUDE_DIRECTORIES(include ${eigen_dir} ${qpDUNES_dir}/include)
 
 #
 # Include directories
@@ -36,6 +51,6 @@ ADD_LIBRARY(nmpclib STATIC
 	src/nmpc.cpp
 	src/ocp.cpp)
 
-ADD_DEPENDENCIES(nmpclib eigen3)
+ADD_DEPENDENCIES(nmpclib eigen3 qpDUNES)
 
 ADD_SUBDIRECTORY(c EXCLUDE_FROM_ALL)
