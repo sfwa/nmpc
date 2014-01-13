@@ -25,6 +25,9 @@ SOFTWARE.
 
 #include "types.h"
 
+/* DynamicsModel forward declaration. */
+class DynamicsModel;
+
 /*
 Definition for filter state vector.
 Contents are as follows:
@@ -36,14 +39,14 @@ Contents are as follows:
     - Wind Velocity (3-vector, m/s, NED frame)
 */
 class State: public StateVector {
-    const DynamicsModel &dynamics;
+    DynamicsModel *dynamics;
 
 public:
-    State(const DynamicsModel& d) : StateVector(), dynamics(d) {}
+    State(DynamicsModel *d) : StateVector(), dynamics(d) {}
 
     template<typename OtherDerived>
     State(const Eigen::MatrixBase<OtherDerived>& other,
-        const DynamicsModel& d) : StateVector(other), dynamics(d) { }
+        DynamicsModel *d) : StateVector(other), dynamics(d) { }
 
     template<typename OtherDerived>
     State & operator= (const Eigen::MatrixBase<OtherDerived>& other)

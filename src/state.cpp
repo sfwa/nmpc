@@ -24,6 +24,7 @@ SOFTWARE.
 
 #include "types.h"
 #include "state.h"
+#include "dynamics.h"
 
 /*
 Runs the kinematics model on the state vector and returns a vector with the
@@ -39,7 +40,7 @@ Contents are as follows:
 const StateVectorDerivative State::model(ControlVector c) {
     StateVectorDerivative output;
 
-    AccelerationVector a = dynamics.evaluate(*this, c);
+    AccelerationVector a = dynamics->evaluate(*this, c);
 
     /* Calculate change in position. */
     output.segment<3>(0) << velocity();
