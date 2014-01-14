@@ -46,6 +46,17 @@ void nmpc_fixedwingdynamics_init() {
     ocp.initialise();
 }
 
+void nmpc_preparation_step() {
+    ocp.preparation_step();
+}
+
+void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]) {
+    Eigen::Map<StateVector> measurement_map =
+        Eigen::Map<StateVector>(measurement);
+    StateVector m = measurement_map;
+    ocp.feedback_step(m);
+}
+
 void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]) {
     Eigen::Map<DeltaVector> state_weight_map =
         Eigen::Map<DeltaVector>(coeffs);

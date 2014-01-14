@@ -119,7 +119,7 @@ class OptimalControlProblem {
     void solve_ivps();
     void calculate_hessians();
     void initialise_qp();
-    void initial_constraint(ReferenceVector measurement);
+    void initial_constraint(StateVector measurement);
     void solve_qp();
     void update_horizon();
 
@@ -145,7 +145,7 @@ public:
         reference_trajectory[i] = in;
     }
     void preparation_step();
-    void feedback_step(ReferenceVector measurement);
+    void feedback_step(StateVector measurement);
     void set_dynamics_model(DynamicsModel *in) { dynamics = in; }
 };
 

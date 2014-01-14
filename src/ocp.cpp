@@ -415,11 +415,11 @@ measurement should be provided in order to to set up the initial state for
 the SQP iteration. This allows the feedback delay to be significantly less
 than one time step.
 */
-void OptimalControlProblem::initial_constraint(ReferenceVector measurement) {
+void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
 }
 
-/* Solves the QP uses qpDUNES. */
+/* Solves the QP using qpDUNES. */
 void OptimalControlProblem::solve_qp() {
 //    return_t status_flag = qpDUNES_solve(&qp_data);
 //    AssertSolutionFound(status_flag);
@@ -461,7 +461,7 @@ should be executed at the last possible moment with the latest sensor data,
 in order to make the control latency significantly less than the horizon step
 length.
 */
-void OptimalControlProblem::feedback_step(ReferenceVector measurement) {
+void OptimalControlProblem::feedback_step(StateVector measurement) {
     initial_constraint(measurement);
     solve_qp();
 }
