@@ -19,10 +19,8 @@ class _State(Structure):
         fields = {
             "position": tuple(self.position),
             "velocity": tuple(self.velocity),
-            "acceleration": tuple(self.acceleration),
             "attitude": tuple(self.attitude),
             "angular_velocity": tuple(self.angular_velocity),
-            "angular_acceleration": tuple(self.angular_acceleration),
             "wind_velocity": tuple(self.wind_velocity)
         }
         return str(fields)
@@ -105,12 +103,41 @@ def init(implementation="c"):
     _State._fields_ = [
         ("position", _REAL_T * 3),
         ("velocity", _REAL_T * 3),
-        ("acceleration", _REAL_T * 3),
         ("attitude", _REAL_T * 4),
         ("angular_velocity", _REAL_T * 3),
-        ("angular_acceleration", _REAL_T * 3),
         ("wind_velocity", _REAL_T * 3)
     ]
+
+    _cnmpc.nmpc_preparation_step.argtypes = []
+    _cnmpc.nmpc_preparation_step.restype = None
+
+    _cnmpc.nmpc_feedback_step.argtype = [POINTER(_State)]
+    _cnmpc.nmpc_feedback_step.restype = None
+
+    _cnmpc.nmpc_set_state_weights.argtype = [
+        POINTER(_REAL_T * (_STATE_DIM-1))]
+    _cnmpc.nmpc_set_state_weights.restype = None
+
+    _cnmpc.nmpc_set_control_weights.argtype = [
+        POINTER(_REAL_T * (_CONTROL_DIM))]
+    _cnmpc.nmpc_set_control_weights.restype = None
+
+    _cnmpc.nmpc_set_terminal_weights.argtype = [
+        POINTER(_REAL_T * (_STATE_DIM-1))]
+    _cnmpc.nmpc_set_terminal_weights.restype = None
+
+    _cnmpc.nmpc_set_lower_control_bound.argtype = [
+        POINTER(_REAL_T * (_CONTROL_DIM))]
+    _cnmpc.nmpc_set_lower_control_bound.restype = None
+
+    _cnmpc.nmpc_set_upper_control_bound.argtype = [
+        POINTER(_REAL_T * (_CONTROL_DIM))]
+    _cnmpc.nmpc_set_upper_control_bound.restype = None
+
+    _cnmpc.nmpc_set_reference_point.argtype = [
+        POINTER(_REAL_T * (_STATE_DIM+_CONTROL_DIM)),
+        c_uint]
+    _cnmpc.nmpc_set_reference_point.restype = None
 
     # Set up the function prototypes
     _cnmpc.nmpc_fixedwingdynamics_set_position.argtypes =
@@ -121,10 +148,6 @@ def init(implementation="c"):
         [_REAL_T, _REAL_T, _REAL_T]
     _cnmpc.nmpc_fixedwingdynamics_set_velocity.restype = None
 
-    _cnmpc.nmpc_fixedwingdynamics_set_acceleration.argtypes =
-        [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_fixedwingdynamics_set_acceleration.restype = None
-
     _cnmpc.nmpc_fixedwingdynamics_set_attitude.argtypes =
         [_REAL_T, _REAL_T, _REAL_T, _REAL_T]
     _cnmpc.nmpc_fixedwingdynamics_set_attitude.restype = None
@@ -132,10 +155,6 @@ def init(implementation="c"):
     _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity.argtypes =
         [_REAL_T, _REAL_T, _REAL_T]
     _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_angular_acceleration.argtypes =
-        [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_fixedwingdynamics_set_angular_acceleration.restype = None
 
     _cnmpc.nmpc_fixedwingdynamics_set_wind_velocity.argtypes =
         [_REAL_T, _REAL_T, _REAL_T]
@@ -160,7 +179,8 @@ def init(implementation="c"):
         POINTER(_REAL_T * 9)]
     _cnmpc.nmpc_fixedwingdynamics_set_inertia_tensor.restype = None
 
-    _cnmpc.nmpc_fixedwingdynamics_set_prop_coeffs.argtypes = [_REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_prop_coeffs.argtypes = [
+        _REAL_T, _REAL_T]
     _cnmpc.nmpc_fixedwingdynamics_set_prop_coeffs.restype = None
 
     _cnmpc.nmpc_fixedwingdynamics_set_drag_coeffs.argtypes = [
@@ -187,9 +207,6 @@ def init(implementation="c"):
     _cnmpc.nmpc_fixedwingdynamics_set_yaw_moment_coeffs.argtypes = [
         POINTER(_REAL_T * 2), POINTER(_REAL_T * _CONTROL_DIM)]
     _cnmpc.nmpc_fixedwingdynamics_set_yaw_moment_coeffs.restype = None
-
-    # Initialize the library
-    _cnmpc.nmpc_init()
 
     # Set up the state
     state = _State()
