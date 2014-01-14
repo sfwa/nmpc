@@ -139,8 +139,9 @@ void OptimalControlProblem::solve_ivps() {
     for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
         /* Solve the initial value problem at this horizon step. */
         integrated_state_horizon[i] = integrator.integrate(
-            State(state_horizon[i], dynamics),
+            State(state_horizon[i]),
             control_horizon[i],
+            dynamics,
             OCP_STEP_LENGTH);
 
         for(j = 0; j < NMPC_GRADIENT_DIM; j++) {
@@ -172,8 +173,9 @@ void OptimalControlProblem::solve_ivps() {
             }
 
             new_state.segment<NMPC_STATE_DIM>(0) = integrator.integrate(
-                State(perturbed_state.segment<NMPC_STATE_DIM>(0), dynamics),
+                State(perturbed_state.segment<NMPC_STATE_DIM>(0)),
                 perturbed_state.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM),
+                dynamics,
                 OCP_STEP_LENGTH);
 
             /*
@@ -297,8 +299,9 @@ void OptimalControlProblem::calculate_hessians() {
 
                 /* Integrate the perturbed state vector. */
                 StateVector integrated_state = integrator.integrate(
-                    State(perturbed_state, dynamics),
+                    State(perturbed_state),
                     perturbed_control,
+                    dynamics,
                     OCP_STEP_LENGTH);
 
                 /* Convert the integrated result back into a delta. */

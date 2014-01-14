@@ -37,8 +37,9 @@ public:
     StateModel integrate(
         StateModel in,
         ControlVector control,
+        DynamicsModel *dynamics,
         real_t delta) const {
-        static_cast<Derived *>(this)->integrate(in, control, delta);
+        static_cast<Derived *>(this)->integrate(in, control, dynamics, delta);
     }
 };
 
@@ -48,14 +49,15 @@ public:
     const StateModel integrate(
         StateModel in,
         ControlVector control,
+        DynamicsModel *dynamics,
         real_t delta) const {
-        StateModel a = in.model(control);
+        StateModel a = in.model(control, dynamics);
         StateModel b = static_cast<StateModel>(
-            in + (real_t)0.5 * delta * a).model(control);
+            in + (real_t)0.5 * delta * a).model(control, dynamics);
         StateModel c = static_cast<StateModel>(
-            in + (real_t)0.5 * delta * b).model(control);
+            in + (real_t)0.5 * delta * b).model(control, dynamics);
         StateModel d = static_cast<StateModel>(
-            in + delta * c).model(control);
+            in + delta * c).model(control, dynamics);
         return in + (delta / (real_t)6.0) *
             (a + (b * (real_t)2.0) + (c * (real_t)2.0) + d);
     }
@@ -67,11 +69,12 @@ public:
     const StateModel integrate(
         StateModel in,
         ControlVector control,
+        DynamicsModel *dynamics,
         real_t delta) const {
-        StateModel initial = in.model(control);
+        StateModel initial = in.model(control, dynamics);
         StateModel predictor = in + delta * initial;
         return in + (delta * (real_t)0.5) *
-            (initial + predictor.model(control));
+            (initial + predictor.model(control, dynamics));
     }
 };
 
@@ -81,8 +84,9 @@ public:
     const StateModel integrate(
         StateModel in,
         ControlVector control,
+        DynamicsModel *dynamics,
         real_t delta) const {
-        return in + delta * in.model(control);
+        return in + delta * in.model(control, dynamics);
     }
 };
 

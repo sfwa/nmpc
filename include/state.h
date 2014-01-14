@@ -39,24 +39,21 @@ Contents are as follows:
     - Wind Velocity (3-vector, m/s, NED frame)
 */
 class State: public StateVector {
-    DynamicsModel *dynamics;
-
 public:
-    State(DynamicsModel *d) : StateVector(), dynamics(d) {}
+    State() : StateVector() {}
 
     template<typename OtherDerived>
-    State(const Eigen::MatrixBase<OtherDerived>& other,
-        DynamicsModel *d) : StateVector(other), dynamics(d) { }
+    State(const Eigen::MatrixBase<OtherDerived>& other) :
+        StateVector(other) { }
 
     template<typename OtherDerived>
     State & operator= (const Eigen::MatrixBase<OtherDerived>& other)
     {
         StateVector::operator=(other);
-        dynamics = other.dynamics;
         return *this;
     }
 
-    const StateVectorDerivative model(ControlVector c);
+    const StateVectorDerivative model(ControlVector c, DynamicsModel *d);
 
     /* Read-only accessors */
     const Vector3r position() const {

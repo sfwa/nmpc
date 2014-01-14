@@ -37,10 +37,10 @@ Contents are as follows:
     - Rate of change in angular velocity (3-vector, rad/s^2, body frame)
     - Rate of change in wind velocity (3-vector, m/s, NED frame)
 */
-const StateVectorDerivative State::model(ControlVector c) {
+const StateVectorDerivative State::model(ControlVector c, DynamicsModel *d) {
     StateVectorDerivative output;
 
-    AccelerationVector a = dynamics->evaluate(*this, c);
+    AccelerationVector a = d->evaluate(*this, c);
 
     /* Calculate change in position. */
     output.segment<3>(0) << velocity();
