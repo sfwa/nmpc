@@ -20,10 +20,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "nmpc/types.h"
-#include "nmpc/state.h"
-#include "nmpc/integrator.h"
-#include "nmpc/dynamics.h"
+#include "types.h"
+#include "state.h"
+#include "integrator.h"
+#include "dynamics.h"
+#include "ocp.h"
 
 #include "cnmpc.h"
 
@@ -38,48 +39,88 @@ static State current;
     IntegratorEuler integrator;
 #endif
 
-void nmpc_init() {
+static OptimalControlProblem ocp =
+    OptimalControlProblem(&fixed_wing_model);
 
+void nmpc_fixedwingdynamics_init() {
+    ocp.initialise();
 }
 
-void nmpc_set_position(real_t lat, real_t lon, real_t alt) {
+void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]) {
+    Eigen::Map<DeltaVector> state_weight_map =
+        Eigen::Map<DeltaVector>(coeffs);
+    DeltaVector state_weight = state_weight_map;
+    ocp.set_state_weights(state_weight);
+}
+
+void nmpc_set_control_weights(real_t coeffs[NMPC_CONTROL_DIM]) {
+    Eigen::Map<ControlVector> control_weight_map =
+        Eigen::Map<ControlVector>(coeffs);
+    ControlVector control_weight = control_weight_map;
+    ocp.set_control_weights(control_weight);
+}
+
+void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]) {
+    Eigen::Map<DeltaVector> terminal_weight_map =
+        Eigen::Map<DeltaVector>(coeffs);
+    DeltaVector terminal_weight = terminal_weight_map;
+    ocp.set_terminal_weights(terminal_weight);
+}
+
+void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]) {
+    Eigen::Map<ControlConstraintVector> control_constraint_map =
+        Eigen::Map<ControlConstraintVector>(coeffs);
+    ControlConstraintVector control_constraint = control_constraint_map;
+    ocp.set_lower_control_bound(control_constraint);
+}
+
+void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]) {
+    Eigen::Map<ControlConstraintVector> control_constraint_map =
+        Eigen::Map<ControlConstraintVector>(coeffs);
+    ControlConstraintVector control_constraint = control_constraint_map;
+    ocp.set_upper_control_bound(control_constraint);
+}
+
+void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM],
+uint32_t i) {
+    Eigen::Map<ReferenceVector> reference_map =
+        Eigen::Map<ReferenceVector>(coeffs);
+    ReferenceVector reference = reference_map;
+    ocp.set_reference_point(reference, i);
+}
+
+void nmpc_fixedwingdynamics_set_position(
+real_t lat, real_t lon, real_t alt) {
     current.position() << lat, lon, alt;
 }
 
-void nmpc_set_velocity(real_t x, real_t y, real_t z) {
+void nmpc_fixedwingdynamics_set_velocity(
+real_t x, real_t y, real_t z) {
     current.velocity() << x, y, z;
 }
 
-void nmpc_set_acceleration(real_t x, real_t y, real_t z) {
-    current.acceleration() << x, y, z;
-}
-
-void nmpc_set_attitude(real_t w, real_t x, real_t y, real_t z) {
+void nmpc_fixedwingdynamics_set_attitude(
+real_t w, real_t x, real_t y, real_t z) {
     current.attitude() << x, y, z, w;
 }
 
-void nmpc_set_angular_velocity(real_t x, real_t y, real_t z) {
+void nmpc_fixedwingdynamics_set_angular_velocity(
+real_t x, real_t y, real_t z) {
     current.angular_velocity() << x, y, z;
 }
 
-void nmpc_set_angular_acceleration(real_t x, real_t y, real_t z) {
-    current.angular_acceleration() << x, y, z;
-}
-
-void nmpc_set_wind_velocity(real_t x, real_t y, real_t z) {
+void nmpc_fixedwingdynamics_set_wind_velocity(
+real_t x, real_t y, real_t z) {
     current.wind_velocity() << x, y, z;
 }
 
-void nmpc_get_state(struct nmpc_state_t *in) {
+void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in) {
     in->position[0] = current.position()[0];
     in->position[1] = current.position()[1];
     in->position[2] = current.position()[2];
     in->velocity[0] = current.velocity()[0];
     in->velocity[1] = current.velocity()[1];
     in->velocity[2] = current.velocity()[2];
-    in->acceleration[0] = current.acceleration()[0];
-    in->acceleration[1] = current.acceleration()[1];
-    in->acceleration[2] = current.acceleration()[2];
     in->attitude[0] = current.attitude()[0];
     in->attitude[1] = current.attitude()[1];
     in->attitude[2] = current.attitude()[2];
@@ -87,15 +128,12 @@ void nmpc_get_state(struct nmpc_state_t *in) {
     in->angular_velocity[0] = current.angular_velocity()[0];
     in->angular_velocity[1] = current.angular_velocity()[1];
     in->angular_velocity[2] = current.angular_velocity()[2];
-    in->angular_acceleration[0] = current.angular_acceleration()[0];
-    in->angular_acceleration[1] = current.angular_acceleration()[1];
-    in->angular_acceleration[2] = current.angular_acceleration()[2];
     in->wind_velocity[0] = current.wind_velocity()[0];
     in->wind_velocity[1] = current.wind_velocity()[1];
     in->wind_velocity[2] = current.wind_velocity()[2];
 }
 
-void nmpc_set_state(struct nmpc_state_t *in) {
+void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in) {
     current <<
         in->position[0],
         in->position[1],
@@ -103,9 +141,6 @@ void nmpc_set_state(struct nmpc_state_t *in) {
         in->velocity[0],
         in->velocity[1],
         in->velocity[2],
-        in->acceleration[0],
-        in->acceleration[1],
-        in->acceleration[2],
         in->attitude[0],
         in->attitude[1],
         in->attitude[2],
@@ -113,20 +148,18 @@ void nmpc_set_state(struct nmpc_state_t *in) {
         in->angular_velocity[0],
         in->angular_velocity[1],
         in->angular_velocity[2],
-        in->angular_acceleration[0],
-        in->angular_acceleration[1],
-        in->angular_acceleration[2],
         in->wind_velocity[0],
         in->wind_velocity[1],
         in->wind_velocity[2];
 }
 
-void nmpc_integrate(float dt, real_t control_vector[NMPC_CONTROL_DIM]) {
-    AccelerationVector temp = fixed_wing_model.evaluate(current, 
-        Eigen::Matrix<real_t, NMPC_CONTROL_DIM, 1>(control_vector));
-    current.acceleration() << temp.segment<3>(0);
-    current.angular_acceleration() << temp.segment<3>(3);
-    current = integrator.integrate(current, dt);
+void nmpc_fixedwingdynamics_integrate(
+float dt, real_t control_vector[NMPC_CONTROL_DIM]) {
+    current = integrator.integrate(
+        current,
+        ControlVector(control_vector),
+        &fixed_wing_model,
+        dt);
 }
 
 void nmpc_fixedwingdynamics_set_mass(real_t mass) {
@@ -153,25 +186,25 @@ void nmpc_fixedwingdynamics_set_lift_coeffs(real_t coeffs[5]) {
 void nmpc_fixedwingdynamics_set_side_coeffs(real_t coeffs[4],
 real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_side_coeffs(Vector4r(coeffs),
-        Vector4r(control));
+        ControlVector(control));
 }
 
 void nmpc_fixedwingdynamics_set_pitch_moment_coeffs(real_t coeffs[2],
 real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_pitch_moment_coeffs(Vector2r(coeffs),
-        Vector4r(control));
+        ControlVector(control));
 }
 
 void nmpc_fixedwingdynamics_set_roll_moment_coeffs(real_t coeffs[1],
 real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_roll_moment_coeffs(Vector1r(coeffs),
-        Vector4r(control));
+        ControlVector(control));
 }
 
 void nmpc_fixedwingdynamics_set_yaw_moment_coeffs(real_t coeffs[2],
 real_t control[NMPC_CONTROL_DIM]) {
     fixed_wing_model.set_yaw_moment_coeffs(Vector2r(coeffs),
-        Vector4r(control));
+        ControlVector(control));
 }
 
 uint32_t nmpc_config_get_state_dim() {

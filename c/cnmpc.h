@@ -24,7 +24,7 @@ SOFTWARE.
 #define INTERFACE_H
 
 #include <stdint.h>
-#include "nmpc/config.h"
+#include "config.h"
 
 #ifdef NMPC_SINGLE_PRECISION
 typedef float real_t;
@@ -41,29 +41,39 @@ extern "C" {
 struct nmpc_state_t {
     real_t position[3];
     real_t velocity[3];
-    real_t acceleration[3];
     real_t attitude[4]; /* w, x, y, z */
     real_t angular_velocity[3];
-    real_t angular_acceleration[3];
     real_t wind_velocity[3];
 };
 
 void nmpc_init();
 
+/* Functions for setting weights and bounds for the OCP solver. */
+void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]);
+void nmpc_set_control_weights(real_t coeffs[NMPC_CONTROL_DIM]);
+void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]);
+void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
+void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
+void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM], uint32_t i);
+
 /* Functions for setting different parts of the state vector. */
-void nmpc_set_position(real_t lat, real_t lon, real_t alt);
-void nmpc_set_velocity(real_t x, real_t y, real_t z);
-void nmpc_set_acceleration(real_t x, real_t y, real_t z);
-void nmpc_set_attitude(real_t w, real_t x, real_t y, real_t z);
-void nmpc_set_angular_velocity(real_t x, real_t y, real_t z);
-void nmpc_set_angular_acceleration(real_t x, real_t y, real_t z);
-void nmpc_set_wind_velocity(real_t x, real_t y, real_t z);
+void nmpc_fixedwingdynamics_set_position(
+    real_t lat, real_t lon, real_t alt);
+void nmpc_fixedwingdynamics_set_velocity(
+    real_t x, real_t y, real_t z);
+void nmpc_fixedwingdynamics_set_attitude(
+    real_t w, real_t x, real_t y, real_t z);
+void nmpc_fixedwingdynamics_set_angular_velocity(
+    real_t x, real_t y, real_t z);
+void nmpc_fixedwingdynamics_set_wind_velocity(
+    real_t x, real_t y, real_t z);
 
 /* Functions for getting the state vector and covariance. */
-void nmpc_set_state(struct nmpc_state_t *in);
-void nmpc_get_state(struct nmpc_state_t *in);
+void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in);
+void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in);
 
-void nmpc_integrate(float dt, real_t control_vector[NMPC_CONTROL_DIM]);
+void nmpc_fixedwingdynamics_integrate(
+    float dt, real_t control_vector[NMPC_CONTROL_DIM]);
 
 /*
 Functions to set airframe properties and coefficients for the fixed-wing

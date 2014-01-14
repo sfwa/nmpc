@@ -28,7 +28,7 @@ SOFTWARE.
 #include "state.h"
 #include "debug.h"
 
-OptimalControlProblem::OptimalControlProblem() {
+OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 #if defined(NMPC_INTEGRATOR_RK4)
     integrator = IntegratorRK4();
 #elif defined(NMPC_INTEGRATOR_HEUN)
@@ -36,6 +36,20 @@ OptimalControlProblem::OptimalControlProblem() {
 #elif defined(NMPC_INTEGRATOR_EULER)
     integrator = IntegratorEuler();
 #endif
+
+    dynamics = d;
+
+    /* Initialise inequality constraints to +/-infinity. */
+    lower_state_bound = StateConstraintVector::Ones() * -NMPC_INFTY;
+    upper_state_bound = StateConstraintVector::Ones() * NMPC_INFTY;
+
+    lower_control_bound = ControlConstraintVector::Ones() * -NMPC_INFTY;
+    upper_control_bound = ControlConstraintVector::Ones() * NMPC_INFTY;
+
+    /* Initialise weight matrices. */
+    state_weights = StateWeightMatrix::Identity();
+    control_weights = ControlWeightMatrix::Identity();
+    terminal_weights = StateWeightMatrix::Identity();
 
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 100;

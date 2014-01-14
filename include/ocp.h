@@ -78,19 +78,18 @@ class OptimalControlProblem {
     HessianMatrix hessians[OCP_HORIZON_LENGTH];
 
     /*
-    Constraint matrix and bounding vectors. Note that we could easily have
-    a constraint matrix, upper and lower bound vector for each horizon step,
-    and they could be recalculated each iteration from a set of nonlinear
-    constraints if desired.
-
-    For now, only one constraint matrix and set of bounding vectors will be
-    used to reduce memory usage.
-
-    May need to generate constraints per-step to handle airspeed limits,
-    though.
+    Affine constraint matrix and bounding vectors. These will be generated
+    each iteration from the non-linear constraints.
     */
-    InequalityConstraintMatrix inequality_constraints;
-    InequalityConstraintVector upper_bound, lower_bound;
+    InequalityConstraintMatrix affine_constraints[OCP_HORIZON_LENGTH];
+    InequalityConstraintVector affine_upper_bound[OCP_HORIZON_LENGTH];
+    InequalityConstraintVector affine_lower_bound[OCP_HORIZON_LENGTH];
+
+    /*
+    Simple inequality constraints.
+    */
+    StateConstraintVector lower_state_bound, upper_state_bound;
+    ControlConstraintVector lower_control_bound, upper_control_bound;
 
     /*
     Matrices for continuity constraints. These are actually Jacobian
@@ -110,8 +109,12 @@ class OptimalControlProblem {
     qpOptions_t qp_options;
 
     GradientVector state_to_delta(
-        const StateVector &s, const ControlVector &c, const ReferenceVector &r);
-    DeltaVector state_to_delta(const StateVector &s1, const StateVector &s2);
+        const StateVector &s,
+        const ControlVector &c,
+        const ReferenceVector &r);
+    DeltaVector state_to_delta(
+        const StateVector &s1,
+        const StateVector &s2);
     void calculate_deltas();
     void solve_ivps();
     void calculate_hessians();
@@ -121,8 +124,26 @@ class OptimalControlProblem {
     void update_horizon();
 
 public:
-    OptimalControlProblem();
+    OptimalControlProblem(DynamicsModel *d);
     void initialise();
+    void set_state_weights(const DeltaVector &in) {
+        state_weights.diagonal() = in;
+    }
+    void set_control_weights(const ControlVector &in) {
+        control_weights.diagonal() = in;
+    }
+    void set_terminal_weights(const DeltaVector &in) {
+        terminal_weights.diagonal() = in;
+    }
+    void set_lower_control_bound(const ControlConstraintVector &in) {
+        lower_control_bound = in;
+    }
+    void set_upper_control_bound(const ControlConstraintVector &in) {
+        upper_control_bound = in;
+    }
+    void set_reference_point(const ReferenceVector &in, uint32_t i) {
+        reference_trajectory[i] = in;
+    }
     void preparation_step();
     void feedback_step(ReferenceVector measurement);
     void set_dynamics_model(DynamicsModel *in) { dynamics = in; }

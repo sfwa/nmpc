@@ -43,6 +43,8 @@ typedef double real_t;
 #define NMPC_EPS_4RT ((real_t)1.221e-4)
 #endif
 
+#define NMPC_INFTY ((real_t)1.0e12)
+
 #define G_ACCEL ((real_t)9.80665)
 #define RHO ((real_t)1.225)
 
@@ -94,11 +96,13 @@ typedef Eigen::Matrix<real_t, NMPC_REFERENCE_DIM, 1> ReferenceVector;
 /* Typedef for delta vector. */
 typedef Eigen::Matrix<real_t, NMPC_DELTA_DIM, 1> DeltaVector;
 
-/* Typedef for constraint vector. */
+/* Typedef for constraint vectors. */
 typedef Eigen::Matrix<
     real_t,
     NMPC_GRADIENT_DIM,
     1> InequalityConstraintVector;
+typedef Eigen::Matrix<real_t, NMPC_DELTA_DIM, 1> StateConstraintVector;
+typedef Eigen::Matrix<real_t, NMPC_CONTROL_DIM, 1> ControlConstraintVector;
 
 /*
 Typedef for inequality constraint matrix. Same dimensions as the Hessian

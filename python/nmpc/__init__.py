@@ -41,9 +41,10 @@ def integrate(dt, control=None):
         raise ValueError("Control vector must contain %d elements" %
                          _CONTROL_DIM)
 
-    _cnmpc.nmpc_set_state(state)
-    _cnmpc.nmpc_integrate(dt, (_REAL_T * _CONTROL_DIM)(*control))
-    _cnmpc.nmpc_get_state(state)
+    _cnmpc.nmpc_fixedwingdynamics_set_state(state)
+    _cnmpc.nmpc_fixedwingdynamics_integrate(
+        dt, (_REAL_T * _CONTROL_DIM)(*control))
+    _cnmpc.nmpc_fixedwingdynamics_get_state(state)
 
 
 def configure_airframe(mass=None, inertia_tensor=None, prop_coeffs=None,
@@ -112,35 +113,45 @@ def init(implementation="c"):
     ]
 
     # Set up the function prototypes
-    _cnmpc.nmpc_set_position.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_position.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_position.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_position.restype = None
 
-    _cnmpc.nmpc_set_velocity.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_velocity.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_velocity.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_velocity.restype = None
 
-    _cnmpc.nmpc_set_acceleration.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_acceleration.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_acceleration.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_acceleration.restype = None
 
-    _cnmpc.nmpc_set_attitude.argtypes = [_REAL_T, _REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_attitude.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_attitude.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_attitude.restype = None
 
-    _cnmpc.nmpc_set_angular_velocity.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_angular_velocity.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity.restype = None
 
-    _cnmpc.nmpc_set_angular_acceleration.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_angular_acceleration.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_angular_acceleration.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_angular_acceleration.restype = None
 
-    _cnmpc.nmpc_set_wind_velocity.argtypes = [_REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_set_wind_velocity.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_wind_velocity.argtypes =
+        [_REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_fixedwingdynamics_set_wind_velocity.restype = None
 
-    _cnmpc.nmpc_get_state.argtypes = [POINTER(_State)]
-    _cnmpc.nmpc_get_state.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_get_state.argtypes =
+        [POINTER(_State)]
+    _cnmpc.nmpc_fixedwingdynamics_get_state.restype = None
 
-    _cnmpc.nmpc_set_state.argtypes = [POINTER(_State)]
-    _cnmpc.nmpc_set_state.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_set_state.argtypes =
+        [POINTER(_State)]
+    _cnmpc.nmpc_fixedwingdynamics_set_state.restype = None
 
-    _cnmpc.nmpc_integrate.argtypes = [c_float, POINTER(_REAL_T * _CONTROL_DIM)]
-    _cnmpc.nmpc_integrate.restype = None
+    _cnmpc.nmpc_fixedwingdynamics_integrate.argtypes =
+        [c_float, POINTER(_REAL_T * _CONTROL_DIM)]
+    _cnmpc.nmpc_fixedwingdynamics_integrate.restype = None
 
     _cnmpc.nmpc_fixedwingdynamics_set_mass.argtypes = [_REAL_T]
     _cnmpc.nmpc_fixedwingdynamics_set_mass.restype = None
@@ -182,4 +193,4 @@ def init(implementation="c"):
 
     # Set up the state
     state = _State()
-    _cnmpc.nmpc_get_state(state)
+    _cnmpc.nmpc_fixedwingdynamics_get_state(state)
