@@ -47,11 +47,11 @@ public:
     template<typename StateModel>
     const StateModel integrate(
         StateModel in,
-        ControlVector ccontrol,
+        ControlVector control,
         real_t delta) const {
         StateModel a = in.model(control);
         StateModel b = static_cast<StateModel>(
-            in + (real_t)0.5 * delta * a).model(control;
+            in + (real_t)0.5 * delta * a).model(control);
         StateModel c = static_cast<StateModel>(
             in + (real_t)0.5 * delta * b).model(control);
         StateModel d = static_cast<StateModel>(
@@ -66,7 +66,7 @@ public:
     template<typename StateModel>
     const StateModel integrate(
         StateModel in,
-        ControlVector ccontrol,
+        ControlVector control,
         real_t delta) const {
         StateModel initial = in.model(control);
         StateModel predictor = in + delta * initial;
@@ -80,7 +80,7 @@ public:
     template<typename StateModel>
     const StateModel integrate(
         StateModel in,
-        ControlVector ccontrol,
+        ControlVector control,
         real_t delta) const {
         return in + delta * in.model(control);
     }

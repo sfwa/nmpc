@@ -29,6 +29,7 @@ SOFTWARE.
 
 #include "types.h"
 #include "state.h"
+#include "integrator.h"
 
 /* OCP control and prediction horizon (number of steps). */
 #define OCP_HORIZON_LENGTH 500
@@ -41,11 +42,11 @@ Optimal Control Problem object.
 */
 class OptimalControlProblem {
     /* Integrator object, depends on selection in `config.h`. */
-#if defined(UKF_INTEGRATOR_RK4)
+#if defined(NMPC_INTEGRATOR_RK4)
     IntegratorRK4 integrator;
-#elif defined(UKF_INTEGRATOR_HEUN)
+#elif defined(NMPC_INTEGRATOR_HEUN)
     IntegratorHeun integrator;
-#elif defined(UKF_INTEGRATOR_EULER)
+#elif defined(NMPC_INTEGRATOR_EULER)
     IntegratorEuler integrator;
 #endif
     
@@ -109,7 +110,7 @@ class OptimalControlProblem {
     qpOptions_t qp_options;
 
     GradientVector state_to_delta(
-        const StateVector s, const ControlVector c, const ReferenceVector r);
+        const StateVector &s, const ControlVector &c, const ReferenceVector &r);
     DeltaVector state_to_delta(const StateVector &s1, const StateVector &s2);
     void calculate_deltas();
     void solve_ivps();

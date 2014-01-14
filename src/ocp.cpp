@@ -29,11 +29,11 @@ SOFTWARE.
 #include "debug.h"
 
 OptimalControlProblem::OptimalControlProblem() {
-#if defined(UKF_INTEGRATOR_RK4)
+#if defined(NMPC_INTEGRATOR_RK4)
     integrator = IntegratorRK4();
-#elif defined(UKF_INTEGRATOR_HEUN)
+#elif defined(NMPC_INTEGRATOR_HEUN)
     integrator = IntegratorHeun();
-#elif defined(UKF_INTEGRATOR_EULER)
+#elif defined(NMPC_INTEGRATOR_EULER)
     integrator = IntegratorEuler();
 #endif
 
@@ -139,12 +139,15 @@ void OptimalControlProblem::solve_ivps() {
     for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
         /* Solve the initial value problem at this horizon step. */
         integrated_state_horizon[i] = integrator.integrate(
-            State(state_horizon[i], *dynamics),
+            State(state_horizon[i], dynamics),
             control_horizon[i],
             OCP_STEP_LENGTH);
 
         for(j = 0; j < NMPC_GRADIENT_DIM; j++) {
-            ReferenceVector perturbed_state = integrated_state_horizon[i];
+            ReferenceVector perturbed_state;
+            perturbed_state.segment<NMPC_STATE_DIM>(0) = state_horizon[i];
+            perturbed_state.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM) =
+                control_horizon[i];
             StateVector new_state;
 
             /* Need to calculate quaternion perturbations using MRPs. */
@@ -153,22 +156,23 @@ void OptimalControlProblem::solve_ivps() {
                 d_p << 0.0, 0.0, 0.0;
                 d_p[j-6] = NMPC_EPS_4RT;
                 real_t x_2 = d_p.squaredNorm();
-                real_t err_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
+                real_t delta_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
                     NMPC_MRP_F_2 + ((real_t)1.0 - NMPC_MRP_A_2) * x_2)) /
-                    (NMPC)_MRP_F_2 + x_2);
-                Vector3r err_xyz = (((real_t)1.0 / NMPC_MRP_F) *
-                    (NMPC_MRP_A + err_w)) * d_p;
+                    (NMPC_MRP_F_2 + x_2);
+                Vector3r delta_xyz = (((real_t)1.0 / NMPC_MRP_F) *
+                    (NMPC_MRP_A + delta_w)) * d_p;
                 Quaternionr delta_q;
                 delta_q.vec() = delta_xyz;
                 delta_q.w() = delta_w;
-                perturbed_state.segment<4>(6) = delta_q *
+                Quaternionr temp = delta_q *
                     Quaternionr(perturbed_state.segment<4>(6));
+                perturbed_state.segment<4>(6) << temp.vec(), temp.w();
             } else {
                 perturbed_state[j] += NMPC_EPS_4RT;
             }
 
             new_state.segment<NMPC_STATE_DIM>(0) = integrator.integrate(
-                State(perturbed_state.segment<NMPC_STATE_DIM>(0), *dynamics),
+                State(perturbed_state.segment<NMPC_STATE_DIM>(0), dynamics),
                 perturbed_state.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM),
                 OCP_STEP_LENGTH);
 
@@ -218,14 +222,14 @@ void OptimalControlProblem::calculate_hessians() {
             GradientVector integrated_delta = state_to_delta(
             integrated_state_horizon[i],
             control_horizon[i],
-            reference_trajectry[i+1]);
+            reference_trajectory[i+1]);
 
             weights = &state_weights;
         } else {
             GradientVector integrated_delta = state_to_delta(
             integrated_state_horizon[i],
             control_horizon[i],
-            reference_trajectry[i]);
+            reference_trajectory[i]);
 
             weights = &terminal_weights;
         }
@@ -235,27 +239,27 @@ void OptimalControlProblem::calculate_hessians() {
         si = integrated_delta.segment<NMPC_DELTA_DIM>(0).transpose() *
             *weights * integrated_delta.segment<NMPC_DELTA_DIM>(0);
 
-        sf = delta[i].segment<NMPC_DELTA_DIM>(0).transpose() *
-            *weights * delta[i].segment<NMPC_DELTA_DIM>(0);
+        sf = deltas[i].segment<NMPC_DELTA_DIM>(0).transpose() *
+            *weights * deltas[i].segment<NMPC_DELTA_DIM>(0);
 
         ci = integrated_delta.segment<NMPC_CONTROL_DIM>(
             NMPC_DELTA_DIM).transpose() *
             control_weights *
             integrated_delta.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
 
-        cf = delta[i].segment<NMPC_CONTROL_DIM>(
+        cf = deltas[i].segment<NMPC_CONTROL_DIM>(
             NMPC_DELTA_DIM).transpose() *
             control_weights *
-            delta[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
+            deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
 
         base_gradient = (sf + cf) - (si + ci);
 
         /* Next, calculate cost function gradient for each parameter. */
         for(j = 0; j < NMPC_GRADIENT_DIM; j++) {
-            if(delta[i](j) >= NMPC_EPS_SQRT) {
+            if(deltas[i](j) >= NMPC_EPS_SQRT) {
                 /* Perturb the delta vector by an appropriate amount. */
-                GradientVector perturbed_delta = delta[i] +
-                    std::abs(delta[i](j))*NMPC_EPS_4RT;
+                GradientVector perturbed_delta = deltas[i];
+                deltas[i](j) += std::abs(deltas[i](j))*NMPC_EPS_4RT;
 
                 /*
                 Apply the perturbed delta vector to the reference trajectory
@@ -270,16 +274,17 @@ void OptimalControlProblem::calculate_hessians() {
                 /* Apply the delta MRP to the state vector quaternion. */
                 Vector3r d_p = perturbed_delta.segment<3>(6);
                 real_t x_2 = d_p.squaredNorm();
-                real_t err_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
+                real_t delta_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
                     NMPC_MRP_F_2 + ((real_t)1.0 - NMPC_MRP_A_2) * x_2)) /
-                    (NMPC)_MRP_F_2 + x_2);
-                Vector3r err_xyz = (((real_t)1.0 / NMPC_MRP_F) *
-                    (NMPC_MRP_A + err_w)) * d_p;
+                    (NMPC_MRP_F_2 + x_2);
+                Vector3r delta_xyz = (((real_t)1.0 / NMPC_MRP_F) *
+                    (NMPC_MRP_A + delta_w)) * d_p;
                 Quaternionr delta_q;
                 delta_q.vec() = delta_xyz;
                 delta_q.w() = delta_w;
-                perturbed_state.segment<4>(6) = delta_q *
-                    Quaternionr(reference_trajectory[i].segment<4>(6));
+                Quaternionr temp = delta_q *
+                    Quaternionr(perturbed_state.segment<4>(6));
+                perturbed_state.segment<4>(6) << temp.vec(), temp.w();
 
                 perturbed_state.segment<6>(10) =
                     reference_trajectory[i].segment<6>(10) +
@@ -292,7 +297,7 @@ void OptimalControlProblem::calculate_hessians() {
 
                 /* Integrate the perturbed state vector. */
                 StateVector integrated_state = integrator.integrate(
-                    State(perturbed_state, *dynamics),
+                    State(perturbed_state, dynamics),
                     perturbed_control,
                     OCP_STEP_LENGTH);
 
@@ -301,12 +306,12 @@ void OptimalControlProblem::calculate_hessians() {
                     integrated_delta = state_to_delta(
                     integrated_state,
                     perturbed_control,
-                    reference_trajectry[i+1]);
+                    reference_trajectory[i+1]);
                 } else {
                     integrated_delta = state_to_delta(
                     integrated_state,
                     perturbed_control,
-                    reference_trajectry[i]);
+                    reference_trajectory[i]);
                 }
 
                 /*
@@ -335,7 +340,7 @@ void OptimalControlProblem::calculate_hessians() {
 
                 cost_gradients[j] =
                     (((sf + cf) - (si + ci)) - base_gradient) /
-                    (2.0*std::abs(delta[i](j))*NMPC_EPS_4RT);
+                    (2.0*std::abs(deltas[i](j))*NMPC_EPS_4RT);
             } else {
                 cost_gradients[j] = 0;
             }
