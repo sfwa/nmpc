@@ -5,7 +5,6 @@ import time
 import ctypes
 
 import nmpc
-nmpc.init()
 from nmpc import _cnmpc, state
 
 import pygame
