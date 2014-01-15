@@ -106,6 +106,8 @@ enum nmpc_precision_t {
 
 uint32_t nmpc_config_get_state_dim(void);
 uint32_t nmpc_config_get_control_dim(void);
+uint32_t nmpc_config_get_horizon_length(void);
+real_t nmpc_config_get_step_length(void);
 enum nmpc_precision_t nmpc_config_get_precision(void);
 
 #ifdef __cplusplus

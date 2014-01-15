@@ -14,6 +14,10 @@ _REAL_T = None
 _CONTROL_DIM = None
 _STATE_DIM = None
 
+# Externally accessible globals
+HORIZON_LENGTH = None
+STEP_LENGTH = None
+
 class _State(Structure):
     def __repr__(self):
         fields = {
@@ -83,8 +87,14 @@ def setup(state_weights, control_weights, terminal_weights,
     _cnmpc.nmpc_set_upper_control_bound(
         (_REAL_T * (_CONTROL_DIM))(*upper_control_bound))
 
+def set_reference(point, index):
+    _cnmpc.nmpc_set_reference_point(
+        (_REAL_T * (_CONTROL_DIM+_STATE_DIM))(*point),
+        index)
+
 def init(implementation="c"):
     global _cnmpc, _REAL_T, _STATE_DIM, _CONTROL_DIM, state
+    global HORIZON_LENGTH, STEP_LENGTH
 
     # Load the requested library and determine configuration parameters
     if implementation == "c":
@@ -112,6 +122,15 @@ def init(implementation="c"):
     _REAL_T = c_double if _PRECISION == NMPC_PRECISION_DOUBLE else c_float
     _CONTROL_DIM = _cnmpc.nmpc_config_get_control_dim()
     _STATE_DIM = _cnmpc.nmpc_config_get_state_dim()
+
+    _cnmpc.nmpc_config_get_horizon_length.argtypes = []
+    _cnmpc.nmpc_config_get_horizon_length.restype = c_long
+
+    _cnmpc.nmpc_config_get_step_length.argtypes = []
+    _cnmpc.nmpc_config_get_step_length.restype = _REAL_T
+
+    HORIZON_LENGTH = _cnmpc.nmpc_config_get_horizon_length()
+    STEP_LENGTH = _cnmpc.nmpc_config_get_step_length()
 
     _State._fields_ = [
         ("position", _REAL_T * 3),

@@ -5,6 +5,7 @@ import sys
 import time
 import ctypes
 import vectors
+import bisect
 
 import nmpc
 nmpc.init()
@@ -45,6 +46,22 @@ def euler_to_q(yaw, pitch, roll):
             vectors.Q.rotate("Z", -yaw))
 
 
+def interpolate_reference(sample_time, points):
+    index = bisect.bisect([p[0] for p in points], sample_time)
+    delta = [b - a for a, b in zip(points[index-1], points[index])]
+    residual_time = ((sample_time - points[index-1][0]) / delta[0])
+    new_point = [(a + b*residual_time) \
+        for a, b in zip(points[index-1], delta)]
+
+    q = vectors.Q(new_point[7], new_point[8], new_point[9], new_point[10])
+    q_norm = q.normalize()
+    new_point[7] = q_norm[0]
+    new_point[8] = q_norm[1]
+    new_point[9] = q_norm[2]
+    new_point[10] = q_norm[3]
+
+    return new_point
+
 # Load the data
 headers = None
 initialised = False
@@ -72,6 +89,8 @@ nmpc.setup(
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
     upper_control_bound=[15000, 1.0, 1.0],
     lower_control_bound=[0, -1.0, -1.0])
+
+xplane_reference_points = []
 
 fields = ["time",
     "pos_x", "pos_y", "pos_z"
@@ -119,6 +138,12 @@ for line in sys.stdin:
             float(data["____Q,rad/s"]),
             float(data["____R,rad/s"])]
 
-        print "\t".join(str(o) for o in out)
+        #print "\t".join(str(o) for o in out)
 
-        readings = dict(zip(fields, map(float, out)))
+        xplane_reference_points.append(map(float, out))
+
+# Set up the NMPC reference trajectory using correct interpolation.
+for i in xrange(0, nmpc.HORIZON_LENGTH):
+    horizon_point = interpolate_reference(
+        i*nmpc.STEP_LENGTH, xplane_reference_points)
+    nmpc.set_reference(horizon_point, i)

@@ -226,6 +226,14 @@ uint32_t nmpc_config_get_control_dim() {
     return NMPC_CONTROL_DIM;
 }
 
+uint32_t nmpc_config_get_horizon_length() {
+    return OCP_HORIZON_LENGTH;
+}
+
+real_t nmpc_config_get_step_length() {
+    return OCP_STEP_LENGTH;
+}
+
 enum nmpc_precision_t nmpc_config_get_precision() {
 #ifdef NMPC_SINGLE_PRECISION
     return NMPC_PRECISION_FLOAT;
