@@ -42,7 +42,7 @@ static State current;
 static OptimalControlProblem ocp =
     OptimalControlProblem(&fixed_wing_model);
 
-void nmpc_fixedwingdynamics_init() {
+void nmpc_init() {
     ocp.initialise();
 }
 

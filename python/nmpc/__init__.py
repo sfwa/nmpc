@@ -12,7 +12,7 @@ state = None
 _cnmpc = None
 _REAL_T = None
 _CONTROL_DIM = None
-
+_STATE_DIM = None
 
 class _State(Structure):
     def __repr__(self):
@@ -70,8 +70,21 @@ def configure_airframe(mass=None, inertia_tensor=None, prop_coeffs=None,
         (_REAL_T * _CONTROL_DIM)(*yaw_moment_coeffs[-_CONTROL_DIM:]))
 
 
+def setup(state_weights, control_weights, terminal_weights,
+        upper_control_bound, lower_control_bound):
+    _cnmpc.nmpc_set_state_weights(
+        (_REAL_T * (_STATE_DIM-1))(*state_weights))
+    _cnmpc.nmpc_set_control_weights(
+        (_REAL_T * (_CONTROL_DIM))(*control_weights))
+    _cnmpc.nmpc_set_terminal_weights(
+        (_REAL_T * (_STATE_DIM-1))(*terminal_weights))
+    _cnmpc.nmpc_set_lower_control_bound(
+        (_REAL_T * (_CONTROL_DIM))(*lower_control_bound))
+    _cnmpc.nmpc_set_upper_control_bound(
+        (_REAL_T * (_CONTROL_DIM))(*upper_control_bound))
+
 def init(implementation="c"):
-    global _cnmpc, _REAL_T, _CONTROL_DIM, state
+    global _cnmpc, _REAL_T, _STATE_DIM, _CONTROL_DIM, state
 
     # Load the requested library and determine configuration parameters
     if implementation == "c":
