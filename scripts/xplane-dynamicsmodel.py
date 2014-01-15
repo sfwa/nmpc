@@ -59,14 +59,14 @@ for line in response.split("\n"):
 print position_offset
 
 TIMESTEP = 1.0/500.0  # 50Hz updates.
-_cnmpc.nmpc_set_position(0, 0, 0)
-_cnmpc.nmpc_set_velocity(20, 0, 0)
-_cnmpc.nmpc_set_acceleration(0, 0, 0)
-_cnmpc.nmpc_set_attitude(1, 0, 0, 0)
-_cnmpc.nmpc_set_angular_velocity(0, 0, 0)
-_cnmpc.nmpc_set_angular_acceleration(0, 0, 0)
-_cnmpc.nmpc_set_wind_velocity(0, 0, 0)
-_cnmpc.nmpc_get_state(state)
+_cnmpc.nmpc_fixedwingdynamics_set_position(0, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_set_velocity(20, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_set_acceleration(0, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_set_attitude(1, 0, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_set_angular_velocity(0, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_set_angular_acceleration(0, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_set_wind_velocity(0, 0, 0)
+_cnmpc.nmpc_fixedwingdynamics_get_state(state)
 
 control_vec = [0, 0, 0, 0]
 
