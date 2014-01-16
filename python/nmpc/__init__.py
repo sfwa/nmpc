@@ -98,6 +98,9 @@ def initialise_horizon():
 def prepare():
     _cnmpc.nmpc_preparation_step()
 
+def solve(measurement):
+    _cnmpc.nmpc_feedback_step((_REAL_T * (_STATE_DIM))(*measurement))
+
 def init(implementation="c"):
     global _cnmpc, _REAL_T, _STATE_DIM, _CONTROL_DIM, state
     global HORIZON_LENGTH, STEP_LENGTH

@@ -461,8 +461,29 @@ the SQP iteration. This allows the feedback delay to be significantly less
 than one time step.
 */
 void OptimalControlProblem::initial_constraint(StateVector measurement) {
-    real_t xLow[NMPC_DELTA_DIM];
-    real_t xUpp[NMPC_DELTA_DIM];
+    real_t zLow[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> zLow_map(zLow);
+    real_t zUpp[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> zUpp_map(zUpp);
+
+    /* Control constraints are unchanged. */
+    zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) = lower_control_bound;
+    zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) = upper_control_bound;
+
+    /*
+    Initial delta is constrained to be the difference between the measurement
+    and the initial reference point.
+    */
+    DeltaVector initial_delta = state_to_delta(
+        measurement, 
+        reference_trajectory[0].segment<NMPC_STATE_DIM>(0));
+    zLow_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
+    zUpp_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
+
+    return_t status_flag = qpDUNES_updateIntervalData(
+        &qp_data, qp_data.intervals[0],
+        0, 0, 0, 0, zLow, zUpp, 0, 0, 0, 0);
+    AssertOK(status_flag);
 }
 
 /* Solves the QP using qpDUNES. */
