@@ -37,7 +37,7 @@ SOFTWARE.
 }
 
 #define AssertOK(m) { \
-	bool _res = m != QPDUNES_OK; \
+	bool _res = m == QPDUNES_OK; \
 	if(!_res) { \
 		std::cout << "Interval setup failed\n"; \
 	} \
@@ -45,7 +45,7 @@ SOFTWARE.
 }
 
 #define AssertSolutionFound(m) { \
-	bool _res = m != QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND; \
+	bool _res = m == QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND; \
 	if(!_res) { \
 		std::cout << "Unable to find optimal solution\n"; \
 	} \

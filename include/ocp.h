@@ -61,7 +61,7 @@ class OptimalControlProblem {
     Difference between predicted state and reference trajectory for each
     point on the horizon, weighted by the weight matrices.
     */
-    GradientVector gradient[OCP_HORIZON_LENGTH];
+    GradientVector gradients[OCP_HORIZON_LENGTH];
 
     /*
     The "deltas" are the set of perturbations from point around which the

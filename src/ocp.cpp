@@ -136,10 +136,10 @@ void OptimalControlProblem::calculate_deltas() {
             weights = &terminal_weights;
         }
 
-        gradient[i].segment<NMPC_DELTA_DIM>(0) =
+        gradients[i].segment<NMPC_DELTA_DIM>(0) =
             *weights * deltas[i].segment<NMPC_DELTA_DIM>(0);
 
-        gradient[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+        gradients[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             control_weights *
             deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
     }
@@ -406,6 +406,18 @@ avoid having to copy data at all.
 */
 void OptimalControlProblem::initialise_qp() {
     uint32_t i;
+    real_t H[NMPC_GRADIENT_DIM*NMPC_GRADIENT_DIM];
+    Eigen::Map<HessianMatrix> H_map(H);
+    real_t g[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> g_map(g);
+    real_t C[(NMPC_STATE_DIM-1)*NMPC_GRADIENT_DIM];
+    Eigen::Map<ContinuityConstraintMatrix> C_map(C);
+    real_t c[NMPC_DELTA_DIM];
+    Eigen::Map<DeltaVector> c_map(c);
+    real_t uLow[NMPC_CONTROL_DIM];
+    Eigen::Map<ControlConstraintVector> uLow_map(uLow);
+    real_t uUpp[NMPC_CONTROL_DIM];
+    Eigen::Map<ControlConstraintVector> uUpp_map(uUpp);
 
     /* Set up problem dimensions. */
     /* TODO: Determine number of affine constraints (D), and add them. */
@@ -420,11 +432,26 @@ void OptimalControlProblem::initialise_qp() {
     return_t status_flag;
 
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
-        // status_flag = qpDUNES_setupRegularInterval(
-        //     &qp_data,
-        //     );
-        // AssertOK(status_flag);
+        /* Copy the relevant data into the qpDUNES arrays. */
+        H_map = hessians[i];
+        g_map = gradients[i];
+        C_map = jacobians[i];
+        c_map = integration_residuals[i];
+        uLow_map = lower_control_bound;
+        uUpp_map = upper_control_bound;
+
+        status_flag = qpDUNES_setupRegularInterval(
+            &qp_data, qp_data.intervals[i],
+            H, 0, 0, 0, g, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
+        AssertOK(status_flag);
     }
+
+    /* Set up final interval */
+    /* TODO: Figure out what should be different here. */
+
+    qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_FALSE);
+
+    qpDUNES_indicateDataChange(&qp_data);
 }
 
 /*
@@ -434,7 +461,8 @@ the SQP iteration. This allows the feedback delay to be significantly less
 than one time step.
 */
 void OptimalControlProblem::initial_constraint(StateVector measurement) {
-
+    real_t xLow[NMPC_DELTA_DIM];
+    real_t xUpp[NMPC_DELTA_DIM];
 }
 
 /* Solves the QP using qpDUNES. */
