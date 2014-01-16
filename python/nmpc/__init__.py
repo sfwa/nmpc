@@ -92,6 +92,12 @@ def set_reference(point, index):
         (_REAL_T * (_CONTROL_DIM+_STATE_DIM))(*point),
         index)
 
+def initialise_horizon():
+    _cnmpc.nmpc_init()
+
+def prepare():
+    _cnmpc.nmpc_preparation_step()
+
 def init(implementation="c"):
     global _cnmpc, _REAL_T, _STATE_DIM, _CONTROL_DIM, state
     global HORIZON_LENGTH, STEP_LENGTH
