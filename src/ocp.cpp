@@ -508,8 +508,15 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
 /* Solves the QP using qpDUNES. */
 void OptimalControlProblem::solve_qp() {
+    real_t solution[NMPC_GRADIENT_DIM*(OCP_HORIZON_LENGTH+1)];
+
     return_t status_flag = qpDUNES_solve(&qp_data);
     AssertSolutionFound(status_flag);
+
+    /* Get the solution. */
+    qpDUNES_getPrimalSol(&qp_data, solution);
+
+    qpDUNES_printMatrixData(solution, OCP_HORIZON_LENGTH, NMPC_GRADIENT_DIM, "solution:");
 }
 
 void OptimalControlProblem::update_horizon() {
