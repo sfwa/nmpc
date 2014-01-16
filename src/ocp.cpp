@@ -21,7 +21,11 @@ SOFTWARE.
 */
 
 #include <cmath>
-#include <qpDUNES.h>
+
+extern "C"
+{
+    #include <qpDUNES.h>
+}
 
 #include "types.h"
 #include "ocp.h"
@@ -51,7 +55,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
     control_weights = ControlWeightMatrix::Identity();
     terminal_weights = StateWeightMatrix::Identity();
 
-//    qp_options = qpDUNES_setupDefaultOptions();
+    qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 100;
     qp_options.printLevel = 2;
     qp_options.stationarityTolerance = 1e-6;
@@ -405,21 +409,21 @@ void OptimalControlProblem::initialise_qp() {
 
     /* Set up problem dimensions. */
     /* TODO: Determine number of affine constraints (D), and add them. */
-//    qpDUNES_setup(
-//        &qp_data,
-//        OCP_HORIZON_LENGTH,
-//        NMPC_DELTA_DIM,
-//        NMPC_CONTROL_DIM,
-//        0,
-//        &qp_options);
+    qpDUNES_setup(
+        &qp_data,
+        OCP_HORIZON_LENGTH,
+        NMPC_DELTA_DIM,
+        NMPC_CONTROL_DIM,
+        0,
+        &qp_options);
 
     return_t status_flag;
 
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
-//        status_flag = qpDUNES_setupRegularInterval(
-//            &qp_data,
-//            );
-//        AssertOK(status_flag);
+        // status_flag = qpDUNES_setupRegularInterval(
+        //     &qp_data,
+        //     );
+        // AssertOK(status_flag);
     }
 }
 
@@ -435,8 +439,8 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
 /* Solves the QP using qpDUNES. */
 void OptimalControlProblem::solve_qp() {
-//    return_t status_flag = qpDUNES_solve(&qp_data);
-//    AssertSolutionFound(status_flag);
+    return_t status_flag = qpDUNES_solve(&qp_data);
+    AssertSolutionFound(status_flag);
 }
 
 void OptimalControlProblem::update_horizon() {
