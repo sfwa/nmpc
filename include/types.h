@@ -28,7 +28,7 @@ SOFTWARE.
 /*
 Definitions for numerical precision. Also included is a definition for the
 fourth root of the machine precision, which is used when calculating the
-finite-difference interval for the Hessian calculation.
+finite-difference interval for the Jacobian calculation.
 */
 
 #ifdef NMPC_SINGLE_PRECISION
@@ -69,13 +69,6 @@ by one because orientation is represented by MRP rather than quaternion.
  */
 typedef Eigen::Matrix<real_t, NMPC_GRADIENT_DIM, 1> GradientVector;
 
-/* Hessian matrices for control and state vectors. */
-typedef Eigen::Matrix<
-    real_t,
-    NMPC_GRADIENT_DIM,
-    NMPC_GRADIENT_DIM,
-    Eigen::RowMajor> HessianMatrix;
-
 /* Matrices for state and control weights. */
 typedef Eigen::Matrix<
     real_t,
@@ -106,10 +99,7 @@ typedef Eigen::Matrix<
 typedef Eigen::Matrix<real_t, NMPC_DELTA_DIM, 1> StateConstraintVector;
 typedef Eigen::Matrix<real_t, NMPC_CONTROL_DIM, 1> ControlConstraintVector;
 
-/*
-Typedef for inequality constraint matrix. Same dimensions as the Hessian
-Matrix.
-*/
+/* Typedef for inequality constraint matrix. */
 typedef Eigen::Matrix<
     real_t,
     NMPC_GRADIENT_DIM,

@@ -72,12 +72,6 @@ class OptimalControlProblem {
     GradientVector deltas[OCP_HORIZON_LENGTH];
 
     /*
-    Hessian matrices for each point on the horizon. Recalculated each
-    iteration for use by the QP solver.
-    */
-    HessianMatrix hessians[OCP_HORIZON_LENGTH];
-
-    /*
     Affine constraint matrix and bounding vectors. These will be generated
     each iteration from the non-linear constraints.
     */
@@ -117,7 +111,6 @@ class OptimalControlProblem {
         const StateVector &s2);
     void calculate_deltas();
     void solve_ivps();
-    void calculate_hessians();
     void initialise_qp();
     void initial_constraint(StateVector measurement);
     void solve_qp();
