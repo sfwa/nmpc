@@ -57,7 +57,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 100;
-    qp_options.printLevel = 2;
+    qp_options.printLevel = 4;
     qp_options.stationarityTolerance = 1e-6;
 }
 
@@ -408,6 +408,12 @@ void OptimalControlProblem::initialise_qp() {
     uint32_t i;
     real_t H[NMPC_GRADIENT_DIM*NMPC_GRADIENT_DIM];
     Eigen::Map<HessianMatrix> H_map(H);
+    real_t Q[NMPC_DELTA_DIM*NMPC_DELTA_DIM];
+    Eigen::Map<StateWeightMatrix> Q_map(Q);
+    real_t R[NMPC_CONTROL_DIM*NMPC_CONTROL_DIM];
+    Eigen::Map<ControlWeightMatrix> R_map(R);
+    real_t P[NMPC_DELTA_DIM*NMPC_DELTA_DIM];
+    Eigen::Map<StateWeightMatrix> P_map(P);
     real_t g[NMPC_GRADIENT_DIM];
     Eigen::Map<GradientVector> g_map(g);
     real_t C[(NMPC_STATE_DIM-1)*NMPC_GRADIENT_DIM];
@@ -433,7 +439,9 @@ void OptimalControlProblem::initialise_qp() {
 
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
-        H_map = hessians[i];
+        //H_map = hessians[i];
+        Q_map = state_weights;
+        R_map = control_weights;
         g_map = gradients[i];
         C_map = jacobians[i];
         c_map = integration_residuals[i];
@@ -442,12 +450,15 @@ void OptimalControlProblem::initialise_qp() {
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
-            H, 0, 0, 0, g, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
+            0, Q, R, 0, g, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
         AssertOK(status_flag);
     }
 
     /* Set up final interval */
-    /* TODO: Figure out what should be different here. */
+    P_map = terminal_weights;
+    status_flag = qpDUNES_setupFinalInterval(&qp_data, qp_data.intervals[i],
+        P, 0, 0, 0, 0, 0, 0);
+    AssertOK(status_flag);
 
     qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_FALSE);
 

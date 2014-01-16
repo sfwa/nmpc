@@ -79,8 +79,8 @@ typedef Eigen::Matrix<
 /* Matrices for state and control weights. */
 typedef Eigen::Matrix<
     real_t,
-    NMPC_STATE_DIM-1,
-    NMPC_STATE_DIM-1,
+    NMPC_DELTA_DIM,
+    NMPC_DELTA_DIM,
     Eigen::RowMajor> StateWeightMatrix;
 
 typedef Eigen::Matrix<
@@ -119,7 +119,7 @@ typedef Eigen::Matrix<
 /* Typedef for continuity constraint matrix.  */
 typedef Eigen::Matrix<
     real_t,
-    NMPC_STATE_DIM-1,
+    NMPC_DELTA_DIM,
     NMPC_GRADIENT_DIM,
     Eigen::RowMajor> ContinuityConstraintMatrix;
 
