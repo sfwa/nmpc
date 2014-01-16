@@ -166,7 +166,7 @@ void OptimalControlProblem::solve_ivps() {
             StateVector new_state;
 
             /* Need to calculate quaternion perturbations using MRPs. */
-            if(j >= 6 || j <= 8) {
+            if(j >= 6 && j <= 8) {
                 Vector3r d_p;
                 d_p << 0.0, 0.0, 0.0;
                 d_p[j-6] = NMPC_EPS_4RT;
@@ -201,13 +201,13 @@ void OptimalControlProblem::solve_ivps() {
                 NMPC_EPS_4RT;
         }
 
-    /*
-    Calculate integration residuals; these are needed for the continuity
-    constraints.
-    */
-    integration_residuals[i] = state_to_delta(
-        integrated_state_horizon[i],
-        state_horizon[i+1]);
+        /*
+        Calculate integration residuals; these are needed for the continuity
+        constraints.
+        */
+        integration_residuals[i] = state_to_delta(
+            integrated_state_horizon[i],
+            state_horizon[i+1]);
     }
 }
 
