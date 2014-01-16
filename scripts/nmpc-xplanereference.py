@@ -85,7 +85,7 @@ nmpc.configure_airframe(
 
 nmpc.setup(
     state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    control_weights=[1e-4, 1, 1],
+    control_weights=[1e-10, 1, 1],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[15000, 1.0, 1.0],
     lower_control_bound=[0, -1.0, -1.0])
@@ -146,7 +146,7 @@ for line in sys.stdin:
 for i in xrange(0, nmpc.HORIZON_LENGTH):
     horizon_point = interpolate_reference(
         i*nmpc.STEP_LENGTH, xplane_reference_points)
-    horizon_point.extend([10000, 0, 0])
+    horizon_point.extend([0, 0, 0])
     nmpc.set_reference(horizon_point[1:], i)
 
 nmpc.initialise_horizon()
