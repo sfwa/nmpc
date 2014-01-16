@@ -57,7 +57,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 100;
-    qp_options.printLevel = 4;
+    qp_options.printLevel = 2;
     qp_options.stationarityTolerance = 1e-6;
 }
 
@@ -447,6 +447,15 @@ void OptimalControlProblem::initialise_qp() {
         c_map = integration_residuals[i];
         uLow_map = lower_control_bound;
         uUpp_map = upper_control_bound;
+
+        std::cout << Q_map << std::endl << std::endl;
+        std::cout << R_map << std::endl << std::endl;
+        std::cout << g_map.transpose() << std::endl << std::endl;
+        std::cout << C_map << std::endl << std::endl;
+        std::cout << c_map.transpose() << std::endl << std::endl;
+        std::cout << uLow_map.transpose() << std::endl << std::endl;
+        std::cout << uUpp_map.transpose() << std::endl << std::endl;
+        std::cout << "====================================" << std::endl << std::endl;
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
