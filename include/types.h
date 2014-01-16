@@ -57,8 +57,7 @@ typedef Eigen::Matrix<real_t, 3, 1> Vector3r;
 typedef Eigen::Matrix<real_t, 4, 1> Vector4r;
 typedef Eigen::Matrix<real_t, 5, 1> Vector5r;
 typedef Eigen::Quaternion<real_t> Quaternionr;
-typedef Eigen::Matrix<real_t, 3, 3> Matrix3x3r;
-typedef Eigen::Matrix<real_t, Eigen::Dynamic, Eigen::Dynamic> MatrixXr;
+typedef Eigen::Matrix<real_t, 3, 3, Eigen::RowMajor> Matrix3x3r;
 typedef Eigen::Matrix<real_t, Eigen::Dynamic, 1> VectorXr;
 
 typedef Eigen::Matrix<real_t, NMPC_STATE_DIM, 1> StateVector;
@@ -74,18 +73,21 @@ typedef Eigen::Matrix<real_t, NMPC_GRADIENT_DIM, 1> GradientVector;
 typedef Eigen::Matrix<
     real_t,
     NMPC_GRADIENT_DIM,
-    NMPC_GRADIENT_DIM> HessianMatrix;
+    NMPC_GRADIENT_DIM,
+    Eigen::RowMajor> HessianMatrix;
 
 /* Matrices for state and control weights. */
 typedef Eigen::Matrix<
     real_t,
     NMPC_STATE_DIM-1,
-    NMPC_STATE_DIM-1> StateWeightMatrix;
+    NMPC_STATE_DIM-1,
+    Eigen::RowMajor> StateWeightMatrix;
 
 typedef Eigen::Matrix<
     real_t,
     NMPC_CONTROL_DIM,
-    NMPC_CONTROL_DIM> ControlWeightMatrix;
+    NMPC_CONTROL_DIM,
+    Eigen::RowMajor> ControlWeightMatrix;
 
 /* Typedef for control vector. */
 typedef Eigen::Matrix<real_t, NMPC_CONTROL_DIM, 1> ControlVector;
@@ -111,13 +113,15 @@ Matrix.
 typedef Eigen::Matrix<
     real_t,
     NMPC_GRADIENT_DIM,
-    NMPC_GRADIENT_DIM> InequalityConstraintMatrix;
+    NMPC_GRADIENT_DIM,
+    Eigen::RowMajor> InequalityConstraintMatrix;
 
 /* Typedef for continuity constraint matrix.  */
 typedef Eigen::Matrix<
     real_t,
     NMPC_STATE_DIM-1,
-    NMPC_GRADIENT_DIM> ContinuityConstraintMatrix;
+    NMPC_GRADIENT_DIM,
+    Eigen::RowMajor> ContinuityConstraintMatrix;
 
 typedef Eigen::Matrix<real_t, 6, 1> AccelerationVector;
 
