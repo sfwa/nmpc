@@ -164,15 +164,16 @@ void OptimalControlProblem::solve_ivps() {
             perturbed_state.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM) =
                 control_horizon[i];
             StateVector new_state;
+            real_t perturbation = NMPC_EPS_4RT;
 
             /* Need to calculate quaternion perturbations using MRPs. */
             if(j < 6) {
-                perturbed_state[j] += NMPC_EPS_4RT;
+                perturbed_state[j] += perturbation;
             }
             else if(j >= 6 && j <= 8) {
                 Vector3r d_p;
                 d_p << 0.0, 0.0, 0.0;
-                d_p[j-6] = NMPC_EPS_4RT;
+                d_p[j-6] = perturbation;
                 real_t x_2 = d_p.squaredNorm();
                 real_t delta_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
                     NMPC_MRP_F_2 + ((real_t)1.0 - NMPC_MRP_A_2) * x_2)) /
@@ -185,8 +186,18 @@ void OptimalControlProblem::solve_ivps() {
                 Quaternionr temp = delta_q *
                     Quaternionr(perturbed_state.segment<4>(6));
                 perturbed_state.segment<4>(6) << temp.vec(), temp.w();
+            } else if(j < NMPC_DELTA_DIM) {
+                perturbed_state[j+1] += perturbation;
             } else {
-                perturbed_state[j+1] += NMPC_EPS_4RT;
+                /*
+                Perturbations for the control inputs should be proportional
+                to the control range to make sure we don't lose too much
+                precision.
+                */
+                perturbation *=
+                    (upper_control_bound[j-NMPC_DELTA_DIM] -
+                    lower_control_bound[j-NMPC_DELTA_DIM]);
+                perturbed_state[j+1] += perturbation;
             }
 
             new_state.segment<NMPC_STATE_DIM>(0) = integrator.integrate(
@@ -201,10 +212,8 @@ void OptimalControlProblem::solve_ivps() {
             */
             jacobians[i].col(j) =
                 state_to_delta(new_state, integrated_state_horizon[i]) /
-                NMPC_EPS_4RT;
+                perturbation;
         }
-
-        std::cout << jacobians[i] << std::endl << std::endl;
 
         /*
         Calculate integration residuals; these are needed for the continuity

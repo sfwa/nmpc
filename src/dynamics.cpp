@@ -148,10 +148,6 @@ const State &in, const ControlVector &control) const {
     if (motor_idx < NMPC_CONTROL_DIM) {
         real_t ve = prop_cve * control[motor_idx], v0 = airflow.x();
         thrust = (real_t)0.5 * RHO * prop_area * (ve * ve - v0 * v0);
-        if (thrust < 0.0) {
-            /* Folding prop, so assume no drag */
-            thrust = 0.0;
-        }
     }
 
     /*
