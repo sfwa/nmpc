@@ -120,11 +120,6 @@ real_t x, real_t y, real_t z) {
     current.angular_velocity() << x, y, z;
 }
 
-void nmpc_fixedwingdynamics_set_wind_velocity(
-real_t x, real_t y, real_t z) {
-    current.wind_velocity() << x, y, z;
-}
-
 void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in) {
     in->position[0] = current.position()[0];
     in->position[1] = current.position()[1];
@@ -139,9 +134,6 @@ void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in) {
     in->angular_velocity[0] = current.angular_velocity()[0];
     in->angular_velocity[1] = current.angular_velocity()[1];
     in->angular_velocity[2] = current.angular_velocity()[2];
-    in->wind_velocity[0] = current.wind_velocity()[0];
-    in->wind_velocity[1] = current.wind_velocity()[1];
-    in->wind_velocity[2] = current.wind_velocity()[2];
 }
 
 void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in) {
@@ -158,10 +150,7 @@ void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in) {
         in->attitude[3],
         in->angular_velocity[0],
         in->angular_velocity[1],
-        in->angular_velocity[2],
-        in->wind_velocity[0],
-        in->wind_velocity[1],
-        in->wind_velocity[2];
+        in->angular_velocity[2];
 }
 
 void nmpc_fixedwingdynamics_integrate(

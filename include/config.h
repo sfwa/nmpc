@@ -40,7 +40,7 @@ Choose the integration method here:
 
 /* NMPC vector dimensioning. */
 #define NMPC_CONTROL_DIM 3
-#define NMPC_STATE_DIM 16
+#define NMPC_STATE_DIM 13
 #define NMPC_DELTA_DIM (NMPC_STATE_DIM - 1)
 #define NMPC_REFERENCE_DIM (NMPC_STATE_DIM + NMPC_CONTROL_DIM)
 #define NMPC_GRADIENT_DIM (NMPC_REFERENCE_DIM - 1)

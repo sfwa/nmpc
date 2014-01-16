@@ -24,8 +24,7 @@ class _State(Structure):
             "position": tuple(self.position),
             "velocity": tuple(self.velocity),
             "attitude": tuple(self.attitude),
-            "angular_velocity": tuple(self.angular_velocity),
-            "wind_velocity": tuple(self.wind_velocity)
+            "angular_velocity": tuple(self.angular_velocity)
         }
         return str(fields)
 
@@ -145,8 +144,7 @@ def init(implementation="c"):
         ("position", _REAL_T * 3),
         ("velocity", _REAL_T * 3),
         ("attitude", _REAL_T * 4),
-        ("angular_velocity", _REAL_T * 3),
-        ("wind_velocity", _REAL_T * 3)
+        ("angular_velocity", _REAL_T * 3)
     ]
 
     _cnmpc.nmpc_preparation_step.argtypes = []
@@ -196,10 +194,6 @@ def init(implementation="c"):
     _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity.argtypes = [
         _REAL_T, _REAL_T, _REAL_T]
     _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_wind_velocity.argtypes = [
-        _REAL_T, _REAL_T, _REAL_T]
-    _cnmpc.nmpc_fixedwingdynamics_set_wind_velocity.restype = None
 
     _cnmpc.nmpc_fixedwingdynamics_get_state.argtypes = [
         POINTER(_State)]

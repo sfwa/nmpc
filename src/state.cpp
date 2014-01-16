@@ -35,7 +35,6 @@ Contents are as follows:
     - Rate of change in linear velocity (3-vector, m/s^2, NED frame)
     - Rate of change in attitude (quaternion (x, y, z, w), 1/s, body frame)
     - Rate of change in angular velocity (3-vector, rad/s^2, body frame)
-    - Rate of change in wind velocity (3-vector, m/s, NED frame)
 */
 const StateVectorDerivative State::model(ControlVector c, DynamicsModel *d) {
     StateVectorDerivative output;
@@ -59,9 +58,6 @@ const StateVectorDerivative State::model(ControlVector c, DynamicsModel *d) {
 
     /* Calculate change in angular velocity (just angular acceleration). */
     output.segment<3>(10) = a.segment<3>(3);
-
-    /* Change in wind velocity is zero. */
-    output.segment<3>(13) << 0, 0, 0;
 
     return output;
 }

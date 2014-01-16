@@ -78,7 +78,7 @@ const StateVector &s, const ControlVector &c, const ReferenceVector &r) {
     delta.segment<3>(6) = NMPC_MRP_F *
         (err_q.vec() / (NMPC_MRP_A + err_q.w()));
 
-    delta.segment<6>(9) = s.segment<6>(10) - r.segment<6>(10);
+    delta.segment<3>(9) = s.segment<3>(10) - r.segment<3>(10);
     delta.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) = 
         c - r.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
 
@@ -102,7 +102,7 @@ const StateVector &s1, const StateVector &s2) {
     delta.segment<3>(6) = NMPC_MRP_F *
         (err_q.vec() / (NMPC_MRP_A + err_q.w()));
 
-    delta.segment<6>(9) = s1.segment<6>(10) - s2.segment<6>(10);
+    delta.segment<3>(9) = s1.segment<3>(10) - s2.segment<3>(10);
 
     return delta;
 }
@@ -320,9 +320,9 @@ void OptimalControlProblem::calculate_hessians() {
                     Quaternionr(perturbed_state.segment<4>(6));
                 perturbed_state.segment<4>(6) << temp.vec(), temp.w();
 
-                perturbed_state.segment<6>(10) =
-                    reference_trajectory[i].segment<6>(10) +
-                    perturbed_delta.segment<6>(9);
+                perturbed_state.segment<3>(10) =
+                    reference_trajectory[i].segment<3>(10) +
+                    perturbed_delta.segment<3>(9);
                 ControlVector perturbed_control = 
                     reference_trajectory[i].segment<NMPC_CONTROL_DIM>(
                         NMPC_STATE_DIM) +

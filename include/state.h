@@ -36,7 +36,6 @@ Contents are as follows:
     - Attitude (quaternion (x, y, z, w), describes rotation from local NED
       frame to body frame.)
     - Angular Velocity (3-vector, rad/s, body frame)
-    - Wind Velocity (3-vector, m/s, NED frame)
 */
 class State: public StateVector {
 public:
@@ -72,10 +71,6 @@ public:
         return segment<3>(10);
     }
 
-    const Vector3r wind_velocity() const {
-        return segment<3>(13);
-    }
-
     /* Mutable accessors */
     Eigen::VectorBlock<StateVector, 3> position() {
         return segment<3>(0);
@@ -91,10 +86,6 @@ public:
 
     Eigen::VectorBlock<StateVector, 3> angular_velocity() {
         return segment<3>(10);
-    }
-
-    Eigen::VectorBlock<StateVector, 3> wind_velocity() {
-        return segment<3>(13);
     }
 };
 

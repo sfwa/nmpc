@@ -79,7 +79,7 @@ const State &in, const ControlVector &control) const {
     Vector3r airflow, lift_axis, drag_axis, side_axis;
     real_t v, v_inv;
 
-    airflow = attitude * (in.wind_velocity() - in.velocity());
+    airflow = attitude * -in.velocity();
     v = airflow.norm();
 
     if (v < NMPC_DYNAMICS_MIN_V) {
@@ -224,7 +224,7 @@ const State &in, const ControlVector &control) const {
     Vector3r airflow;
     real_t v, v_inv, horizontal_v2, vertical_v2, vertical_v, vertical_v_inv;
 
-    airflow = attitude * (in.wind_velocity() - in.velocity());
+    airflow = attitude * -in.velocity();
     v = airflow.norm();
     horizontal_v2 = airflow.y() * airflow.y() + airflow.x() * airflow.x();
     vertical_v2 = airflow.z() * airflow.z() + airflow.x() * airflow.x();

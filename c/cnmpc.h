@@ -43,7 +43,6 @@ struct nmpc_state_t {
     real_t velocity[3];
     real_t attitude[4]; /* w, x, y, z */
     real_t angular_velocity[3];
-    real_t wind_velocity[3];
 };
 
 void nmpc_init();
@@ -66,8 +65,6 @@ void nmpc_fixedwingdynamics_set_velocity(
 void nmpc_fixedwingdynamics_set_attitude(
     real_t w, real_t x, real_t y, real_t z);
 void nmpc_fixedwingdynamics_set_angular_velocity(
-    real_t x, real_t y, real_t z);
-void nmpc_fixedwingdynamics_set_wind_velocity(
     real_t x, real_t y, real_t z);
 
 /* Functions for getting the state vector and covariance. */
