@@ -146,9 +146,10 @@ for line in sys.stdin:
 for i in xrange(0, nmpc.HORIZON_LENGTH):
     horizon_point = interpolate_reference(
         i*nmpc.STEP_LENGTH, xplane_reference_points)
-    horizon_point.extend([0, 0, 0])
+    horizon_point.extend([12000, 0, 0])
     nmpc.set_reference(horizon_point[1:], i)
 
 nmpc.initialise_horizon()
-nmpc.prepare()
-nmpc.solve(interpolate_reference(0, xplane_reference_points)[1:])
+for i in range(1):
+    nmpc.prepare()
+    nmpc.solve(interpolate_reference(0, xplane_reference_points)[1:])
