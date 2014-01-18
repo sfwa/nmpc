@@ -339,6 +339,7 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
 /* Solves the QP using qpDUNES. */
 void OptimalControlProblem::solve_qp() {
+    uint32_t i;
     real_t solution[NMPC_GRADIENT_DIM*(OCP_HORIZON_LENGTH+1)];
 
     return_t status_flag = qpDUNES_solve(&qp_data);
@@ -347,7 +348,46 @@ void OptimalControlProblem::solve_qp() {
     /* Get the solution. */
     qpDUNES_getPrimalSol(&qp_data, solution);
 
-    qpDUNES_printMatrixData(solution, OCP_HORIZON_LENGTH, NMPC_GRADIENT_DIM, "solution:");
+    /*
+    Apply the deltas to the reference trajectory to generate the new state
+    horizon.
+    */
+    for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
+        Eigen::Map<GradientVector> solution_map(
+            &solution[i*NMPC_GRADIENT_DIM]);
+
+        std::cout << solution_map.transpose() << std::endl;
+
+        state_horizon[i].segment<6>(0) =
+            reference_trajectory[i].segment<6>(0) +
+            solution_map.segment<6>(0);
+
+        Vector3r d_p = solution_map.segment<3>(6);
+        real_t x_2 = d_p.squaredNorm();
+        real_t delta_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
+            NMPC_MRP_F_2 + ((real_t)1.0 - NMPC_MRP_A_2) * x_2)) /
+            (NMPC_MRP_F_2 + x_2);
+        Vector3r delta_xyz = (((real_t)1.0 / NMPC_MRP_F) *
+            (NMPC_MRP_A + delta_w)) * d_p;
+        Quaternionr delta_q;
+        delta_q.vec() = delta_xyz;
+        delta_q.w() = delta_w;
+        Quaternionr temp = delta_q *
+            Quaternionr(reference_trajectory[i].segment<4>(6));
+        state_horizon[i].segment<4>(6) << temp.vec(), temp.w();
+
+        state_horizon[i].segment<3>(10) =
+            reference_trajectory[i].segment<3>(10) +
+            solution_map.segment<3>(9);
+
+        control_horizon[i] =
+            reference_trajectory[i].segment<NMPC_CONTROL_DIM>(
+                NMPC_STATE_DIM) +
+            solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
+
+        std::cout << reference_trajectory[i].transpose() << std::endl;
+        std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
+    }
 }
 
 void OptimalControlProblem::update_horizon() {
