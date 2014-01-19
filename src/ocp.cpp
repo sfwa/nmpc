@@ -72,8 +72,8 @@ const StateVector &s, const ControlVector &c, const ReferenceVector &r) {
     normalisation issues, we calculate the difference between attitudes as a
     3-vector of Modified Rodrigues Parameters (MRP).
     */
-    Quaternionr err_q = (Quaternionr(r.segment<4>(6)) *
-        Quaternionr(s.segment<4>(6)).conjugate());
+    Quaternionr err_q = (Quaternionr(s.segment<4>(6)) *
+        Quaternionr(r.segment<4>(6)).conjugate());
 
     delta.segment<3>(6) = NMPC_MRP_F *
         (err_q.vec() / (NMPC_MRP_A + err_q.w()));
@@ -89,7 +89,7 @@ DeltaVector OptimalControlProblem::state_to_delta(
 const StateVector &s1, const StateVector &s2) {
     DeltaVector delta;
 
-    delta.segment<6>(0) = s1.segment<6>(0) - s2.segment<6>(0);
+    delta.segment<6>(0) = s2.segment<6>(0) - s1.segment<6>(0);
 
     /*
     In order to increase the linearity of the problem and avoid quaternion
@@ -102,7 +102,7 @@ const StateVector &s1, const StateVector &s2) {
     delta.segment<3>(6) = NMPC_MRP_F *
         (err_q.vec() / (NMPC_MRP_A + err_q.w()));
 
-    delta.segment<3>(9) = s1.segment<3>(10) - s2.segment<3>(10);
+    delta.segment<3>(9) = s2.segment<3>(10) - s1.segment<3>(10);
 
     return delta;
 }
@@ -122,6 +122,8 @@ void OptimalControlProblem::calculate_deltas() {
             state_horizon[i],
             control_horizon[i],
             reference_trajectory[i]);
+
+        std::cout << deltas[i].transpose() << std::endl;
 
         /*
         Calculates the gradient vector, which is the difference between each
@@ -143,6 +145,8 @@ void OptimalControlProblem::calculate_deltas() {
             control_weights *
             deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
     }
+
+    std::cout << std::endl;
 }
 
 /*
@@ -215,7 +219,7 @@ void OptimalControlProblem::solve_ivps() {
             yield a full column of the Jacobian matrix.
             */
             jacobians[i].col(j) =
-                state_to_delta(new_state, integrated_state_horizon[i]) /
+                state_to_delta(integrated_state_horizon[i], new_state) /
                 perturbation;
         }
 
@@ -224,8 +228,8 @@ void OptimalControlProblem::solve_ivps() {
         constraints.
         */
         integration_residuals[i] = state_to_delta(
-            integrated_state_horizon[i],
-            state_horizon[i+1]);
+            state_horizon[i+1],
+            integrated_state_horizon[i]);
     }
 }
 
@@ -279,18 +283,18 @@ void OptimalControlProblem::initialise_qp() {
         uLow_map = lower_control_bound;
         uUpp_map = upper_control_bound;
 
-        std::cout << Q_map << std::endl << std::endl;
-        std::cout << R_map << std::endl << std::endl;
-        std::cout << g_map.transpose() << std::endl << std::endl;
-        std::cout << C_map << std::endl << std::endl;
-        std::cout << c_map.transpose() << std::endl << std::endl;
-        std::cout << uLow_map.transpose() << std::endl << std::endl;
-        std::cout << uUpp_map.transpose() << std::endl << std::endl;
-        std::cout << "====================================" << std::endl << std::endl;
+        // std::cout << Q_map << std::endl << std::endl;
+        // std::cout << R_map << std::endl << std::endl;
+        // std::cout << g_map.transpose() << std::endl << std::endl;
+        // std::cout << C_map << std::endl << std::endl;
+        // std::cout << c_map.transpose() << std::endl << std::endl;
+        // std::cout << uLow_map.transpose() << std::endl << std::endl;
+        // std::cout << uUpp_map.transpose() << std::endl << std::endl;
+        // std::cout << "====================================" << std::endl << std::endl;
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
-            0, Q, R, 0, g, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
+            0, Q, R, 0, 0, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
         AssertOK(status_flag);
     }
 
@@ -326,8 +330,8 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
     and the initial reference point.
     */
     DeltaVector initial_delta = state_to_delta(
-        measurement, 
-        reference_trajectory[0].segment<NMPC_STATE_DIM>(0));
+        reference_trajectory[0].segment<NMPC_STATE_DIM>(0),
+        measurement);
     zLow_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
     zUpp_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
 
@@ -385,9 +389,11 @@ void OptimalControlProblem::solve_qp() {
                 NMPC_STATE_DIM) +
             solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
 
-        std::cout << reference_trajectory[i].transpose() << std::endl;
-        std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
+        // std::cout << reference_trajectory[i].transpose() << std::endl;
+        // std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
     }
+
+    std::cout << "=========" << std::endl << std::endl;
 }
 
 void OptimalControlProblem::update_horizon() {
