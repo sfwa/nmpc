@@ -123,8 +123,6 @@ void OptimalControlProblem::calculate_deltas() {
             control_horizon[i],
             reference_trajectory[i]);
 
-        std::cout << deltas[i].transpose() << std::endl;
-
         /*
         Calculates the gradient vector, which is the difference between each
         point on the state/control horizon and the corresponding point in the
@@ -145,8 +143,6 @@ void OptimalControlProblem::calculate_deltas() {
             control_weights *
             deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
     }
-
-    std::cout << std::endl;
 }
 
 /*
@@ -294,7 +290,7 @@ void OptimalControlProblem::initialise_qp() {
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
-            0, Q, R, 0, 0, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
+            0, Q, R, 0, g, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
         AssertOK(status_flag);
     }
 
