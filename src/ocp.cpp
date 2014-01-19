@@ -297,7 +297,7 @@ void OptimalControlProblem::initialise_qp() {
     /* Set up final interval */
     P_map = terminal_weights;
     status_flag = qpDUNES_setupFinalInterval(&qp_data, qp_data.intervals[i],
-        P, 0, 0, 0, 0, 0, 0);
+        P, g, 0, 0, 0, 0, 0);
     AssertOK(status_flag);
 
     qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_FALSE);

@@ -150,6 +150,6 @@ for i in xrange(0, nmpc.HORIZON_LENGTH):
     nmpc.set_reference(horizon_point[1:], i)
 
 nmpc.initialise_horizon()
-for i in range(8):
+for i in range(2):
     nmpc.prepare()
     nmpc.solve(interpolate_reference(0, xplane_reference_points)[1:])
