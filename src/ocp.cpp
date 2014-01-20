@@ -142,11 +142,7 @@ void OptimalControlProblem::calculate_deltas() {
         gradients[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             control_weights *
             deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
-
-        std::cout << deltas[i].transpose() << std::endl;
     }
-
-    std::cout << "------------------" << std::endl << std::endl;
 }
 
 /*
@@ -280,17 +276,8 @@ void OptimalControlProblem::initialise_qp() {
         g_map = gradients[i];
         C_map = jacobians[i];
         c_map = integration_residuals[i];
-        uLow_map = lower_control_bound;
-        uUpp_map = upper_control_bound;
-
-        // std::cout << Q_map << std::endl << std::endl;
-        // std::cout << R_map << std::endl << std::endl;
-        // std::cout << g_map.transpose() << std::endl << std::endl;
-        // std::cout << C_map << std::endl << std::endl;
-        // std::cout << c_map.transpose() << std::endl << std::endl;
-        // std::cout << uLow_map.transpose() << std::endl << std::endl;
-        // std::cout << uUpp_map.transpose() << std::endl << std::endl;
-        // std::cout << "====================================" << std::endl << std::endl;
+        uLow_map = lower_control_bound - control_horizon[i];
+        uUpp_map = upper_control_bound - control_horizon[i];
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
