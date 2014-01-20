@@ -1,6 +1,6 @@
 # nmpc
 
-Non-linear Model Predictive Control library.
+Non-linear Model Predictive Control library for UAV control.
 
 
 ## Structure
