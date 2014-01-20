@@ -142,7 +142,11 @@ void OptimalControlProblem::calculate_deltas() {
         gradients[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             control_weights *
             deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
+
+        std::cout << deltas[i].transpose() << std::endl;
     }
+
+    std::cout << "------------------" << std::endl << std::endl;
 }
 
 /*
@@ -358,8 +362,7 @@ void OptimalControlProblem::solve_qp() {
 
         std::cout << solution_map.transpose() << std::endl;
 
-        state_horizon[i].segment<6>(0) =
-            reference_trajectory[i].segment<6>(0) +
+        state_horizon[i].segment<6>(0) +=
             solution_map.segment<6>(0);
 
         Vector3r d_p = solution_map.segment<3>(6);
@@ -373,20 +376,17 @@ void OptimalControlProblem::solve_qp() {
         delta_q.vec() = delta_xyz;
         delta_q.w() = delta_w;
         Quaternionr temp = delta_q *
-            Quaternionr(reference_trajectory[i].segment<4>(6));
+            Quaternionr(state_horizon[i].segment<4>(6));
         state_horizon[i].segment<4>(6) << temp.vec(), temp.w();
 
-        state_horizon[i].segment<3>(10) =
-            reference_trajectory[i].segment<3>(10) +
+        state_horizon[i].segment<3>(10) +=
             solution_map.segment<3>(9);
 
-        control_horizon[i] =
-            reference_trajectory[i].segment<NMPC_CONTROL_DIM>(
-                NMPC_STATE_DIM) +
+        control_horizon[i] +=
             solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
 
-        // std::cout << reference_trajectory[i].transpose() << std::endl;
-        // std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
+        std::cout << reference_trajectory[i].transpose() << std::endl;
+        std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
     }
 
     std::cout << "=========" << std::endl << std::endl;
