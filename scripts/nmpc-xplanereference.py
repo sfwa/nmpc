@@ -69,7 +69,7 @@ initial_time = 0.0
 
 nmpc.setup(
     state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    control_weights=[1e-10, 1, 1],
+    control_weights=[1e-10, 1e-10, 1e-10],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[25000, 1.0, 1.0],
     lower_control_bound=[0, -1.0, -1.0])

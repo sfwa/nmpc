@@ -309,8 +309,10 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
     Eigen::Map<GradientVector> zUpp_map(zUpp);
 
     /* Control constraints are unchanged. */
-    zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) = lower_control_bound;
-    zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) = upper_control_bound;
+    zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+        lower_control_bound - control_horizon[0];
+    zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+        upper_control_bound - control_horizon[0];
 
     /*
     Initial delta is constrained to be the difference between the measurement
