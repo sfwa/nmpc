@@ -48,31 +48,6 @@ def integrate(dt, control=None):
     _cnmpc.nmpc_fixedwingdynamics_get_state(state)
 
 
-def configure_airframe(mass=None, inertia_tensor=None, prop_coeffs=None,
-        drag_coeffs=None, lift_coeffs=None, side_coeffs=None,
-        pitch_moment_coeffs=None, roll_moment_coeffs=None,
-        yaw_moment_coeffs=None):
-    _cnmpc.nmpc_fixedwingdynamics_set_mass(mass)
-    _cnmpc.nmpc_fixedwingdynamics_set_inertia_tensor(
-        (_REAL_T * 9)(*inertia_tensor))
-    _cnmpc.nmpc_fixedwingdynamics_set_prop_coeffs(prop_coeffs[0],
-        prop_coeffs[1])
-    _cnmpc.nmpc_fixedwingdynamics_set_lift_coeffs((_REAL_T * 5)(*lift_coeffs))
-    _cnmpc.nmpc_fixedwingdynamics_set_drag_coeffs((_REAL_T * 5)(*drag_coeffs))
-    _cnmpc.nmpc_fixedwingdynamics_set_side_coeffs(
-        (_REAL_T * 4)(*side_coeffs[0:-_CONTROL_DIM]),
-        (_REAL_T * _CONTROL_DIM)(*side_coeffs[-_CONTROL_DIM:]))
-    _cnmpc.nmpc_fixedwingdynamics_set_pitch_moment_coeffs(
-        (_REAL_T * 2)(*pitch_moment_coeffs[0:-_CONTROL_DIM]),
-        (_REAL_T * _CONTROL_DIM)(*pitch_moment_coeffs[-_CONTROL_DIM:]))
-    _cnmpc.nmpc_fixedwingdynamics_set_roll_moment_coeffs(
-        (_REAL_T * 1)(*roll_moment_coeffs[0:-_CONTROL_DIM]),
-        (_REAL_T * _CONTROL_DIM)(*roll_moment_coeffs[-_CONTROL_DIM:]))
-    _cnmpc.nmpc_fixedwingdynamics_set_yaw_moment_coeffs(
-        (_REAL_T * 2)(*yaw_moment_coeffs[0:-_CONTROL_DIM]),
-        (_REAL_T * _CONTROL_DIM)(*yaw_moment_coeffs[-_CONTROL_DIM:]))
-
-
 def setup(state_weights, control_weights, terminal_weights,
         upper_control_bound, lower_control_bound):
     _cnmpc.nmpc_set_state_weights(
@@ -206,42 +181,6 @@ def init(implementation="c"):
     _cnmpc.nmpc_fixedwingdynamics_integrate.argtypes = [
         c_float, POINTER(_REAL_T * _CONTROL_DIM)]
     _cnmpc.nmpc_fixedwingdynamics_integrate.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_mass.argtypes = [_REAL_T]
-    _cnmpc.nmpc_fixedwingdynamics_set_mass.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_inertia_tensor.argtypes = [
-        POINTER(_REAL_T * 9)]
-    _cnmpc.nmpc_fixedwingdynamics_set_inertia_tensor.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_prop_coeffs.argtypes = [
-        _REAL_T, _REAL_T]
-    _cnmpc.nmpc_fixedwingdynamics_set_prop_coeffs.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_drag_coeffs.argtypes = [
-        POINTER(_REAL_T * 5)]
-    _cnmpc.nmpc_fixedwingdynamics_set_drag_coeffs.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_lift_coeffs.argtypes = [
-        POINTER(_REAL_T * 5)]
-    _cnmpc.nmpc_fixedwingdynamics_set_lift_coeffs.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_side_coeffs.argtypes = [
-        POINTER(_REAL_T * 4),
-        POINTER(_REAL_T * _CONTROL_DIM)]
-    _cnmpc.nmpc_fixedwingdynamics_set_side_coeffs.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_pitch_moment_coeffs.argtypes = [
-        POINTER(_REAL_T * 2), POINTER(_REAL_T * _CONTROL_DIM)]
-    _cnmpc.nmpc_fixedwingdynamics_set_pitch_moment_coeffs.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_roll_moment_coeffs.argtypes = [
-        POINTER(_REAL_T * 1), POINTER(_REAL_T * _CONTROL_DIM)]
-    _cnmpc.nmpc_fixedwingdynamics_set_roll_moment_coeffs.restype = None
-
-    _cnmpc.nmpc_fixedwingdynamics_set_yaw_moment_coeffs.argtypes = [
-        POINTER(_REAL_T * 2), POINTER(_REAL_T * _CONTROL_DIM)]
-    _cnmpc.nmpc_fixedwingdynamics_set_yaw_moment_coeffs.restype = None
 
     # Set up the state
     state = _State()

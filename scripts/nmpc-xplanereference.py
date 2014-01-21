@@ -67,22 +67,6 @@ headers = None
 initialised = False
 initial_time = 0.0
 
-nmpc.configure_airframe(
-    mass=3.8,
-    inertia_tensor=[
-        2.59e-1, 0, -0.334e-1,
-        0, 1.47e-1, 0,
-        -0.334e-1, 0, 4.05e-1],
-    prop_coeffs=[0.025, 0.00250],
-    drag_coeffs=[0.0, 0.0, 0.2, 0.0, 0.05],
-    lift_coeffs=[-3.7, -5.4, 1.3, 1.7, 0.05],
-    side_coeffs=[
-        0, 2.35e-01, -1.87e-03, 4.53e-04,
-        0.0, 1.1e-02, -1.1e-02],
-    pitch_moment_coeffs=[-0.01, -0.0018, 0.0, -0.001, -0.001],
-    roll_moment_coeffs=[-0.002, 0.0, -0.003, 0.003],
-    yaw_moment_coeffs=[0, -0.005, 0.0, 0.0, 0.0])
-
 nmpc.setup(
     state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     control_weights=[1e-10, 1, 1],

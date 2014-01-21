@@ -75,25 +75,6 @@ void nmpc_fixedwingdynamics_integrate(
     float dt, real_t control_vector[NMPC_CONTROL_DIM]);
 
 /*
-Functions to set airframe properties and coefficients for the fixed-wing
-dynamics model.
-*/
-void nmpc_fixedwingdynamics_set_mass(real_t mass);
-void nmpc_fixedwingdynamics_set_inertia_tensor(real_t inertia_tensor[9]);
-void nmpc_fixedwingdynamics_set_prop_coeffs(real_t in_prop_area,
-    real_t in_prop_cve);
-void nmpc_fixedwingdynamics_set_drag_coeffs(real_t coeffs[5]);
-void nmpc_fixedwingdynamics_set_lift_coeffs(real_t coeffs[5]);
-void nmpc_fixedwingdynamics_set_side_coeffs(real_t coeffs[4],
-    real_t control[NMPC_CONTROL_DIM]);
-void nmpc_fixedwingdynamics_set_pitch_moment_coeffs(real_t coeffs[2],
-    real_t control[NMPC_CONTROL_DIM]);
-void nmpc_fixedwingdynamics_set_roll_moment_coeffs(real_t coeffs[1],
-    real_t control[NMPC_CONTROL_DIM]);
-void nmpc_fixedwingdynamics_set_yaw_moment_coeffs(real_t coeffs[2],
-    real_t control[NMPC_CONTROL_DIM]);
-
-/*
 Functions to access the compiled configuration
 */
 enum nmpc_precision_t {

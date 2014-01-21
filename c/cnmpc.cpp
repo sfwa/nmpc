@@ -28,8 +28,8 @@ SOFTWARE.
 
 #include "cnmpc.h"
 
-static FixedWingFlightDynamicsModel fixed_wing_model =
-    FixedWingFlightDynamicsModel();
+static X8DynamicsModel dynamics_model =
+    X8DynamicsModel();
 static State current;
 #if defined(NMPC_INTEGRATOR_RK4)
     IntegratorRK4 integrator;
@@ -40,7 +40,7 @@ static State current;
 #endif
 
 static OptimalControlProblem ocp =
-    OptimalControlProblem(&fixed_wing_model);
+    OptimalControlProblem(&dynamics_model);
 
 void nmpc_init() {
     ocp.initialise();
@@ -158,53 +158,8 @@ float dt, real_t control_vector[NMPC_CONTROL_DIM]) {
     current = integrator.integrate(
         current,
         ControlVector(control_vector),
-        &fixed_wing_model,
+        &dynamics_model,
         dt);
-}
-
-void nmpc_fixedwingdynamics_set_mass(real_t mass) {
-    fixed_wing_model.set_mass(mass);
-}
-
-void nmpc_fixedwingdynamics_set_inertia_tensor(real_t inertia_tensor[9]) {
-    fixed_wing_model.set_inertia_tensor(Matrix3x3r(inertia_tensor));
-}
-
-void nmpc_fixedwingdynamics_set_prop_coeffs(real_t in_prop_area,
-real_t in_prop_cve){
-    fixed_wing_model.set_prop_coeffs(in_prop_area, in_prop_cve);
-}
-
-void nmpc_fixedwingdynamics_set_drag_coeffs(real_t coeffs[5]) {
-    fixed_wing_model.set_drag_coeffs(Vector5r(coeffs));
-}
-
-void nmpc_fixedwingdynamics_set_lift_coeffs(real_t coeffs[5]) {
-    fixed_wing_model.set_lift_coeffs(Vector5r(coeffs));
-}
-
-void nmpc_fixedwingdynamics_set_side_coeffs(real_t coeffs[4],
-real_t control[NMPC_CONTROL_DIM]) {
-    fixed_wing_model.set_side_coeffs(Vector4r(coeffs),
-        ControlVector(control));
-}
-
-void nmpc_fixedwingdynamics_set_pitch_moment_coeffs(real_t coeffs[2],
-real_t control[NMPC_CONTROL_DIM]) {
-    fixed_wing_model.set_pitch_moment_coeffs(Vector2r(coeffs),
-        ControlVector(control));
-}
-
-void nmpc_fixedwingdynamics_set_roll_moment_coeffs(real_t coeffs[1],
-real_t control[NMPC_CONTROL_DIM]) {
-    fixed_wing_model.set_roll_moment_coeffs(Vector1r(coeffs),
-        ControlVector(control));
-}
-
-void nmpc_fixedwingdynamics_set_yaw_moment_coeffs(real_t coeffs[2],
-real_t control[NMPC_CONTROL_DIM]) {
-    fixed_wing_model.set_yaw_moment_coeffs(Vector2r(coeffs),
-        ControlVector(control));
 }
 
 uint32_t nmpc_config_get_state_dim() {
