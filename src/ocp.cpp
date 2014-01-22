@@ -75,6 +75,10 @@ const StateVector &s, const ControlVector &c, const ReferenceVector &r) {
     Quaternionr err_q = (Quaternionr(s.segment<4>(6)) *
         Quaternionr(r.segment<4>(6)).conjugate());
 
+    if(err_q.w() < 0) {
+        err_q = Quaternionr(-err_q.w(), -err_q.x(), -err_q.y(), -err_q.z());
+    }
+
     delta.segment<3>(6) = NMPC_MRP_F *
         (err_q.vec() / (NMPC_MRP_A + err_q.w()));
 
@@ -98,6 +102,10 @@ const StateVector &s1, const StateVector &s2) {
     */
     Quaternionr err_q = (Quaternionr(s2.segment<4>(6)) *
         Quaternionr(s1.segment<4>(6)).conjugate());
+
+    if(err_q.w() < 0) {
+        err_q = Quaternionr(-err_q.w(), -err_q.x(), -err_q.y(), -err_q.z());
+    }
 
     delta.segment<3>(6) = NMPC_MRP_F *
         (err_q.vec() / (NMPC_MRP_A + err_q.w()));
