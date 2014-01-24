@@ -389,10 +389,6 @@ void OptimalControlProblem::solve_qp() {
     std::cout << "=========" << std::endl << std::endl;
 }
 
-void OptimalControlProblem::update_horizon() {
-
-}
-
 /* Copies the reference trajectory into the state and control horizons. */
 void OptimalControlProblem::initialise() {
     uint32_t i;
@@ -427,4 +423,29 @@ length.
 void OptimalControlProblem::feedback_step(StateVector measurement) {
     initial_constraint(measurement);
     solve_qp();
+}
+
+/*
+Shift the horizon across and add a new point to the end of the reference
+trajectory.
+*/
+void OptimalControlProblem::update_horizon(ReferenceVector new_reference) {
+    uint32_t i;
+
+    /* TODO: Do this more intelligently. */
+    for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
+        state_horizon[i] = state_horizon[i+1];
+        control_horizon[i] = control_horizon[i+1];
+        reference_trajectory[i] = reference_trajectory[i+1];
+    }
+
+    /* Insert new reference point. */
+    reference_trajectory[i] = new_reference;
+    state_horizon[i] = new_reference.segment<NMPC_STATE_DIM>(0);
+    control_horizon[i] = new_reference.segment<NMPC_CONTROL_DIM>(
+        NMPC_STATE_DIM);
+
+    /* Prepare the QP for the next solution. */
+    qpDUNES_shiftLambda(&qp_data);
+    qpDUNES_shiftIntervals(&qp_data);
 }

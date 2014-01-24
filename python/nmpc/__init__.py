@@ -75,6 +75,16 @@ def prepare():
 def solve(measurement):
     _cnmpc.nmpc_feedback_step((_REAL_T * (_STATE_DIM))(*measurement))
 
+def get_controls():
+    new_controls = (_REAL_T * _CONTROL_DIM)(*([0] * _CONTROL_DIM))
+    _cnmpc.nmpc_get_controls(pointer(new_controls))
+
+    return list(new_controls)
+
+def update_horizon(new_reference):
+    _cnmpc.nmpc_update_horizon(
+        (_REAL_T * (_STATE_DIM+_CONTROL_DIM))(*new_reference))
+
 def init(implementation="c"):
     global _cnmpc, _REAL_T, _STATE_DIM, _CONTROL_DIM, state
     global HORIZON_LENGTH, STEP_LENGTH
@@ -127,6 +137,13 @@ def init(implementation="c"):
 
     _cnmpc.nmpc_feedback_step.argtype = [POINTER(_State)]
     _cnmpc.nmpc_feedback_step.restype = None
+
+    _cnmpc.nmpc_get_controls.argtype = [POINTER(_REAL_T * _CONTROL_DIM)]
+    _cnmpc.nmpc_get_controls.restype = None
+
+    _cnmpc.nmpc_update_horizon.argtype = [
+        POINTER(_REAL_T * (_STATE_DIM+_CONTROL_DIM))]
+    _cnmpc.nmpc_update_horizon.restype = None
 
     _cnmpc.nmpc_set_state_weights.argtype = [
         POINTER(_REAL_T * (_STATE_DIM-1))]

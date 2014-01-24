@@ -49,7 +49,6 @@ def euler_to_q(yaw, pitch, roll):
 def interpolate_reference(sample_time, points):
     index = bisect.bisect([p[0] for p in points], sample_time)
     if index >= len(points):
-        print points[-1]
         return points[-1]
     delta = [b - a for a, b in zip(points[index-1], points[index])]
     residual_time = ((sample_time - points[index-1][0]) / delta[0])
@@ -137,6 +136,6 @@ for i in xrange(0, nmpc.HORIZON_LENGTH):
     nmpc.set_reference(horizon_point[1:], i)
 
 nmpc.initialise_horizon()
-for i in range(2):
-    nmpc.prepare()
-    nmpc.solve(interpolate_reference(0, xplane_reference_points)[1:])
+nmpc.prepare()
+nmpc.solve(interpolate_reference(0, xplane_reference_points)[1:])
+print nmpc.get_controls()

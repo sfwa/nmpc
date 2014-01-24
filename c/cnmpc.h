@@ -48,6 +48,8 @@ struct nmpc_state_t {
 void nmpc_init();
 void nmpc_preparation_step();
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]);
+void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
+void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]);
 
 /* Functions for setting weights and bounds for the OCP solver. */
 void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]);

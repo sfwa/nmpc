@@ -114,7 +114,6 @@ class OptimalControlProblem {
     void initialise_qp();
     void initial_constraint(StateVector measurement);
     void solve_qp();
-    void update_horizon();
 
 public:
     OptimalControlProblem(DynamicsModel *d);
@@ -139,6 +138,8 @@ public:
     }
     void preparation_step();
     void feedback_step(StateVector measurement);
+    const ControlVector& get_controls() const { return control_horizon[0]; }
+    void update_horizon(ReferenceVector new_reference);
     void set_dynamics_model(DynamicsModel *in) { dynamics = in; }
 };
 
