@@ -49,7 +49,7 @@ for line in sys.stdin:
     update += "set sim/flightmodel/position/theta %.6f\n" % math.degrees(pitch)
     update += "set sim/flightmodel/position/phi %.6f\n" % math.degrees(roll)
 
-    time.sleep(1.0/50.0)  # 50Hz updates
+    time.sleep(1.0/100.0)  # 50Hz updates
 
     print line
     sock.sendall(update)
