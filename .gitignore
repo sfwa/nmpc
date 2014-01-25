@@ -1,13 +1,61 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
+*.py[cod]
+.DS_Store
 
-# Compiled Dynamic libraries
+# C extensions
 *.so
 *.dylib
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
+a.out
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+var
+sdist
+develop-eggs
+.installed.cfg
+lib64
+Debug
+Release
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+
+# Translations
+*.mo
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.pydevproject
+
+# LaTeX
+*.synctex.gz
+*.aux
+*.log
+
+# Symlink to dynamic library for development
+python/nmpc/c
+python/nmpc/ccs-c66x
+
+# Cmake junk
+CMakeFiles
+*.cmake
+CMakeCache.txt
+src/googletest
+src/qpDUNES*
+src/eigen3*
+src/*.gz
+src/*.zip
+Makefile
+test/src/googletest*
+tmp
