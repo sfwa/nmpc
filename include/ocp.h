@@ -112,6 +112,7 @@ class OptimalControlProblem {
     void calculate_deltas();
     void solve_ivps();
     void initialise_qp();
+    void update_qp();
     void initial_constraint(StateVector measurement);
     void solve_qp();
 
