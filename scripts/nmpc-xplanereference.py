@@ -145,19 +145,27 @@ _cnmpc.nmpc_fixedwingdynamics_set_attitude(
     initial_point[9])
 _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity(*initial_point[11:14])
 _cnmpc.nmpc_fixedwingdynamics_get_state(state)
-print initial_point
+
 nmpc.initialise_horizon()
 
-for i in xrange(100):
+for i in xrange(500):
     nmpc.prepare()
     nmpc.solve(
         list(state.position) +
         list(state.velocity) +
         list(state.attitude) +
         list(state.angular_velocity))
+    print "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f" \
+        % (i*nmpc.STEP_LENGTH,
+            state.position[0],
+            state.position[1],
+            state.position[2],
+            state.attitude[0],
+            state.attitude[1],
+            state.attitude[2],
+            state.attitude[3])
     control_vec = nmpc.get_controls()
     nmpc.integrate(nmpc.STEP_LENGTH, (ctypes.c_double * 3)(*control_vec))
-    print control_vec
     horizon_point = [a for a in interpolate_reference(
         (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
