@@ -41,7 +41,7 @@ extern "C" {
 struct nmpc_state_t {
     real_t position[3];
     real_t velocity[3];
-    real_t attitude[4]; /* w, x, y, z */
+    real_t attitude[4]; /* x, y, z, W */
     real_t angular_velocity[3];
 };
 

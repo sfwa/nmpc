@@ -135,13 +135,29 @@ for i in xrange(0, nmpc.HORIZON_LENGTH):
     horizon_point.extend([15000, 0, 0])
     nmpc.set_reference(horizon_point[1:], i)
 
+initial_point = interpolate_reference(0, xplane_reference_points)
+_cnmpc.nmpc_fixedwingdynamics_set_position(*initial_point[1:4])
+_cnmpc.nmpc_fixedwingdynamics_set_velocity(*initial_point[4:7])
+_cnmpc.nmpc_fixedwingdynamics_set_attitude(
+    initial_point[10],
+    initial_point[7],
+    initial_point[8],
+    initial_point[9])
+_cnmpc.nmpc_fixedwingdynamics_set_angular_velocity(*initial_point[11:14])
+_cnmpc.nmpc_fixedwingdynamics_get_state(state)
+print initial_point
 nmpc.initialise_horizon()
 
 for i in xrange(100):
     nmpc.prepare()
-    nmpc.solve(interpolate_reference(
-        i*nmpc.STEP_LENGTH, xplane_reference_points)[1:])
-    print nmpc.get_controls()
+    nmpc.solve(
+        list(state.position) +
+        list(state.velocity) +
+        list(state.attitude) +
+        list(state.angular_velocity))
+    control_vec = nmpc.get_controls()
+    nmpc.integrate(nmpc.STEP_LENGTH, (ctypes.c_double * 3)(*control_vec))
+    print control_vec
     horizon_point = [a for a in interpolate_reference(
         (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
