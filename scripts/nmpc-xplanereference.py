@@ -70,7 +70,7 @@ initialised = False
 initial_time = 0.0
 
 nmpc.setup(
-    state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 10, 10, 10],
+    state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     control_weights=[1e-10, 1e-2, 1e-2],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[25000, 1.0, 1.0],
@@ -137,12 +137,12 @@ for i in xrange(0, nmpc.HORIZON_LENGTH):
 
 nmpc.initialise_horizon()
 
-for i in xrange(5):
+for i in xrange(100):
     nmpc.prepare()
     nmpc.solve(interpolate_reference(
-        0, xplane_reference_points)[1:])
-    # print nmpc.get_controls()
-    # horizon_point = [a for a in interpolate_reference(
-    #     (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
-    # horizon_point.extend([15000, 0, 0])
-    # nmpc.update_horizon(horizon_point[1:])
+        i*nmpc.STEP_LENGTH, xplane_reference_points)[1:])
+    print nmpc.get_controls()
+    horizon_point = [a for a in interpolate_reference(
+        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
+    horizon_point.extend([15000, 0, 0])
+    nmpc.update_horizon(horizon_point[1:])

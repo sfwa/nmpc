@@ -131,6 +131,8 @@ void OptimalControlProblem::calculate_deltas() {
             control_horizon[i],
             reference_trajectory[i]);
 
+        // std::cout << deltas[i].transpose() << std::endl;
+
         /*
         Calculates the gradient vector, which is the difference between each
         point on the state/control horizon and the corresponding point in the
@@ -151,6 +153,8 @@ void OptimalControlProblem::calculate_deltas() {
             control_weights *
             deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
     }
+
+    // std::cout << "++++++++++++++++" << std::endl << std::endl;
 }
 
 /*
@@ -326,10 +330,10 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
     /*
     Initial delta is constrained to be the difference between the measurement
-    and the initial reference point.
+    and the initial state horizon point.
     */
     DeltaVector initial_delta = state_to_delta(
-        reference_trajectory[0].segment<NMPC_STATE_DIM>(0),
+        state_horizon[0],
         measurement);
     zLow_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
     zUpp_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
@@ -387,10 +391,10 @@ void OptimalControlProblem::solve_qp() {
 
         // std::cout << reference_trajectory[i].transpose() << std::endl;
         // std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
-        std::cout << control_horizon[i].transpose() << std::endl;
+        // std::cout << control_horizon[i].transpose() << std::endl;
     }
 
-    std::cout << "=========" << std::endl << std::endl;
+    // std::cout << "=========" << std::endl << std::endl;
 }
 
 /* Copies the reference trajectory into the state and control horizons. */
