@@ -52,7 +52,8 @@ class OptimalControlProblem {
     
     DynamicsModel *dynamics;
 
-    ReferenceVector reference_trajectory[OCP_HORIZON_LENGTH];
+    ControlVector control_reference[OCP_HORIZON_LENGTH];
+    StateVector state_reference[OCP_HORIZON_LENGTH];
     ControlVector control_horizon[OCP_HORIZON_LENGTH];
     StateVector state_horizon[OCP_HORIZON_LENGTH];
     StateVector integrated_state_horizon[OCP_HORIZON_LENGTH];
@@ -62,14 +63,6 @@ class OptimalControlProblem {
     point on the horizon, weighted by the weight matrices.
     */
     GradientVector gradients[OCP_HORIZON_LENGTH];
-
-    /*
-    The "deltas" are the set of perturbations from point around which the
-    system has been linearised, which arise due to the feedback step (actual
-    measurement data being supplied in each iteration). These are the vectors
-    which the QP solver is trying to optimise.
-    */
-    GradientVector deltas[OCP_HORIZON_LENGTH];
 
     /*
     Affine constraint matrix and bounding vectors. These will be generated
@@ -102,14 +95,10 @@ class OptimalControlProblem {
     qpData_t qp_data;
     qpOptions_t qp_options;
 
-    GradientVector state_to_delta(
-        const StateVector &s,
-        const ControlVector &c,
-        const ReferenceVector &r);
     DeltaVector state_to_delta(
         const StateVector &s1,
         const StateVector &s2);
-    void calculate_deltas();
+    void calculate_gradient();
     void solve_ivps();
     void initialise_qp();
     void update_qp();
@@ -135,7 +124,8 @@ public:
         upper_control_bound = in;
     }
     void set_reference_point(const ReferenceVector &in, uint32_t i) {
-        reference_trajectory[i] = in;
+        state_reference[i] = in.segment<NMPC_STATE_DIM>(0);
+        control_reference[i] = in.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
     }
     void preparation_step();
     void feedback_step(StateVector measurement);
