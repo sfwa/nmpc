@@ -47,9 +47,9 @@ const State &in, const ControlVector &control) const {
     horizontal_v2 = airflow.y() * airflow.y() + airflow.x() * airflow.x();
     vertical_v2 = airflow.z() * airflow.z() + airflow.x() * airflow.x();
 
-    v_inv = (real_t)1.0 / std::max(v, 1.0);
+    v_inv = (real_t)1.0 / std::max(v, (real_t)1.0);
     vertical_v = std::sqrt(vertical_v2);
-    vertical_v_inv = (real_t)1.0 / std::max(vertical_v, 1.0);
+    vertical_v_inv = (real_t)1.0 / std::max(vertical_v, (real_t)1.0);
 
     /* Determine alpha and beta: alpha = atan(wz/wx), beta = atan(wy/|wxz|) */
     real_t alpha, sin_alpha, cos_alpha, sin_beta, cos_beta, a2, sin_cos_alpha;
@@ -66,9 +66,9 @@ const State &in, const ControlVector &control) const {
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
     lift = -5 * a2 * alpha + a2 + 2.5 * alpha + 0.12;
     if (alpha < 0.0) {
-        lift = std::min(lift, 0.8 * sin_cos_alpha);
+        lift = std::min(lift, (real_t)0.8 * sin_cos_alpha);
     } else {
-        lift = std::max(lift, 0.8 * sin_cos_alpha);
+        lift = std::max(lift, (real_t)0.8 * sin_cos_alpha);
     }
 
     drag = 0.05 + 0.7 * sin_alpha * sin_alpha;
