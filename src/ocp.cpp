@@ -109,6 +109,8 @@ void OptimalControlProblem::calculate_gradient() {
             control_weights *
             (control_horizon[i] - control_reference[i]);
     }
+
+    gradients[i] = GradientVector::Zero();
 }
 
 /*
@@ -254,8 +256,9 @@ void OptimalControlProblem::initialise_qp() {
 
     /* Set up final interval. */
     P_map = terminal_weights;
+    g_map = gradients[i];
     status_flag = qpDUNES_setupFinalInterval(&qp_data, qp_data.intervals[i],
-        P, 0, zLow, zUpp, 0, 0, 0);
+        P, g, zLow, zUpp, 0, 0, 0);
     AssertOK(status_flag);
 
     qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_TRUE);
@@ -301,8 +304,9 @@ void OptimalControlProblem::update_qp() {
     }
 
     /* Set up final interval. */
+    g_map = gradients[i];
     status_flag = qpDUNES_updateIntervalData(&qp_data, qp_data.intervals[i],
-        0, 0, 0, 0, zLow, zUpp, 0, 0, 0, 0);
+        0, g, 0, 0, zLow, zUpp, 0, 0, 0, 0);
     AssertOK(status_flag);
 
     qpDUNES_indicateDataChange(&qp_data);
