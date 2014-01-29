@@ -135,6 +135,11 @@ for i in xrange(0, nmpc.HORIZON_LENGTH):
     horizon_point.extend([15000, 0, 0])
     nmpc.set_reference(horizon_point[1:], i)
 
+# Set up terminal reference. No need for control values as they'd be ignored.
+terminal_point = [a for a in interpolate_reference(
+    nmpc.HORIZON_LENGTH*nmpc.STEP_LENGTH, xplane_reference_points)]
+nmpc.set_reference(terminal_point[1:], nmpc.HORIZON_LENGTH)
+
 initial_point = interpolate_reference(0, xplane_reference_points)
 _cnmpc.nmpc_fixedwingdynamics_set_position(*initial_point[1:4])
 _cnmpc.nmpc_fixedwingdynamics_set_velocity(*initial_point[4:7])

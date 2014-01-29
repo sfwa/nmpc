@@ -53,9 +53,9 @@ class OptimalControlProblem {
     DynamicsModel *dynamics;
 
     ControlVector control_reference[OCP_HORIZON_LENGTH];
-    StateVector state_reference[OCP_HORIZON_LENGTH];
+    StateVector state_reference[OCP_HORIZON_LENGTH+1];
     ControlVector control_horizon[OCP_HORIZON_LENGTH];
-    StateVector state_horizon[OCP_HORIZON_LENGTH];
+    StateVector state_horizon[OCP_HORIZON_LENGTH+1];
     StateVector integrated_state_horizon[OCP_HORIZON_LENGTH];
 
     /*
@@ -125,7 +125,11 @@ public:
     }
     void set_reference_point(const ReferenceVector &in, uint32_t i) {
         state_reference[i] = in.segment<NMPC_STATE_DIM>(0);
-        control_reference[i] = in.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
+
+        if(i < OCP_HORIZON_LENGTH) {
+            control_reference[i] =
+                in.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
+        }
     }
     void preparation_step();
     void feedback_step(StateVector measurement);
