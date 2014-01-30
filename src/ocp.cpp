@@ -88,32 +88,6 @@ const StateVector &s1, const StateVector &s2) {
 }
 
 /*
-Linearises the state and control horizon around the previous solution, to
-allow the QP solver to further optimise control values over the horizon.
-Also calculates the gradient vector, which is just each delta multiplied by
-the relevant weight matrix (the final one being multiplied by the terminal
-weight).
-*/
-void OptimalControlProblem::calculate_gradient() {
-    uint32_t i;
-
-    for(i = 0; i < OCP_HORIZON_LENGTH; i++ ) {
-        /*
-        Calculates the gradient vector, which is the difference between each
-        point on the state/control horizon and the corresponding point in the
-        reference trajectory multiplied by the weights. The terminal weights
-        are applied to the last state delta.
-        */
-        gradients[i].segment<NMPC_DELTA_DIM>(0) = DeltaVector::Zero();
-        gradients[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            control_weights *
-            (control_reference[i] - control_reference[i]);
-    }
-
-    gradients[i] = GradientVector::Zero();
-}
-
-/*
 Solve the initial value problems in order to set up continuity constraints,
 which effectively store the system dynamics for this SQP iteration.
 At the same time, compute the Jacobian function by applying perturbations to
@@ -236,11 +210,13 @@ void OptimalControlProblem::initialise_qp() {
 
     return_t status_flag;
 
+    /* Gradient vector fixed to zero. */
+    g_map = GradientVector::Zero();
+
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
         Q_map = state_weights;
         R_map = control_weights;
-        g_map = gradients[i];
         C_map = jacobians[i];
         c_map = integration_residuals[i];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
@@ -256,7 +232,6 @@ void OptimalControlProblem::initialise_qp() {
 
     /* Set up final interval. */
     P_map = terminal_weights;
-    g_map = gradients[i];
     status_flag = qpDUNES_setupFinalInterval(&qp_data, qp_data.intervals[i],
         P, g, zLow, zUpp, 0, 0, 0);
     AssertOK(status_flag);
@@ -287,9 +262,11 @@ void OptimalControlProblem::update_qp() {
 
     return_t status_flag;
 
+    /* Gradient vector fixed to zero. */
+    g_map = GradientVector::Zero();
+
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
-        g_map = gradients[i];
         C_map = jacobians[i];
         c_map = integration_residuals[i];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
@@ -304,7 +281,6 @@ void OptimalControlProblem::update_qp() {
     }
 
     /* Set up final interval. */
-    g_map = gradients[i];
     status_flag = qpDUNES_updateIntervalData(&qp_data, qp_data.intervals[i],
         0, g, 0, 0, zLow, zUpp, 0, 0, 0, 0);
     AssertOK(status_flag);
@@ -424,7 +400,6 @@ void OptimalControlProblem::initialise() {
 
     state_horizon[i] = state_reference[i];
 
-    calculate_gradient();
     solve_ivps();
     initialise_qp();
 }
@@ -435,7 +410,6 @@ step is independent of the lastest sensor measurements and so can be
 executed as soon as possible after the previous iteration.
 */
 void OptimalControlProblem::preparation_step() {
-    calculate_gradient();
     solve_ivps();
     update_qp();
 }

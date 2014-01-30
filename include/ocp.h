@@ -59,12 +59,6 @@ class OptimalControlProblem {
     StateVector integrated_state_horizon[OCP_HORIZON_LENGTH];
 
     /*
-    Difference between predicted state and reference trajectory for each
-    point on the horizon, weighted by the weight matrices.
-    */
-    GradientVector gradients[OCP_HORIZON_LENGTH+1];
-
-    /*
     Affine constraint matrix and bounding vectors. These will be generated
     each iteration from the non-linear constraints.
     */
