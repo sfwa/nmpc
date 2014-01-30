@@ -159,14 +159,6 @@ void OptimalControlProblem::solve_ivps() {
                 state_to_delta(integrated_state_horizon[i], new_state) /
                 perturbation;
         }
-
-        /*
-        Calculate integration residuals; these are needed for the continuity
-        constraints.
-        */
-        integration_residuals[i] = state_to_delta(
-            state_reference[i+1],
-            integrated_state_horizon[i]);
     }
 }
 
@@ -213,12 +205,14 @@ void OptimalControlProblem::initialise_qp() {
     /* Gradient vector fixed to zero. */
     g_map = GradientVector::Zero();
 
+    /* Continuity constraint constant term fixed to zero. */
+    c_map = DeltaVector::Zero();
+
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
         Q_map = state_weights;
         R_map = control_weights;
         C_map = jacobians[i];
-        c_map = integration_residuals[i];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             lower_control_bound - control_reference[i];
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
@@ -265,10 +259,12 @@ void OptimalControlProblem::update_qp() {
     /* Gradient vector fixed to zero. */
     g_map = GradientVector::Zero();
 
+    /* Continuity constraint constant term fixed to zero. */
+    c_map = DeltaVector::Zero();
+
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
         C_map = jacobians[i];
-        c_map = integration_residuals[i];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             lower_control_bound - control_reference[i];
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =

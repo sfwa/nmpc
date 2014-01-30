@@ -78,7 +78,6 @@ class OptimalControlProblem {
     the horizon.
     */
     ContinuityConstraintMatrix jacobians[OCP_HORIZON_LENGTH];
-    DeltaVector integration_residuals[OCP_HORIZON_LENGTH];
 
     /* Weight matrices. */
     StateWeightMatrix state_weights;
