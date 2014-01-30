@@ -107,7 +107,7 @@ void OptimalControlProblem::calculate_gradient() {
         gradients[i].segment<NMPC_DELTA_DIM>(0) = DeltaVector::Zero();
         gradients[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             control_weights *
-            (control_horizon[i] - control_reference[i]);
+            (control_reference[i] - control_reference[i]);
     }
 
     gradients[i] = GradientVector::Zero();
@@ -126,7 +126,7 @@ void OptimalControlProblem::solve_ivps() {
         /* Solve the initial value problem at this horizon step. */
         integrated_state_horizon[i] = integrator.integrate(
             State(state_reference[i]),
-            control_horizon[i],
+            control_reference[i],
             dynamics,
             OCP_STEP_LENGTH);
 
@@ -134,7 +134,7 @@ void OptimalControlProblem::solve_ivps() {
             ReferenceVector perturbed_state;
             perturbed_state.segment<NMPC_STATE_DIM>(0) = state_reference[i];
             perturbed_state.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM) =
-                control_horizon[i];
+                control_reference[i];
             StateVector new_state;
             real_t perturbation = NMPC_EPS_4RT;
 
@@ -244,9 +244,9 @@ void OptimalControlProblem::initialise_qp() {
         C_map = jacobians[i];
         c_map = integration_residuals[i];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            lower_control_bound - control_horizon[i];
+            lower_control_bound - control_reference[i];
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            upper_control_bound - control_horizon[i];
+            upper_control_bound - control_reference[i];
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
@@ -293,9 +293,9 @@ void OptimalControlProblem::update_qp() {
         C_map = jacobians[i];
         c_map = integration_residuals[i];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            lower_control_bound - control_horizon[i];
+            lower_control_bound - control_reference[i];
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            upper_control_bound - control_horizon[i];
+            upper_control_bound - control_reference[i];
 
         status_flag = qpDUNES_updateIntervalData(
             &qp_data, qp_data.intervals[i],
@@ -326,9 +326,9 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
     /* Control constraints are unchanged. */
     zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-        lower_control_bound - control_horizon[0];
+        lower_control_bound - control_reference[0];
     zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-        upper_control_bound - control_horizon[0];
+        upper_control_bound - control_reference[0];
 
     /*
     Initial delta is constrained to be the difference between the measurement
@@ -385,7 +385,8 @@ void OptimalControlProblem::solve_qp() {
 
         state_horizon[i].segment<3>(10) += solution_map.segment<3>(9);
 
-        control_horizon[i] +=
+        control_horizon[i] =
+            control_reference[i] +
             solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
     }
 
