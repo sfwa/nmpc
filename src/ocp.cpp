@@ -56,7 +56,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
     terminal_weights = StateWeightMatrix::Identity();
 
     qp_options = qpDUNES_setupDefaultOptions();
-    qp_options.maxIter = 100;
+    qp_options.maxIter = 10;
     qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-6;
 }

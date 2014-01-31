@@ -32,7 +32,7 @@ SOFTWARE.
 #include "integrator.h"
 
 /* OCP control and prediction horizon (number of steps). */
-#define OCP_HORIZON_LENGTH 500
+#define OCP_HORIZON_LENGTH 100
 
 /* OCP control step length (seconds). */
 #define OCP_STEP_LENGTH (1.0/50.0)
