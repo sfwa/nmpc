@@ -58,6 +58,9 @@ class X8DynamicsModel: public DynamicsModel {
     /* Store inverse inertia tensor for performance */
     Matrix3x3r inertia_tensor_inv;
 
+    /* Store wind velocity as a parameter, because we can't control it. */
+    Vector3r wind_velocity;
+
 public:
     X8DynamicsModel(void) {
         mass_inv = (real_t)1.0 / 3.8;
@@ -68,7 +71,11 @@ public:
             0, 1.7e-1, 0,
             -0.334e-1, 0, 4.05e-1;
         inertia_tensor_inv = inertia_tensor.inverse();
+
+        wind_velocity << 0.0, 0.0, 0.0;
     }
+
+    void set_wind_velocity(const Vector3r &in) { wind_velocity = in; }
 
     AccelerationVector evaluate(
     const State &in, const ControlVector &control) const;

@@ -112,6 +112,10 @@ uint32_t i) {
     ocp.set_reference_point(reference, i);
 }
 
+void nmpc_set_wind_velocity(real_t x, real_t y, real_t z) {
+    dynamics_model.set_wind_velocity(Vector3r(x, y, z));
+}
+
 void nmpc_fixedwingdynamics_set_position(
 real_t lat, real_t lon, real_t alt) {
     current.position() << lat, lon, alt;

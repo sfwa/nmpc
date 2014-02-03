@@ -59,6 +59,9 @@ void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
 void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
 void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM], uint32_t i);
 
+/* Function to set the wind estimate for the dynamics model. */
+void nmpc_set_wind_velocity(real_t x, real_t y, real_t z);
+
 /* Functions for setting different parts of the state vector. */
 void nmpc_fixedwingdynamics_set_position(
     real_t lat, real_t lon, real_t alt);

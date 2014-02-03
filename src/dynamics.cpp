@@ -42,7 +42,7 @@ const State &in, const ControlVector &control) const {
     Vector3r airflow;
     real_t v, v_inv, horizontal_v2, vertical_v2, vertical_v, vertical_v_inv;
 
-    airflow = attitude * -in.velocity();
+    airflow = attitude * (wind_velocity - in.velocity());
     v = airflow.norm();
     horizontal_v2 = airflow.y() * airflow.y() + airflow.x() * airflow.x();
     vertical_v2 = airflow.z() * airflow.z() + airflow.x() * airflow.x();

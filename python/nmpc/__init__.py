@@ -81,6 +81,12 @@ def get_controls():
 
     return list(new_controls)
 
+def set_wind_velocity(wind_velocity):
+    _cnmpc.nmpc_set_wind_velocity(
+        _REAL_T(wind_velocity[0]),
+        _REAL_T(wind_velocity[1]),
+        _REAL_T(wind_velocity[2]))
+
 def update_horizon(new_reference):
     _cnmpc.nmpc_update_horizon(
         (_REAL_T * (_STATE_DIM+_CONTROL_DIM))(*new_reference))
@@ -169,6 +175,10 @@ def init(implementation="c"):
         POINTER(_REAL_T * (_STATE_DIM+_CONTROL_DIM)),
         c_uint]
     _cnmpc.nmpc_set_reference_point.restype = None
+
+    _cnmpc.nmpc_set_wind_velocity.argtype = [
+        _REAL_T, _REAL_T, _REAL_T]
+    _cnmpc.nmpc_set_wind_velocity.restype = None
 
     # Set up the function prototypes
     _cnmpc.nmpc_fixedwingdynamics_set_position.argtypes = [
