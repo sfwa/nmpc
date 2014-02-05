@@ -42,14 +42,14 @@ const State &in, const ControlVector &control) const {
     Vector3r airflow;
     real_t v, v_inv, horizontal_v2, vertical_v2, vertical_v, vertical_v_inv;
 
-    airflow = attitude * -in.velocity();
+    airflow = attitude * (wind_velocity - in.velocity());
     v = airflow.norm();
     horizontal_v2 = airflow.y() * airflow.y() + airflow.x() * airflow.x();
     vertical_v2 = airflow.z() * airflow.z() + airflow.x() * airflow.x();
 
-    v_inv = (real_t)1.0 / std::max(v, 1.0);
+    v_inv = (real_t)1.0 / std::max(v, (real_t)1.0);
     vertical_v = std::sqrt(vertical_v2);
-    vertical_v_inv = (real_t)1.0 / std::max(vertical_v, 1.0);
+    vertical_v_inv = (real_t)1.0 / std::max(vertical_v, (real_t)1.0);
 
     /* Determine alpha and beta: alpha = atan(wz/wx), beta = atan(wy/|wxz|) */
     real_t alpha, sin_alpha, cos_alpha, sin_beta, cos_beta, a2, sin_cos_alpha;
@@ -65,19 +65,14 @@ const State &in, const ControlVector &control) const {
 
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
     lift = -5 * a2 * alpha + a2 + 2.5 * alpha + 0.12;
-    if (alpha < 0.0) {
-        lift = std::min(lift, 0.8 * sin_cos_alpha);
-    } else {
-        lift = std::max(lift, 0.8 * sin_cos_alpha);
-    }
 
     drag = 0.05 + 0.7 * sin_alpha * sin_alpha;
     side_force = 0.3 * sin_beta * cos_beta;
 
-    pitch_moment = 0.001 - 0.1 * sin_cos_alpha - 0.003 * pitch_rate -
-                   0.01 * control[1] - 0.01 * control[2];
-    roll_moment = -0.03 * sin_beta - 0.015 * roll_rate +
-                  0.025 * control[1] - 0.025 * control[2];
+    pitch_moment = 0.01 + 0.03 * sin_cos_alpha - 0.002 * pitch_rate -
+                   0.3 * control[1] - 0.3 * control[2];
+    roll_moment = -0.03 * sin_beta - 0.01 * roll_rate +
+                  0.4 * control[1] - 0.4 * control[2];
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
                  0.01 * std::abs(control[1]) + 0.01 * std::abs(control[2]);
 

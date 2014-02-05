@@ -56,37 +56,9 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
     terminal_weights = StateWeightMatrix::Identity();
 
     qp_options = qpDUNES_setupDefaultOptions();
-    qp_options.maxIter = 100;
-    qp_options.printLevel = 2;
+    qp_options.maxIter = 10;
+    qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-6;
-}
-
-GradientVector OptimalControlProblem::state_to_delta(
-const StateVector &s, const ControlVector &c, const ReferenceVector &r) {
-    GradientVector delta;
-
-    delta.segment<6>(0) = s.segment<6>(0) - r.segment<6>(0);
-
-    /*
-    In order to increase the linearity of the problem and avoid quaternion
-    normalisation issues, we calculate the difference between attitudes as a
-    3-vector of Modified Rodrigues Parameters (MRP).
-    */
-    Quaternionr err_q = (Quaternionr(s.segment<4>(6)) *
-        Quaternionr(r.segment<4>(6)).conjugate());
-
-    if(err_q.w() < 0) {
-        err_q = Quaternionr(-err_q.w(), -err_q.x(), -err_q.y(), -err_q.z());
-    }
-
-    delta.segment<3>(6) = NMPC_MRP_F *
-        (err_q.vec() / (NMPC_MRP_A + err_q.w()));
-
-    delta.segment<3>(9) = s.segment<3>(10) - r.segment<3>(10);
-    delta.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) = 
-        c - r.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
-
-    return delta;
 }
 
 DeltaVector OptimalControlProblem::state_to_delta(
@@ -116,44 +88,6 @@ const StateVector &s1, const StateVector &s2) {
 }
 
 /*
-Linearises the state and control horizon around the previous solution, to
-allow the QP solver to further optimise control values over the horizon.
-Also calculates the gradient vector, which is just each delta multiplied by
-the relevant weight matrix (the final one being multiplied by the terminal
-weight).
-*/
-void OptimalControlProblem::calculate_deltas() {
-    uint32_t i;
-
-    for(i = 0; i < OCP_HORIZON_LENGTH; i++ ) {
-        deltas[i] = state_to_delta(
-            state_horizon[i],
-            control_horizon[i],
-            reference_trajectory[i]);
-
-        /*
-        Calculates the gradient vector, which is the difference between each
-        point on the state/control horizon and the corresponding point in the
-        reference trajectory multiplied by the weights. The terminal weights
-        are applied to the last state delta.
-        */
-        StateWeightMatrix *weights;
-        if(i != OCP_HORIZON_LENGTH-1) {
-            weights = &state_weights;
-        } else {
-            weights = &terminal_weights;
-        }
-
-        gradients[i].segment<NMPC_DELTA_DIM>(0) =
-            *weights * deltas[i].segment<NMPC_DELTA_DIM>(0);
-
-        gradients[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            control_weights *
-            deltas[i].segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
-    }
-}
-
-/*
 Solve the initial value problems in order to set up continuity constraints,
 which effectively store the system dynamics for this SQP iteration.
 At the same time, compute the Jacobian function by applying perturbations to
@@ -162,27 +96,26 @@ each of the variables in turn, for use in the continuity constraints.
 void OptimalControlProblem::solve_ivps() {
     uint32_t i, j;
 
-    for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
+    for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Solve the initial value problem at this horizon step. */
         integrated_state_horizon[i] = integrator.integrate(
-            State(state_horizon[i]),
-            control_horizon[i],
+            State(state_reference[i]),
+            control_reference[i],
             dynamics,
             OCP_STEP_LENGTH);
 
         for(j = 0; j < NMPC_GRADIENT_DIM; j++) {
             ReferenceVector perturbed_state;
-            perturbed_state.segment<NMPC_STATE_DIM>(0) = state_horizon[i];
+            perturbed_state.segment<NMPC_STATE_DIM>(0) = state_reference[i];
             perturbed_state.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM) =
-                control_horizon[i];
+                control_reference[i];
             StateVector new_state;
             real_t perturbation = NMPC_EPS_4RT;
 
             /* Need to calculate quaternion perturbations using MRPs. */
             if(j < 6) {
                 perturbed_state[j] += perturbation;
-            }
-            else if(j >= 6 && j <= 8) {
+            } else if(j >= 6 && j <= 8) {
                 Vector3r d_p;
                 d_p << 0.0, 0.0, 0.0;
                 d_p[j-6] = perturbation;
@@ -226,25 +159,14 @@ void OptimalControlProblem::solve_ivps() {
                 state_to_delta(integrated_state_horizon[i], new_state) /
                 perturbation;
         }
-
-        /*
-        Calculate integration residuals; these are needed for the continuity
-        constraints.
-        */
-        integration_residuals[i] = state_to_delta(
-            state_horizon[i+1],
-            integrated_state_horizon[i]);
     }
 }
 
 /*
 Uses all of the information calculated so far to set up the various qpDUNES
 datastructures in preparation for the feedback step.
-This is really inefficient right now – there's heaps of copying and
-transpositions because the Eigen matrices are all in column-major format
-whereas qpDUNES expects row-major arrays.
-Could do this much more efficiently using the Eigen Map class, and possibly
-avoid having to copy data at all.
+This is really inefficient right now – there's heaps of probably unnecessary
+copying going on.
 */
 void OptimalControlProblem::initialise_qp() {
     uint32_t i;
@@ -260,10 +182,13 @@ void OptimalControlProblem::initialise_qp() {
     Eigen::Map<ContinuityConstraintMatrix> C_map(C);
     real_t c[NMPC_DELTA_DIM];
     Eigen::Map<DeltaVector> c_map(c);
-    real_t uLow[NMPC_CONTROL_DIM];
-    Eigen::Map<ControlConstraintVector> uLow_map(uLow);
-    real_t uUpp[NMPC_CONTROL_DIM];
-    Eigen::Map<ControlConstraintVector> uUpp_map(uUpp);
+    real_t zLow[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> zLow_map(zLow);
+    real_t zUpp[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> zUpp_map(zUpp);
+
+    zLow_map.segment<NMPC_DELTA_DIM>(0) = lower_state_bound;
+    zUpp_map.segment<NMPC_DELTA_DIM>(0) = upper_state_bound;
 
     /* Set up problem dimensions. */
     /* TODO: Determine number of affine constraints (D), and add them. */
@@ -277,29 +202,84 @@ void OptimalControlProblem::initialise_qp() {
 
     return_t status_flag;
 
+    /* Gradient vector fixed to zero. */
+    g_map = GradientVector::Zero();
+
+    /* Continuity constraint constant term fixed to zero. */
+    c_map = DeltaVector::Zero();
+
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
         Q_map = state_weights;
         R_map = control_weights;
-        g_map = gradients[i];
         C_map = jacobians[i];
-        c_map = integration_residuals[i];
-        uLow_map = lower_control_bound - control_horizon[i];
-        uUpp_map = upper_control_bound - control_horizon[i];
+        zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+            lower_control_bound - control_reference[i];
+        zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+            upper_control_bound - control_reference[i];
 
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
-            0, Q, R, 0, g, C, 0, 0, c, 0, 0, 0, 0, uLow, uUpp, 0, 0, 0);
+            0, Q, R, 0, g, C, 0, 0, c, zLow, zUpp, 0, 0, 0, 0, 0, 0, 0);
         AssertOK(status_flag);
     }
 
-    /* Set up final interval */
+    /* Set up final interval. */
     P_map = terminal_weights;
     status_flag = qpDUNES_setupFinalInterval(&qp_data, qp_data.intervals[i],
-        P, g, 0, 0, 0, 0, 0);
+        P, g, zLow, zUpp, 0, 0, 0);
     AssertOK(status_flag);
 
-    qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_FALSE);
+    qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_TRUE);
+
+    qpDUNES_indicateDataChange(&qp_data);
+}
+
+/*
+Updates the QP with the latest linearisations.
+*/
+void OptimalControlProblem::update_qp() {
+    uint32_t i;
+    real_t g[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> g_map(g);
+    real_t C[(NMPC_STATE_DIM-1)*NMPC_GRADIENT_DIM];
+    Eigen::Map<ContinuityConstraintMatrix> C_map(C);
+    real_t c[NMPC_DELTA_DIM];
+    Eigen::Map<DeltaVector> c_map(c);
+    real_t zLow[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> zLow_map(zLow);
+    real_t zUpp[NMPC_GRADIENT_DIM];
+    Eigen::Map<GradientVector> zUpp_map(zUpp);
+
+    zLow_map.segment<NMPC_DELTA_DIM>(0) = lower_state_bound;
+    zUpp_map.segment<NMPC_DELTA_DIM>(0) = upper_state_bound;
+
+    return_t status_flag;
+
+    /* Gradient vector fixed to zero. */
+    g_map = GradientVector::Zero();
+
+    /* Continuity constraint constant term fixed to zero. */
+    c_map = DeltaVector::Zero();
+
+    for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
+        /* Copy the relevant data into the qpDUNES arrays. */
+        C_map = jacobians[i];
+        zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+            lower_control_bound - control_reference[i];
+        zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+            upper_control_bound - control_reference[i];
+
+        status_flag = qpDUNES_updateIntervalData(
+            &qp_data, qp_data.intervals[i],
+            0, g, C, c, zLow, zUpp, 0, 0, 0, 0);
+        AssertOK(status_flag);
+    }
+
+    /* Set up final interval. */
+    status_flag = qpDUNES_updateIntervalData(&qp_data, qp_data.intervals[i],
+        0, g, 0, 0, zLow, zUpp, 0, 0, 0, 0);
+    AssertOK(status_flag);
 
     qpDUNES_indicateDataChange(&qp_data);
 }
@@ -318,16 +298,16 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
 
     /* Control constraints are unchanged. */
     zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-        lower_control_bound - control_horizon[0];
+        lower_control_bound - control_reference[0];
     zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-        upper_control_bound - control_horizon[0];
+        upper_control_bound - control_reference[0];
 
     /*
     Initial delta is constrained to be the difference between the measurement
-    and the initial reference point.
+    and the initial state horizon point.
     */
     DeltaVector initial_delta = state_to_delta(
-        reference_trajectory[0].segment<NMPC_STATE_DIM>(0),
+        state_reference[0],
         measurement);
     zLow_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
     zUpp_map.segment<NMPC_DELTA_DIM>(0) = initial_delta;
@@ -336,6 +316,8 @@ void OptimalControlProblem::initial_constraint(StateVector measurement) {
         &qp_data, qp_data.intervals[0],
         0, 0, 0, 0, zLow, zUpp, 0, 0, 0, 0);
     AssertOK(status_flag);
+
+    qpDUNES_indicateDataChange(&qp_data);
 }
 
 /* Solves the QP using qpDUNES. */
@@ -357,10 +339,7 @@ void OptimalControlProblem::solve_qp() {
         Eigen::Map<GradientVector> solution_map(
             &solution[i*NMPC_GRADIENT_DIM]);
 
-        std::cout << solution_map.transpose() << std::endl;
-
-        state_horizon[i].segment<6>(0) +=
-            solution_map.segment<6>(0);
+        state_horizon[i].segment<6>(0) += solution_map.segment<6>(0);
 
         Vector3r d_p = solution_map.segment<3>(6);
         real_t x_2 = d_p.squaredNorm();
@@ -376,17 +355,34 @@ void OptimalControlProblem::solve_qp() {
             Quaternionr(state_horizon[i].segment<4>(6));
         state_horizon[i].segment<4>(6) << temp.vec(), temp.w();
 
-        state_horizon[i].segment<3>(10) +=
-            solution_map.segment<3>(9);
+        state_horizon[i].segment<3>(10) += solution_map.segment<3>(9);
 
-        control_horizon[i] +=
+        control_horizon[i] =
+            control_reference[i] +
             solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
-
-        std::cout << reference_trajectory[i].transpose() << std::endl;
-        std::cout << state_horizon[i].transpose() << "\t" << control_horizon[i].transpose() << std::endl << std::endl;
     }
 
-    std::cout << "=========" << std::endl << std::endl;
+    /* Last interval. */
+    Eigen::Map<GradientVector> solution_map(
+        &solution[i*NMPC_GRADIENT_DIM]);
+
+    state_horizon[i].segment<6>(0) += solution_map.segment<6>(0);
+
+    Vector3r d_p = solution_map.segment<3>(6);
+    real_t x_2 = d_p.squaredNorm();
+    real_t delta_w = (-NMPC_MRP_A * x_2 + NMPC_MRP_F * std::sqrt(
+        NMPC_MRP_F_2 + ((real_t)1.0 - NMPC_MRP_A_2) * x_2)) /
+        (NMPC_MRP_F_2 + x_2);
+    Vector3r delta_xyz = (((real_t)1.0 / NMPC_MRP_F) *
+        (NMPC_MRP_A + delta_w)) * d_p;
+    Quaternionr delta_q;
+    delta_q.vec() = delta_xyz;
+    delta_q.w() = delta_w;
+    Quaternionr temp = delta_q *
+        Quaternionr(state_horizon[i].segment<4>(6));
+    state_horizon[i].segment<4>(6) << temp.vec(), temp.w();
+
+    state_horizon[i].segment<3>(10) += solution_map.segment<3>(9);
 }
 
 /* Copies the reference trajectory into the state and control horizons. */
@@ -394,12 +390,14 @@ void OptimalControlProblem::initialise() {
     uint32_t i;
 
     for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
-        state_horizon[i] =
-            reference_trajectory[i].segment<NMPC_STATE_DIM>(0);
-        control_horizon[i] =
-            reference_trajectory[i].segment<NMPC_CONTROL_DIM>(
-                NMPC_STATE_DIM);
+        state_horizon[i] = state_reference[i];
+        control_horizon[i] = control_reference[i];
     }
+
+    state_horizon[i] = state_reference[i];
+
+    solve_ivps();
+    initialise_qp();
 }
 
 /*
@@ -408,9 +406,8 @@ step is independent of the lastest sensor measurements and so can be
 executed as soon as possible after the previous iteration.
 */
 void OptimalControlProblem::preparation_step() {
-    calculate_deltas();
     solve_ivps();
-    initialise_qp();
+    update_qp();
 }
 
 /*
@@ -436,14 +433,19 @@ void OptimalControlProblem::update_horizon(ReferenceVector new_reference) {
     for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
         state_horizon[i] = state_horizon[i+1];
         control_horizon[i] = control_horizon[i+1];
-        reference_trajectory[i] = reference_trajectory[i+1];
+        state_reference[i] = state_reference[i+1];
+        control_reference[i] = control_reference[i+1];
     }
 
+    state_horizon[i] = state_horizon[i+1];
+    state_reference[i] = state_reference[i+1];
+
     /* Insert new reference point. */
-    reference_trajectory[i] = new_reference;
-    state_horizon[i] = new_reference.segment<NMPC_STATE_DIM>(0);
-    control_horizon[i] = new_reference.segment<NMPC_CONTROL_DIM>(
+    state_reference[i+1] = new_reference.segment<NMPC_STATE_DIM>(0);
+    control_reference[i] = new_reference.segment<NMPC_CONTROL_DIM>(
         NMPC_STATE_DIM);
+    state_horizon[i+1] = state_reference[i+1];
+    control_horizon[i] = control_reference[i];
 
     /* Prepare the QP for the next solution. */
     qpDUNES_shiftLambda(&qp_data);

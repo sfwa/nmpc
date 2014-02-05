@@ -41,7 +41,7 @@ extern "C" {
 struct nmpc_state_t {
     real_t position[3];
     real_t velocity[3];
-    real_t attitude[4]; /* w, x, y, z */
+    real_t attitude[4]; /* x, y, z, W */
     real_t angular_velocity[3];
 };
 
@@ -58,6 +58,9 @@ void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]);
 void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
 void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
 void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM], uint32_t i);
+
+/* Function to set the wind estimate for the dynamics model. */
+void nmpc_set_wind_velocity(real_t x, real_t y, real_t z);
 
 /* Functions for setting different parts of the state vector. */
 void nmpc_fixedwingdynamics_set_position(
