@@ -50,7 +50,7 @@ void nmpc_preparation_step() {
     ocp.preparation_step();
 }
 
-void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]) {
+void nmpc_feedback_step(const real_t measurement[NMPC_STATE_DIM]) {
     Eigen::Map<StateVector> measurement_map =
         Eigen::Map<StateVector>(measurement);
     StateVector m = measurement_map;
@@ -62,49 +62,49 @@ void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     control_map = ocp.get_controls();
 }
 
-void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
+void nmpc_update_horizon(const real_t new_reference[NMPC_REFERENCE_DIM]) {
     Eigen::Map<ReferenceVector> reference_map =
         Eigen::Map<ReferenceVector>(new_reference);
     ReferenceVector m = reference_map;
     ocp.update_horizon(m);
 }
 
-void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]) {
+void nmpc_set_state_weights(const real_t coeffs[NMPC_DELTA_DIM]) {
     Eigen::Map<DeltaVector> state_weight_map =
         Eigen::Map<DeltaVector>(coeffs);
     DeltaVector state_weight = state_weight_map;
     ocp.set_state_weights(state_weight);
 }
 
-void nmpc_set_control_weights(real_t coeffs[NMPC_CONTROL_DIM]) {
+void nmpc_set_control_weights(const real_t coeffs[NMPC_CONTROL_DIM]) {
     Eigen::Map<ControlVector> control_weight_map =
         Eigen::Map<ControlVector>(coeffs);
     ControlVector control_weight = control_weight_map;
     ocp.set_control_weights(control_weight);
 }
 
-void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]) {
+void nmpc_set_terminal_weights(const real_t coeffs[NMPC_DELTA_DIM]) {
     Eigen::Map<DeltaVector> terminal_weight_map =
         Eigen::Map<DeltaVector>(coeffs);
     DeltaVector terminal_weight = terminal_weight_map;
     ocp.set_terminal_weights(terminal_weight);
 }
 
-void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]) {
+void nmpc_set_lower_control_bound(const real_t coeffs[NMPC_CONTROL_DIM]) {
     Eigen::Map<ControlConstraintVector> control_constraint_map =
         Eigen::Map<ControlConstraintVector>(coeffs);
     ControlConstraintVector control_constraint = control_constraint_map;
     ocp.set_lower_control_bound(control_constraint);
 }
 
-void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]) {
+void nmpc_set_upper_control_bound(const real_t coeffs[NMPC_CONTROL_DIM]) {
     Eigen::Map<ControlConstraintVector> control_constraint_map =
         Eigen::Map<ControlConstraintVector>(coeffs);
     ControlConstraintVector control_constraint = control_constraint_map;
     ocp.set_upper_control_bound(control_constraint);
 }
 
-void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM],
+void nmpc_set_reference_point(const real_t coeffs[NMPC_REFERENCE_DIM],
 uint32_t i) {
     Eigen::Map<ReferenceVector> reference_map =
         Eigen::Map<ReferenceVector>(coeffs);
@@ -152,7 +152,7 @@ void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in) {
     in->angular_velocity[2] = current.angular_velocity()[2];
 }
 
-void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in) {
+void nmpc_fixedwingdynamics_set_state(const struct nmpc_state_t *in) {
     current <<
         in->position[0],
         in->position[1],
@@ -170,7 +170,7 @@ void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in) {
 }
 
 void nmpc_fixedwingdynamics_integrate(
-float dt, real_t control_vector[NMPC_CONTROL_DIM]) {
+float dt, const real_t control_vector[NMPC_CONTROL_DIM]) {
     current = integrator.integrate(
         current,
         ControlVector(control_vector),
