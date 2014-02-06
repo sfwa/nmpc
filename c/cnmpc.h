@@ -47,17 +47,17 @@ struct nmpc_state_t {
 
 void nmpc_init();
 void nmpc_preparation_step();
-void nmpc_feedback_step(const real_t measurement[NMPC_STATE_DIM]);
+void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]);
 void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
-void nmpc_update_horizon(const real_t new_reference[NMPC_REFERENCE_DIM]);
+void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]);
 
 /* Functions for setting weights and bounds for the OCP solver. */
-void nmpc_set_state_weights(const real_t coeffs[NMPC_DELTA_DIM]);
-void nmpc_set_control_weights(const real_t coeffs[NMPC_CONTROL_DIM]);
-void nmpc_set_terminal_weights(const real_t coeffs[NMPC_DELTA_DIM]);
-void nmpc_set_lower_control_bound(const real_t coeffs[NMPC_CONTROL_DIM]);
-void nmpc_set_upper_control_bound(const real_t coeffs[NMPC_CONTROL_DIM]);
-void nmpc_set_reference_point(const real_t coeffs[NMPC_REFERENCE_DIM],
+void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]);
+void nmpc_set_control_weights(real_t coeffs[NMPC_CONTROL_DIM]);
+void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]);
+void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
+void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
+void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM],
 uint32_t i);
 
 /* Function to set the wind estimate for the dynamics model. */
@@ -74,11 +74,11 @@ void nmpc_fixedwingdynamics_set_angular_velocity(
     real_t x, real_t y, real_t z);
 
 /* Functions for getting the state vector. */
-void nmpc_fixedwingdynamics_set_state(const struct nmpc_state_t *in);
+void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in);
 void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in);
 
-void nmpc_fixedwingdynamics_integrate(
-    float dt, const real_t control_vector[NMPC_CONTROL_DIM]);
+void nmpc_fixedwingdynamics_integrate(float dt,
+real_t control_vector[NMPC_CONTROL_DIM]);
 
 /*
 Functions to access the compiled configuration
