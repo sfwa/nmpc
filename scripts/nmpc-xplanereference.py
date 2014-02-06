@@ -75,6 +75,7 @@ nmpc.setup(
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[25000, 1.0, 1.0],
     lower_control_bound=[0, -1.0, -1.0])
+nmpc.initialise_horizon()
 
 xplane_reference_points = []
 
@@ -150,8 +151,6 @@ _cnmpc.nmpc_fixedwingdynamics_set_attitude(
     initial_point[9])
 _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity(*initial_point[11:14])
 _cnmpc.nmpc_fixedwingdynamics_get_state(state)
-
-nmpc.initialise_horizon()
 
 for i in xrange(500):
     nmpc.prepare()
