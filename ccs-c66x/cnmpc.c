@@ -116,8 +116,8 @@ const real_t v2[3]) {
 
 static real_t wind_velocity[3];
 
-/* 32000B */
-static real_t ocp_state_reference[OCP_HORIZON_LENGTH * NMPC_REFERENCE_DIM];
+/* 26052B */
+static real_t ocp_state_reference[(OCP_HORIZON_LENGTH + 1u) * NMPC_STATE_DIM];
 
 /* 6000B */
 static real_t ocp_control_reference[OCP_HORIZON_LENGTH * NMPC_CONTROL_DIM];
@@ -132,6 +132,9 @@ static real_t ocp_control_weights[NMPC_CONTROL_DIM]; /* diagonal only */
 
 static qpData_t qp_data;
 static qpOptions_t qp_options;
+
+/* Current control solution */
+static real_t ocp_control_value[NMPC_CONTROL_DIM];
 
 
 void _state_to_delta(real_t *delta, const real_t *restrict s1,
@@ -177,10 +180,9 @@ const real_t *restrict s2) {
 #define IVP_PERTURBATION NMPC_EPS_4RT
 #define IVP_PERTURBATION_RECIP (1.0 / NMPC_EPS_4RT)
 void _solve_interval_ivp(qpData_t *qp, interval_t *interval,
-real_t *control_ref, real_t *state_ref) {
+real_t *control_ref, real_t *state_ref, real_t *out_jacobian) {
     size_t i, j;
     real_t integrated_state[NMPC_STATE_DIM], new_state[NMPC_STATE_DIM];
-    real_t jacobian[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM]; /* 720B */
 
     /* Solve the initial value problem at this horizon step. */
     integrated_state = integrator.integrate(
@@ -189,7 +191,7 @@ real_t *control_ref, real_t *state_ref) {
         dynamics,
         OCP_STEP_LENGTH);
 
-    for(i = 0; i < NMPC_GRADIENT_DIM; i++) {
+    for (i = 0; i < NMPC_GRADIENT_DIM; i++) {
         real_t perturbed_reference[NMPC_REFERENCE_DIM];
         real_t perturbation = IVP_PERTURBATION,
                perturbation_recip = IVP_PERTURBATION_RECIP;
@@ -247,8 +249,12 @@ real_t *control_ref, real_t *state_ref) {
         Calculate delta between perturbed state and original state, to
         yield a full column of the Jacobian matrix.
         */
-        jacobian.col(i) =
-            _state_to_delta(integrated_state, new_state) * perturbation_recip;
+        _state_to_delta(out_jacobian[NMPC_DELTA_DIM * i], integrated_state,
+                        new_state);
+        #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM)
+        for (j = 0; j < NMPC_DELTA_DIM; j++) {
+            out_jacobian[NMPC_DELTA_DIM * i + j] *= perturbation_recip;
+        }
     }
 }
 
@@ -290,8 +296,8 @@ void _initial_constraint(StateVector measurement) {
 
 /* Solves the QP using qpDUNES. */
 void _solve_qp() {
-    uint32_t i;
-    real_t solution[NMPC_GRADIENT_DIM*(OCP_HORIZON_LENGTH+1)];
+    size_t i;
+    real_t solution[NMPC_GRADIENT_DIM * (OCP_HORIZON_LENGTH + 1u)];
 
     return_t status_flag = qpDUNES_solve(&qp_data);
     AssertSolutionFound(status_flag);
@@ -300,10 +306,10 @@ void _solve_qp() {
     qpDUNES_getPrimalSol(&qp_data, solution);
 
     /* Get the first control element */
-    Eigen::Map<GradientVector> solution_map(&solution[0]);
-    control_horizon[0] =
-        control_reference[0] +
-        solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
+    for (i = 0; i < NMPC_CONTROL_DIM; i++) {
+        ocp_control_value[i] = control_reference[i] +
+                               solution[NMPC_DELTA_DIM + i];
+    }
 }
 
 
@@ -330,7 +336,6 @@ void nmpc_init() {
     zUpp_map.segment<NMPC_DELTA_DIM>(0) = upper_state_bound;
 
     /* Set up problem dimensions. */
-    /* TODO: Determine number of affine constraints (D), and add them. */
     qpDUNES_setup(
         &qp_data,
         OCP_HORIZON_LENGTH,
@@ -375,45 +380,14 @@ void nmpc_init() {
 }
 
 void nmpc_preparation_step() {
-    uint32_t i;
-    real_t g[NMPC_GRADIENT_DIM];
-    Eigen::Map<GradientVector> g_map(g);
-    real_t C[(NMPC_STATE_DIM-1)*NMPC_GRADIENT_DIM];
-    Eigen::Map<ContinuityConstraintMatrix> C_map(C);
-    real_t c[NMPC_DELTA_DIM];
-    Eigen::Map<DeltaVector> c_map(c);
-    real_t zLow[NMPC_GRADIENT_DIM];
-    Eigen::Map<GradientVector> zLow_map(zLow);
-    real_t zUpp[NMPC_GRADIENT_DIM];
-    Eigen::Map<GradientVector> zUpp_map(zUpp);
-
-    zLow_map.segment<NMPC_DELTA_DIM>(0) = lower_state_bound;
-    zUpp_map.segment<NMPC_DELTA_DIM>(0) = upper_state_bound;
-
-    return_t status_flag;
-
-    /* Gradient vector fixed to zero. */
-    g_map = GradientVector::Zero();
-
-    /* Continuity constraint constant term fixed to zero. */
-    c_map = DeltaVector::Zero();
-
-    for(i = 0; i < OCP_HORIZON_LENGTH; i++) {
-        /* Copy the relevant data into the qpDUNES arrays. */
-        C_map = jacobians[i];
-        zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            lower_control_bound - control_reference[i];
-        zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            upper_control_bound - control_reference[i];
-
-        status_flag = qpDUNES_updateIntervalData(
-            &qp_data, qp_data.intervals[i],
-            0, g, C, c, zLow, zUpp, 0, 0, 0, 0);
-        AssertOK(status_flag);
-    }
+    zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+        lower_control_bound - control_reference[OCP_HORIZON_LENGTH];
+    zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
+        upper_control_bound - control_reference[OCP_HORIZON_LENGTH];
 
     /* Set up final interval. */
-    status_flag = qpDUNES_updateIntervalData(&qp_data, qp_data.intervals[i],
+    status_flag = qpDUNES_updateIntervalData(
+        &qp_data, qp_data.intervals[OCP_HORIZON_LENGTH],
         0, g, 0, 0, zLow, zUpp, 0, 0, 0, 0);
     AssertOK(status_flag);
 
@@ -421,8 +395,8 @@ void nmpc_preparation_step() {
 }
 
 void nmpc_feedback_step(const real_t measurement[NMPC_STATE_DIM]) {
-    initial_constraint(measurement);
-    solve_qp();
+    _initial_constraint(measurement);
+    _solve_qp();
 }
 
 void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
@@ -434,28 +408,20 @@ void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
 }
 
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
-    uint32_t i;
-
-    /* TODO: Do this more intelligently. */
-    for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
-        state_reference[i] = state_reference[i+1];
-        control_reference[i] = control_reference[i+1];
-    }
-
-    state_reference[i] = state_reference[i+1];
-
-    /* Insert new reference point. */
-    state_reference[i+1] = new_reference.segment<NMPC_STATE_DIM>(0);
-    control_reference[i] = new_reference.segment<NMPC_CONTROL_DIM>(
-        NMPC_STATE_DIM);
+    /*
+    Shift reference state and control -- we need to track all these values
+    so we can calculate the appropriate delta in _initial_constraint
+    */
+    memmove(state_reference, &state_reference[NMPC_STATE_DIM],
+            sizeof(real_t) * NMPC_STATE_DIM * (OCP_HORIZON_LENGTH - 1u));
+    memmove(control_reference, &control_reference[NMPC_CONTROL_DIM],
+            sizeof(real_t) * NMPC_CONTROL_DIM * (OCP_HORIZON_LENGTH - 1u));
 
     /* Prepare the QP for the next solution. */
     qpDUNES_shiftLambda(&qp_data);
     qpDUNES_shiftIntervals(&qp_data);
 
-    /* Solve the IVP for the new reference point */
-    _solve_interval_ivp(&qp_data, qp_data.intervals[i], state_reference,
-                        control_reference);
+    nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH - 1);
 }
 
 void nmpc_set_state_weights(const real_t coeffs[NMPC_DELTA_DIM]) {
@@ -504,12 +470,40 @@ uint32_t i) {
     Only set control and solve IVPs for regular points, not the final one
     */
     if (i < OCP_HORIZON_LENGTH) {
+        real_t jacobian[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
+               z_low[NMPC_GRADIENT_DIM],
+               z_upp[NMPC_GRADIENT_DIM];
+        return_t status_flag;
+        size_t j;
+
+        /* Copy the control reference */
         memcpy(&ocp_control_reference[i * sizeof(real_t) * NMPC_CONTROL_DIM],
                &coeffs[NMPC_STATE_DIM], sizeof(real_t) * NMPC_CONTROL_DIM);
 
-        /* Solve the IVP for the new reference point */
-        _solve_interval_ivp(&qp_data, qp_data.intervals[i], state_reference,
-                            control_reference);
+        /* Update state and control constraints */
+        memcpy(z_low, lower_state_bound, sizeof(real_t) * NMPC_DELTA_DIM);
+        memcpy(z_upp, upper_state_bound, sizeof(real_t) * NMPC_DELTA_DIM);
+
+        #pragma MUST_ITERATE(NMPC_CONTROL_DIM, NMPC_CONTROL_DIM)
+        for (j = 0; j < NMPC_CONTROL_DIM; j++) {
+            z_low[NMPC_DELTA_DIM + j] = lower_control_bound[j] -
+                                        coeffs[NMPC_STATE_DIM + j];
+            z_upp[NMPC_DELTA_DIM + j] = upper_control_bound[j] -
+                                        coeffs[NMPC_STATE_DIM + j];
+        }
+
+        /*
+        Solve the IVP for the new reference point to get the Jacobian (aka
+        continuity constraint matrix, C).
+        */
+        _solve_interval_ivp(&qp_data, qp_data.intervals[i], coeffs,
+                            &coeffs[NMPC_STATE_DIM], jacobian);
+
+        /* Copy the relevant data into the qpDUNES arrays. */
+        status_flag = qpDUNES_updateIntervalData(
+            &qp_data, qp_data.intervals[i],
+            0, 0, jacobian, 0, z_low, z_upp, 0, 0, 0, 0);
+        AssertOK(status_flag);
     }
 }
 
