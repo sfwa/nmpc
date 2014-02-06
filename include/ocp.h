@@ -49,7 +49,7 @@ class OptimalControlProblem {
 #elif defined(NMPC_INTEGRATOR_EULER)
     IntegratorEuler integrator;
 #endif
-    
+
     DynamicsModel *dynamics;
 
     ControlVector control_reference[OCP_HORIZON_LENGTH];
@@ -92,7 +92,7 @@ class OptimalControlProblem {
         const StateVector &s1,
         const StateVector &s2);
     void calculate_gradient();
-    void solve_ivps();
+    void solve_ivps(uint32_t i);
     void initialise_qp();
     void update_qp();
     void initial_constraint(StateVector measurement);
@@ -116,14 +116,7 @@ public:
     void set_upper_control_bound(const ControlConstraintVector &in) {
         upper_control_bound = in;
     }
-    void set_reference_point(const ReferenceVector &in, uint32_t i) {
-        state_reference[i] = in.segment<NMPC_STATE_DIM>(0);
-
-        if(i < OCP_HORIZON_LENGTH) {
-            control_reference[i] =
-                in.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
-        }
-    }
+    void set_reference_point(const ReferenceVector &in, uint32_t i);
     void preparation_step();
     void feedback_step(StateVector measurement);
     const ControlVector& get_controls() const { return control_horizon[0]; }

@@ -10,7 +10,7 @@ class build_cnmpc(distutils.command.build_py.build_py):
     description = """Build the CNMPC shared library"""
 
     def run(self):
-        subprocess.call("cmake . && make cnmpc && cp -r c ./python/nmpc/",
+        subprocess.call("cmake -DCMAKE_BUILD_TYPE=Release . && make cnmpc && cp -r c ./python/nmpc/",
                         shell=True,
                         cwd=os.path.dirname(os.path.abspath(__file__)))
         self.data_files = self.get_data_files()
