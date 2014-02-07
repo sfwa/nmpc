@@ -57,7 +57,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 5;
-    qp_options.printLevel = 10;
+    qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-3;
 }
 
