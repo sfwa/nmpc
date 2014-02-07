@@ -2,7 +2,7 @@
  *	This file is part of qpDUNES.
  *
  *	qpDUNES -- A DUal NEwton Strategy for convex quadratic programming.
- *	Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al. 
+ *	Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al.
  *	All rights reserved.
  *
  *	qpDUNES is free software; you can redistribute it and/or
@@ -89,11 +89,7 @@
 		typedef unsigned int uint_t;
 	#endif
 	#ifndef real_t
-		#ifdef __USE_SINGLE_PRECISION__
-			typedef float real_t;
-		#else
-			typedef double real_t;
-		#endif	/* __USE_SINGLE_PRECISION__ */
+		typedef float real_t;
 	#endif
 #else	/* __MATLAB__ */
 	typedef int int_t;
@@ -236,7 +232,7 @@ typedef enum
 
 
 
-/** 
+/**
  *	\brief generic matrix data type
  *
  *	...
@@ -290,7 +286,7 @@ typedef matrix_t xnxn_matrix_t;
 
 
 
-/** 
+/**
  *	\brief generic vector data type
  *
  *	...
@@ -321,7 +317,7 @@ typedef vector_t zn1_vector_t;
 
 
 
-/** 
+/**
  *	\brief generic integer vector data type
  *
  *	...
@@ -400,7 +396,7 @@ typedef struct
  *	\brief Hessian interval data type and dynamic constraint interval data type
  *
  *	Datatype for one interval of the QP data.
- * 
+ *
  *  Structure of the Hessian block:
  *   (x)' (Q  S) (x)
  *   (u)  (S' R) (u)
@@ -420,15 +416,15 @@ typedef struct
 	/* dimensions */
 	uint_t nD;					/**< number of constraints */
 	uint_t nV;					/**< number of variables */
-	
+
 
 	/* primal objective function */
 	vv_matrix_t H;				/**< Hessian */
 	vv_matrix_t cholH;			/**< inverse of Hessian */
 	real_t HQNorm;				/**< norm of Q-part of Hessian */     /*FIXME: choose which norm to compute exactly, etc.*/
-	
+
 	z_vector_t g;				/**< primal gradient block */
-	
+
 
 	/* dualized objective function */
 	z_vector_t q;				/**< linear objective function term after dualization */
@@ -446,7 +442,7 @@ typedef struct
 	dz_matrix_t D;				/**< full constraint matrix */
 	d_vector_t  dLow;			/**< constraint lower bound */
 	d_vector_t  dUpp;			/**< constraint upper bound */
-	
+
 
 	/* primal QP solution */
 	z_vector_t z;				/**< full primal solution for current lambda guess */
@@ -459,10 +455,10 @@ typedef struct
 
 	/* QP solver */
 	qp_solver_t qpSolverSpecification;		/**< dedicated QP solver */
-	
+
 	qpSolverClipping_t qpSolverClipping;	/**< workspace for clipping QP solver */
 	qpSolverQpoases_t qpSolverQpoases;		/**< pointer to qpOASES object */
-	
+
 	boolean_t actSetHasChanged;				/**< indicator flag whether an active set change occurred on this
 										     	 interval during the current iteration */
 
@@ -470,16 +466,16 @@ typedef struct
 	/* workspace */
 	x_vector_t lambdaK;		/**<  */
 	x_vector_t lambdaK1;	/**<  */
-	
+
 	x_vector_t xVecTmp;			/**<  */
 	u_vector_t uVecTmp;			/**<  */
 	z_vector_t zVecTmp;			/**<  */
-	
+
 } interval_t;
 
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -514,11 +510,11 @@ typedef struct
 	real_t equalityTolerance;
 	real_t newtonHessDiagRegTolerance;	/**< Tolerance on diagonal elements of Newton Hessian before regularizing */
 	real_t activenessTolerance;			/**< Tolerance in constraint violation before a constraint is considered active => needed to avoid weakly active constraints, which might yield suboptimal Hessian directions */
-	
+
 	real_t QPDUNES_ZERO;					/** Numerical value of zero (for situations in which it would be unreasonable to compare with 0.0). Has to be positive. */
 	real_t QPDUNES_INFTY;					/**< Numerical value of infinity (e.g. for non-existing bounds). Has to be positive. */
 	real_t ascentCurvatureTolerance;	/**< Tolerance when a step is called a zero curvature step */
-	
+
 	/* additional options */
 	int_t nbrInitialGradientSteps;		/**< after the first Newton step a number of cheaper gradient
 											 steps with line search can be used to drive the method
@@ -528,7 +524,7 @@ typedef struct
 	/* regularization options */
 	nwtnHssnRegType_t regType;
 	real_t regParam;					/**< Levenberg-Marquardt relaxation parameter */
-	
+
 	nwtnHssnFacAlg_t nwtnHssnFacAlg;
 
 	/* line search options */
@@ -642,7 +638,7 @@ typedef struct
 
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -664,25 +660,25 @@ typedef struct
 
 	xn_vector_t lambda;
 	xn_vector_t deltaLambda;
-	
+
 	xn2x_matrix_t hessian;
 	xn2x_matrix_t cholHessian;
 	xn_vector_t gradient;
-	
+
 
 	real_t alpha;
 	real_t optObjVal;
-	
+
 	qpOptions_t options;
-	
-	
+
+
 	/* workspace */
 	x_vector_t xVecTmp;			/**<  */
 	u_vector_t uVecTmp;			/**<  */
 	z_vector_t zVecTmp;			/**<  */
 	xn_vector_t xnVecTmp;		/**<  */
 	xn_vector_t xnVecTmp2;		/**<  */
-	
+
 	xx_matrix_t xxMatTmp;		/**<  */
 	xx_matrix_t xxMatTmp2;		/**<  */
 	ux_matrix_t uxMatTmp;		/**<  */
@@ -690,7 +686,7 @@ typedef struct
 	zx_matrix_t zxMatTmp;		/**<  */
 	zz_matrix_t zzMatTmp;		/**<  */
 	zz_matrix_t zzMatTmp2;		/**<  */
-	
+
 	/* log */
 	log_t log;
 

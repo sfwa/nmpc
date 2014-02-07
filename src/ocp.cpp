@@ -32,20 +32,6 @@ extern "C"
 #include "state.h"
 #include "debug.h"
 
-#include <stdio.h>
-#include <iostream>
-
-void _print_matrix(const char *label, real_t mat[], size_t rows,
-size_t cols) {
-    printf("%s", label);
-    for (size_t i = 0; i < cols; i++) {
-        for (size_t j = 0; j < rows; j++) {
-            printf("%12.6g ", mat[j*cols + i]);
-        }
-        printf("\n");
-    }
-}
-
 OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 #if defined(NMPC_INTEGRATOR_RK4)
     integrator = IntegratorRK4();
@@ -71,7 +57,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 5;
-    qp_options.printLevel = 0;
+    qp_options.printLevel = 10;
     qp_options.stationarityTolerance = 1e-3;
 }
 
@@ -394,15 +380,6 @@ uint32_t i) {
             lower_control_bound - control_reference[i];
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             upper_control_bound - control_reference[i];
-
-/*
-        if (i == 11 || i == 12) {
-            _print_matrix("g:\n", g, NMPC_GRADIENT_DIM, 1);
-            _print_matrix("C:\n", C, NMPC_STATE_DIM - 1, NMPC_GRADIENT_DIM);
-            _print_matrix("zLow:\n", zLow, NMPC_GRADIENT_DIM, 1);
-            _print_matrix("zUpp:\n", zUpp, NMPC_GRADIENT_DIM, 1);
-        }
-*/
 
         status_flag = qpDUNES_updateIntervalData(
             &qp_data, qp_data.intervals[i],

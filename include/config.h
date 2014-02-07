@@ -25,7 +25,7 @@ SOFTWARE.
 
 /* Uncomment one of the following to select the float-point precision */
 #define NMPC_SINGLE_PRECISION
-// #define NMPC_DOUBLE_PRECISION
+/* #define NMPC_DOUBLE_PRECISION */
 
 /*
 Choose the integration method here:

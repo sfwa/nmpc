@@ -29,19 +29,6 @@ SOFTWARE.
 
 #include "qpDUNES.h"
 
-#include <stdio.h>
-
-void _print_matrix(const char *label, real_t mat[], size_t rows,
-size_t cols) {
-    printf("%s", label);
-    for (size_t i = 0; i < cols; i++) {
-        for (size_t j = 0; j < rows; j++) {
-            printf("%12.6g ", mat[j*cols + i]);
-        }
-        printf("\n");
-    }
-}
-
 #ifndef __TI_COMPILER_VERSION__
     #include "config.h"
     #include "../c/cnmpc.h"
@@ -210,7 +197,6 @@ const real_t *restrict s2) {
 static inline float fatan2(float y, float x) {
 #define PI_FLOAT     (real_t)3.14159265
 #define PIBY2_FLOAT  (real_t)1.5707963
-// |error| < 0.005
     if (x == (real_t)0.0) {
         if (y > (real_t)0.0) return PIBY2_FLOAT;
         if (y == (real_t)0.0) return (real_t)0.0;
@@ -597,14 +583,15 @@ const real_t *restrict control_ref, real_t *out_jacobian) {
 
         /*
         Calculate delta between perturbed state and original state, to
-        yield a full column of the Jacobian matrix.
+        yield a full column of the Jacobian matrix. Transpose during the copy
+        to match the qpDUNES row-major convention.
         */
-        real_t jacobian_col[NMPC_GRADIENT_DIM];
+        real_t jacobian_col[NMPC_DELTA_DIM];
         _state_to_delta(jacobian_col, integrated_state, new_state);
-        #pragma MUST_ITERATE(NMPC_GRADIENT_DIM, NMPC_GRADIENT_DIM)
-        for (j = 0; j < NMPC_GRADIENT_DIM; j++) {
-            out_jacobian[NMPC_DELTA_DIM * i + j] = jacobian_col[j] *
-                                                   perturbation_recip;
+        #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM)
+        for (j = 0; j < NMPC_DELTA_DIM; j++) {
+            out_jacobian[NMPC_GRADIENT_DIM * j + i] = jacobian_col[j] *
+                                                      perturbation_recip;
         }
     }
 }
@@ -666,13 +653,13 @@ static void _solve_qp(void) {
 
 
 void nmpc_init(void) {
-    real_t jacobian[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
+    real_t C[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
            z_low[NMPC_GRADIENT_DIM],
            z_upp[NMPC_GRADIENT_DIM],
-           gradient[NMPC_GRADIENT_DIM],
+           g[NMPC_GRADIENT_DIM],
            c[NMPC_DELTA_DIM],
-           state_weight_mat[NMPC_DELTA_DIM * NMPC_DELTA_DIM], /* 576B */
-           control_weight_mat[NMPC_CONTROL_DIM * NMPC_CONTROL_DIM];
+           Q[NMPC_DELTA_DIM * NMPC_DELTA_DIM], /* 576B */
+           R[NMPC_CONTROL_DIM * NMPC_CONTROL_DIM];
     return_t status_flag;
     size_t i;
 
@@ -685,7 +672,7 @@ void nmpc_init(void) {
     /* qpDUNES configuration */
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 5;
-    qp_options.printLevel = 10;
+    qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-3f;
 
     /* Set up problem dimensions. */
@@ -698,24 +685,24 @@ void nmpc_init(void) {
         &qp_options);
 
     /* Convert state and control diagonals into full matrices */
-    memset(state_weight_mat, 0, sizeof(state_weight_mat));
+    memset(Q, 0, sizeof(Q));
     for (i = 0; i < NMPC_DELTA_DIM; i++) {
-        state_weight_mat[NMPC_DELTA_DIM * i + i] = ocp_state_weights[i];
+        Q[NMPC_DELTA_DIM * i + i] = ocp_state_weights[i];
     }
 
-    memset(control_weight_mat, 0, sizeof(control_weight_mat));
+    memset(R, 0, sizeof(R));
     for (i = 0; i < NMPC_CONTROL_DIM; i++) {
-        control_weight_mat[NMPC_CONTROL_DIM * i + i] = ocp_control_weights[i];
+        R[NMPC_CONTROL_DIM * i + i] = ocp_control_weights[i];
     }
 
     /* Gradient vector fixed to zero. */
-    memset(gradient, 0, sizeof(gradient));
+    memset(g, 0, sizeof(g));
 
     /* Continuity constraint constant term fixed to zero. */
     memset(c, 0, sizeof(c));
 
     /* Set Jacobian to 1 for now */
-    memset(jacobian, 0, sizeof(jacobian));
+    memset(C, 0, sizeof(C));
 
     /* Global state and control constraints */
     memcpy(z_low, ocp_lower_state_bound, sizeof(real_t) * NMPC_DELTA_DIM);
@@ -729,20 +716,19 @@ void nmpc_init(void) {
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_setupRegularInterval(
             &qp_data, qp_data.intervals[i],
-            0, state_weight_mat, control_weight_mat, 0, gradient, jacobian,
-            0, 0, c, z_low, z_upp, 0, 0, 0, 0, 0, 0, 0);
+            0, Q, R, 0, g, C, 0, 0, c, z_low, z_upp, 0, 0, 0, 0, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
     }
 
     /* Set up final interval. */
     for (i = 0; i < NMPC_DELTA_DIM; i++) {
-        state_weight_mat[NMPC_DELTA_DIM * i + i] = ocp_terminal_weights[i];
+        Q[NMPC_DELTA_DIM * i + i] = ocp_terminal_weights[i];
     }
 
-    status_flag = qpDUNES_setupFinalInterval(&qp_data, qp_data.intervals[i],
-        state_weight_mat, gradient, z_low, z_upp, 0, 0, 0);
+    status_flag = qpDUNES_setupFinalInterval(
+        &qp_data, qp_data.intervals[OCP_HORIZON_LENGTH],
+        Q, g, z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
-
 
     qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_TRUE);
 
@@ -858,13 +844,6 @@ uint32_t i) {
         continuity constraint matrix, C).
         */
         _solve_interval_ivp(coeffs, &coeffs[NMPC_STATE_DIM], jacobian);
-
-        if (i == 11 || i == 12) {
-            _print_matrix("g:\n", gradient, NMPC_GRADIENT_DIM, 1);
-            _print_matrix("C:\n", jacobian, NMPC_STATE_DIM - 1, NMPC_GRADIENT_DIM);
-            _print_matrix("zLow:\n", z_low, NMPC_GRADIENT_DIM, 1);
-            _print_matrix("zUpp:\n", z_upp, NMPC_GRADIENT_DIM, 1);
-        }
 
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_updateIntervalData(
