@@ -71,7 +71,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 
     qp_options = qpDUNES_setupDefaultOptions();
     qp_options.maxIter = 5;
-    qp_options.printLevel = 10;
+    qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-3;
 }
 
@@ -395,12 +395,14 @@ uint32_t i) {
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
             upper_control_bound - control_reference[i];
 
+/*
         if (i == 11 || i == 12) {
             _print_matrix("g:\n", g, NMPC_GRADIENT_DIM, 1);
             _print_matrix("C:\n", C, NMPC_STATE_DIM - 1, NMPC_GRADIENT_DIM);
             _print_matrix("zLow:\n", zLow, NMPC_GRADIENT_DIM, 1);
             _print_matrix("zUpp:\n", zUpp, NMPC_GRADIENT_DIM, 1);
         }
+*/
 
         status_flag = qpDUNES_updateIntervalData(
             &qp_data, qp_data.intervals[i],

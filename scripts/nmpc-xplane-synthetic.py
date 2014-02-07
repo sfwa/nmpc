@@ -10,7 +10,7 @@ import datetime
 import copy
 
 import nmpc
-nmpc.init(implementation="c66x")
+nmpc.init(implementation="c")
 from nmpc import _cnmpc, state
 
 def socket_readlines(socket):

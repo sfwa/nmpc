@@ -5,7 +5,7 @@ INCLUDE(ExternalProject)
 # CMake module(s) path
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
-set(CMAKE_C_FLAGS "-O3 -D__USE_SINGLE_PRECISION__")
+set(CMAKE_C_FLAGS "-O3")
 
 # Set default ExternalProject root directory
 SET_DIRECTORY_PROPERTIES(PROPERTIES EP_PREFIX .)
@@ -28,7 +28,7 @@ SET(eigen_dir ${source_dir})
 # Add qpDUNES
 ExternalProject_Add(
 qpDUNES
-URL https://github.com/jfrasch/qpDUNES/archive/master.zip
+URL https://github.com/sfwa/qpDUNES/archive/master.zip
 TIMEOUT 300
 # Disable install step
 INSTALL_COMMAND ""
