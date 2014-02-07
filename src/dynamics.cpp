@@ -64,9 +64,9 @@ const State &in, const ControlVector &control) const {
     a2 = alpha * alpha;
 
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
-    lift = -5 * a2 * alpha + a2 + 2.5 * alpha + 0.12;
+    lift = -5 * a2 * alpha + a2 + 2.0 * alpha + 0.3;
 
-    drag = 0.05 + 0.7 * sin_alpha * sin_alpha;
+    drag = 0.05 + 0.8 * sin_alpha * sin_alpha;
     side_force = 0.3 * sin_beta * cos_beta;
 
     pitch_moment = 0.01 + 0.03 * sin_cos_alpha - 0.002 * pitch_rate -
