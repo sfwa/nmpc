@@ -201,16 +201,10 @@ const real_t *restrict s2) {
     _nassert((size_t)s2 % 4 == 0);
 
     size_t i;
-    real_t *const restrict s1ptr = (real_t*)s1,
-           *const restrict s2ptr = (real_t*)s2,
-           *const restrict rptr = (real_t*)res;
-
     #pragma MUST_ITERATE(NMPC_STATE_DIM, NMPC_STATE_DIM)
-    #pragma UNROLL(2)
     for (i = 0; i < NMPC_STATE_DIM; i++) {
-        rptr[i] = s2ptr[i] + s1ptr[i] * a;
+        res[i] = s2[i] + s1[i] * a;
     }
-    rptr[i] = s1ptr[i] * a + s2ptr[i];
 }
 
 static inline float fatan2(float y, float x) {
@@ -294,18 +288,16 @@ const real_t *restrict control) {
 
     /* Change in velocity */
     real_t a[4];
-    a[X] = -state[6 + X];
-    a[Y] = -state[6 + Y];
-    a[Z] = -state[6 + Z];
-    a[W] = state[6 + W];
+    a[X] = state[6 + X];
+    a[Y] = state[6 + Y];
+    a[Z] = state[6 + Z];
+    a[W] = -state[6 + W];
     quaternion_vector3_multiply(&out[3], a, accel);
 
     /*
     Change in attitude (XYZW): delta_att = 0.5 * (omega_v.conj() * att)
     */
-    a[X] = -a[X];
-    a[Y] = -a[Y];
-    a[Z] = -a[Z];
+    a[W] = -a[W];
     real_t omega_q_conj[4] = {
         -state[10 + X],
         -state[10 + Y],
@@ -356,8 +348,8 @@ const real_t delta) {
     size_t i;
     #pragma MUST_ITERATE(NMPC_STATE_DIM, NMPC_STATE_DIM)
     for (i = 0; i < NMPC_STATE_DIM; i++) {
-        out[i] = state[i] + delta_on_3 * (b[i] + c[i]);
-        out[i] = state[i] + delta_on_6 * (a[i] + d[i]);
+        out[i] = state[i] +
+                 delta_on_3 * (b[i] + c[i]) + delta_on_6 * (a[i] + d[i]);
     }
 }
 
@@ -432,7 +424,7 @@ const real_t *restrict state, const real_t *restrict control) {
     sin_beta = airflow[Y] * v_inv;
     cos_beta = vertical_v * v_inv;
 
-    alpha = fatan2(-airflow[Z], -airflow[X]);
+    alpha = (float)atan2(-airflow[Z], -airflow[X]);
     a2 = alpha * alpha;
 
     sin_alpha = -airflow[Z] * vertical_v_inv;
@@ -441,11 +433,11 @@ const real_t *restrict state, const real_t *restrict control) {
     /* Work out aerodynamic forces in wind frame */
     real_t lift, alt_lift, drag, side_force;
 
-    lift = (-5.0f * alpha + 1.0f) * a2 + 2.5f * alpha + 0.12f;
+    lift = (-5.0f * alpha + 1.0f) * a2 + 2.0f * alpha + 0.3f;
     /* Generalize lift force for very high / very low alpha */
     sin_cos_alpha = sin_alpha * cos_alpha;
     alt_lift = 0.8f * sin_cos_alpha;
-    if ((alpha < 0.25f && lift > alt_lift) ||
+    if ((alpha < -0.25f && lift > alt_lift) ||
         (alpha > 0.0f && lift < alt_lift)) {
         lift = alt_lift;
     }
@@ -453,7 +445,7 @@ const real_t *restrict state, const real_t *restrict control) {
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
     lift = (qbar * 0.26315789473684f) * lift;
     drag = (qbar * 0.26315789473684f) *
-           (0.05f + 0.7f * sin_alpha * sin_alpha);
+           (0.05f + 0.8f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.3f * sin_beta * cos_beta;
 
     /* Convert aerodynamic forces from wind frame to body frame */
@@ -472,10 +464,10 @@ const real_t *restrict state, const real_t *restrict control) {
            pitch_rate = state[10 + Y],
            roll_rate = state[10 + X],
            left_aileron = control[1], right_aileron = control[2];
-    pitch_moment = 0.001f - 0.1f * sin_cos_alpha - 0.003f * pitch_rate -
-                   0.01f * (left_aileron + right_aileron);
-    roll_moment = -0.03f * sin_beta - 0.015f * roll_rate +
-                  0.025f * (left_aileron - right_aileron);
+    pitch_moment = 0.01f - 0.03f * sin_cos_alpha - 0.002f * pitch_rate -
+                   0.3f * (left_aileron + right_aileron);
+    roll_moment = -0.03f * sin_beta - 0.01f * roll_rate +
+                  0.4f * (left_aileron - right_aileron);
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron));
     pitch_moment *= qbar;
@@ -549,9 +541,6 @@ const real_t *restrict control_ref, real_t *out_jacobian) {
     _state_integrate_rk4(integrated_state, state_ref, control_ref,
                          OCP_STEP_LENGTH);
 
-    //_print_matrix("Reference state:\n", state_ref, NMPC_STATE_DIM, 1);
-    //_print_matrix("Integrated state:\n", integrated_state, NMPC_STATE_DIM, 1);
-
     for (i = 0; i < NMPC_GRADIENT_DIM; i++) {
         real_t perturbed_reference[NMPC_REFERENCE_DIM];
         real_t perturbation = IVP_PERTURBATION,
@@ -618,8 +607,6 @@ const real_t *restrict control_ref, real_t *out_jacobian) {
                                                    perturbation_recip;
         }
     }
-
-    //_print_matrix("Jacobian:\n", out_jacobian, NMPC_GRADIENT_DIM, NMPC_DELTA_DIM);
 }
 
 /*
@@ -871,6 +858,13 @@ uint32_t i) {
         continuity constraint matrix, C).
         */
         _solve_interval_ivp(coeffs, &coeffs[NMPC_STATE_DIM], jacobian);
+
+        if (i == 11 || i == 12) {
+            _print_matrix("g:\n", gradient, NMPC_GRADIENT_DIM, 1);
+            _print_matrix("C:\n", jacobian, NMPC_STATE_DIM - 1, NMPC_GRADIENT_DIM);
+            _print_matrix("zLow:\n", z_low, NMPC_GRADIENT_DIM, 1);
+            _print_matrix("zUpp:\n", z_upp, NMPC_GRADIENT_DIM, 1);
+        }
 
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_updateIntervalData(

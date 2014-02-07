@@ -65,16 +65,21 @@ const State &in, const ControlVector &control) const {
 
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
     lift = -5 * a2 * alpha + a2 + 2.0 * alpha + 0.3;
+    if (alpha < -0.25) {
+        lift = std::min(lift, (real_t)0.8 * sin_cos_alpha);
+    } else {
+        lift = std::max(lift, (real_t)0.8 * sin_cos_alpha);
+    }
 
     drag = 0.05 + 0.8 * sin_alpha * sin_alpha;
     side_force = 0.3 * sin_beta * cos_beta;
 
     pitch_moment = 0.01 + 0.03 * sin_cos_alpha - 0.002 * pitch_rate -
-                   0.3 * control[1] - 0.3 * control[2];
+                   0.3 * (control[1] + control[2]);
     roll_moment = -0.03 * sin_beta - 0.01 * roll_rate +
-                  0.4 * control[1] - 0.4 * control[2];
+                  0.4 * (control[1] - control[2]);
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
-                 0.01 * std::abs(control[1]) + 0.01 * std::abs(control[2]);
+                 0.01 * (std::abs(control[1]) + std::abs(control[2]));
 
     /*
     Determine motor thrust and torque.

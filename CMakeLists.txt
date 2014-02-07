@@ -5,6 +5,8 @@ INCLUDE(ExternalProject)
 # CMake module(s) path
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
+set(CMAKE_C_FLAGS "-O3 -D__USE_SINGLE_PRECISION__")
+
 # Set default ExternalProject root directory
 SET_DIRECTORY_PROPERTIES(PROPERTIES EP_PREFIX .)
 
