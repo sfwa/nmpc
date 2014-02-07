@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#if !defined(WIN32) && !defined(__TI_COMPILER_VERSION__)
+#ifndef WIN32
     #include <sys/time.h>
 #endif
 

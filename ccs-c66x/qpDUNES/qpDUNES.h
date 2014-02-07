@@ -33,6 +33,7 @@
 #include "types.h"
 #include "matrix_vector.h"
 #include "stage_qp_solver_clipping.h"
+#include "stage_qp_solver_qpoases.hpp"
 #include "dual_qp.h"
 #include "utils.h"
 

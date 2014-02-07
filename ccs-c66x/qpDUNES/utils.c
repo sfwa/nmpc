@@ -2,7 +2,7 @@
  *	This file is part of qpDUNES.
  *
  *	qpDUNES -- A DUal NEwton Strategy for convex quadratic programming.
- *	Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al.
+ *	Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al. 
  *	All rights reserved.
  *
  *	qpDUNES is free software; you can redistribute it and/or
@@ -34,12 +34,12 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "utils.h"
+#include <qp/utils.h>
 
 
 /* ----------------------------------------------
  * safe free routine
- *
+ * 
  > >>>>>                  *                         */
 void qpDUNES_free(	real_t** data
 				)
@@ -92,7 +92,7 @@ void qpDUNES_copyRealArray( int_t n,
 						 )
 {
 	int_t i;
-
+	
 	if ( from != 0 )
 	{
 		for( i=0; i<n; ++i )
@@ -108,19 +108,19 @@ sparsityType_t qpDUNES_detectMatrixSparsity(	const real_t* const M,
 {
 	sparsityType_t sparsityM;
 	int_t i,j;
-
+	
 	if ( ( nRows < 1 ) || ( nCols < 1 ) || ( M == 0 ) )
 		return QPDUNES_OK;
-
+	
 	if ( nRows != nCols )
 	{
 		sparsityM = QPDUNES_DENSE;
 		return QPDUNES_OK;
 	}
-
+	
 	/* check for sparsity */
 	sparsityM = QPDUNES_DIAGONAL;
-
+	
 	for( i=0; i<nRows; ++i ) {	/* check if dense */
 		for( j=0; j<i-1; ++j ) {	/* lower triangle */
 			if ( fabs( M[i*nCols+j] ) > 1e-15 ) {	/* TODO: make threshold adjustable! */
@@ -135,12 +135,12 @@ sparsityType_t qpDUNES_detectMatrixSparsity(	const real_t* const M,
 			}
 		}
 	}
-
+	
 	/* check whether diagonal or identity */
 	if ( sparsityM != QPDUNES_DENSE )
 	{
 		sparsityM = QPDUNES_IDENTITY;
-
+		
 		for( i=0; i<nRows; ++i ) {
 			if ( fabs( M[i*nCols+i] - 1.0 ) > 1e-15 ) {
 				sparsityM = QPDUNES_DIAGONAL;
@@ -148,9 +148,9 @@ sparsityType_t qpDUNES_detectMatrixSparsity(	const real_t* const M,
 			}
 		}
 	}
-
+	
 	return sparsityM;
-
+	
 }
 
 
@@ -161,10 +161,10 @@ return_t qpDUNES_updateMatrixData(	matrix_t* const to,
 								)
 {
 	int_t i;
-
+	
 	if ( from == 0 )
 		return QPDUNES_OK;
-
+	
 	if ( to == 0 )
 		return QPDUNES_ERR_INVALID_ARGUMENT;
 
@@ -174,19 +174,19 @@ return_t qpDUNES_updateMatrixData(	matrix_t* const to,
 			for( i=0; i<nRows*nCols; ++i )
 				to->data[i] = from[i];
 			break;
-
+			
 		case QPDUNES_DIAGONAL:
 			for( i=0; i<nRows; ++i )
 				to->data[i] = from[i*nCols+i];
 			break;
-
+			
 		case QPDUNES_IDENTITY:
 			break;
-
+			
 		default:
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 	}
-
+	
 	return QPDUNES_OK;
 }
 
@@ -197,12 +197,12 @@ return_t qpDUNES_setupZeroMatrix(	int_t nRows,
 								)
 {
 	int_t i;
-
+	
 	for( i=0; i<nRows*nCols; ++i )
 		to->data[i] = 0.0;
 
 	to->sparsityType = QPDUNES_ALLZEROS;
-
+	
 	return QPDUNES_OK;
 }
 
@@ -212,7 +212,7 @@ return_t qpDUNES_setMatrixNull(	matrix_t* const matrix
 {
 	qpDUNES_free( &(matrix->data) );
 	matrix->sparsityType = QPDUNES_MATRIX_UNDEFINED;
-
+	
 	return QPDUNES_OK;
 }
 
@@ -256,12 +256,12 @@ return_t qpDUNES_setupScaledIdentityMatrix(	int_t nRows,
 											)
 {
 	int_t i;
-
+	
 	qpDUNES_setupZeroMatrix( nRows,nRows,to );
-
+	
 	for( i=0; i<nRows; ++i )
 		to->data[i*nRows+i] = scalar;
-
+	
 	to->sparsityType = QPDUNES_DIAGONAL;
 
 	return QPDUNES_OK;
@@ -287,7 +287,7 @@ return_t qpDUNES_updateVector(	vector_t* const to,
 
 	if ( ( n < 1 ) || ( from == 0 ) )
 		return QPDUNES_OK;
-
+	
 	if ( to == 0 )
 		return QPDUNES_ERR_INVALID_ARGUMENT;
 
@@ -308,7 +308,7 @@ return_t qpDUNES_updateSimpleBoundVector(	qpData_t* qpData,
 										)
 {
 	uint_t i;
-
+	
 	if ( dBnd != 0 ) {
 		for( i=0; i<_NX_+_NU_; ++i ) {
 			to->data[i] = dBnd[i];
@@ -337,7 +337,7 @@ return_t qpDUNES_updateConstraintVector( 	vector_t* const to,
 										)
 {
 	int_t i;
-
+	
 	if ( dBnd != 0 ) {
 		for( i=0; i<nD; ++i ) {
 			to->data[i] = dBnd[i];
@@ -356,7 +356,7 @@ return_t qpDUNES_setupZeroVector(	vector_t* const to,
 								)
 {
 	int_t i;
-
+	
 	for( i=0; i<n; ++i )
 		to->data[i] = 0.0;
 
@@ -370,7 +370,7 @@ return_t qpDUNES_setupUniformVector(	vector_t* const to,
 									)
 {
 	int_t i;
-
+	
 	for( i=0; i<n; ++i ) {
 		to->data[i] = value;
 	}
@@ -385,7 +385,7 @@ return_t qpDUNES_copyVector(	vector_t* const to,
 							)
 {
 	int_t ii;
-
+	
 	for( ii=0; ii<n; ++ii )
 		to->data[ii] = from->data[ii];
 
@@ -401,9 +401,9 @@ return_t qpDUNES_copyMatrix(	matrix_t* const to,
 							)
 {
 	int_t ii;
-
+	
 	/** choose appropriate copy routine */
-	switch( from->sparsityType )
+	switch( from->sparsityType )	
 	{
 		case QPDUNES_DENSE		:
 		case QPDUNES_SPARSE	:
@@ -425,31 +425,31 @@ return_t qpDUNES_copyMatrix(	matrix_t* const to,
 		default				:
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 	}
-
+	
 	return QPDUNES_OK;
 }
 /*<<<< END OF qp42_copyMatrix */
 
 
 /** ... */
-return_t qpDUNES_makeMatrixDense( matrix_t* const M_ptr,
+return_t qpDUNES_makeMatrixDense( matrix_t* const M_ptr, 
 								int_t dim0,
 								int_t dim1
 								)
 {
 	int_t ii, jj;
-
+	
 	real_t* M = M_ptr->data; /* enable matrix access by preprocessor macro */
-
-	switch( M_ptr->sparsityType )
+	
+	switch( M_ptr->sparsityType )	
 	{
 		case QPDUNES_DENSE		:
 			break;
-
+		
 		case QPDUNES_SPARSE	:
 			M_ptr->sparsityType = QPDUNES_DENSE;
 			break;
-
+		
 		case QPDUNES_DIAGONAL	:
 			/* matrix diagonal is saved in first line */
 			for( ii=dim0-1; ii >= 0; --ii ) {	/* go through matrix back to front */
@@ -463,7 +463,7 @@ return_t qpDUNES_makeMatrixDense( matrix_t* const M_ptr,
 			}
 			M_ptr->sparsityType = QPDUNES_DENSE;
 			break;
-
+		
 		case QPDUNES_IDENTITY	:
 			for( ii=dim0-1; ii >= 0; --ii ) {	/* go through matrix back to front */
 				for( jj=dim1-1; jj > ii; --jj ) {
@@ -476,11 +476,11 @@ return_t qpDUNES_makeMatrixDense( matrix_t* const M_ptr,
 			}
 			M_ptr->sparsityType = QPDUNES_DENSE;
 			break;
-
+		
 		default				:
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 	}
-
+	
 	return QPDUNES_OK;
 }
 /*<<<< END OF qp42_makeMatrixDense */
@@ -494,9 +494,9 @@ return_t qpDUNES_transposeMatrix(	matrix_t* const to,
 								)
 {
 	int_t ii,jj;
-
+	
 	/** choose appropriate copy routine */
-	switch( from->sparsityType )
+	switch( from->sparsityType )	
 	{
 		case QPDUNES_DENSE		:
 			to->sparsityType = QPDUNES_DENSE;
@@ -506,7 +506,7 @@ return_t qpDUNES_transposeMatrix(	matrix_t* const to,
 				}
 			}
 			break;
-
+		
 		case QPDUNES_SPARSE	:
 /*			qp42_printWarning( __FILE__, __LINE__, "Sparse tranposeMatrix not implemented. Copying densely instead." );*/
 			to->sparsityType = QPDUNES_DENSE;
@@ -516,18 +516,18 @@ return_t qpDUNES_transposeMatrix(	matrix_t* const to,
 				}
 			}
 			break;
-
+		
 		case QPDUNES_DIAGONAL	:
 			break;
-
+		
 		case QPDUNES_IDENTITY	:
 			to->sparsityType = QPDUNES_IDENTITY;
 			break;
-
+		
 		default				:
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 	}
-
+	
 	return QPDUNES_OK;
 }
 /*<<<< END OF qp42_transposeMatrix */
@@ -579,10 +579,10 @@ return_t qpDUNES_copyArray(	real_t* const to,
 							)
 {
 	int_t ii;
-
+	
 	for( ii=0; ii<n; ++ii )
 		to[ii] = from[ii];
-
+	
 	return QPDUNES_OK;
 }
 
@@ -648,7 +648,7 @@ int_t qpDUNES_sign(	const qpData_t* const qpData,
 void qpDUNES_assertOK(	return_t statusFlag,
 							char* fileName,
 							int_t lineNumber,
-							char* errString
+							char* errString 
 							)
 {
 	#ifdef USE_ASSERTS
@@ -688,12 +688,12 @@ void qpDUNES_printStrArgs(	const char* const string,
     #ifdef __MATLAB__
         char buffer[MAX_STR_LEN];
     #endif
-
+	
 	#ifndef __SUPPRESS_ALL_OUTPUT__
 	/* get printf arguments list */
 	va_list printArgs;
 	va_start( printArgs, string );
-
+	
 	/* print output */
 	#ifdef __MATLAB__
 		vsprintf( buffer,string, printArgs );
@@ -704,7 +704,7 @@ void qpDUNES_printStrArgs(	const char* const string,
 		vprintf( string, printArgs );
 		va_end( printArgs );
 	#endif
-
+	
 	#endif /* __SUPPRESS_ALL_OUTPUT__ */
 }
 /*<<< END OF qp42_printStrArgs */
@@ -774,17 +774,17 @@ void qpDUNES_printStrArgsListToFile(	FILE* filePtr,
  * customizable printing routine
  >>>>>                                            */
 void qpDUNES_printf(	const char* const string,
-					...
+					... 
 					)
 {
 	/* get printf arguments list */
 	va_list printArgs;
 	va_start( printArgs, string );
-
+	
 	/* print output, add newline */
 	qpDUNES_printStrArgsList( string, printArgs );
 	qpDUNES_printStrArgs( "\n" );
-
+	
 	va_end( printArgs );
 }
 /*<<< END OF qpDUNES_printf */
@@ -837,7 +837,7 @@ void qpDUNES_printSuccess( const qpData_t* const qpData,
 
 /* ----------------------------------------------
  * ...
- *
+ * 
  > >>>>                                            */
 void qpDUNES_printWarning(	const qpData_t* const qpData,
 						const char* const fileName,
@@ -857,7 +857,7 @@ void qpDUNES_printWarning(	const qpData_t* const qpData,
 
 /* ----------------------------------------------
  * ...
- *
+ * 
  >>>>>                                            */
 void qpDUNES_printError(	const qpData_t* const qpData,
 						const char* const fileName,
@@ -869,7 +869,7 @@ void qpDUNES_printError(	const qpData_t* const qpData,
 	/* get printf arguments list */
 	va_list printArgs;
 	va_start( printArgs, errString );
-
+	
 	/* print red output */
 	if( qpData->options.printLevel >= 1 ) {
 		qpDUNES_printStrArgs( "[qpDUNES] %s", COL_ERR );
@@ -877,7 +877,7 @@ void qpDUNES_printError(	const qpData_t* const qpData,
 		qpDUNES_printStrArgsList( errString, printArgs );
 		qpDUNES_printStrArgs( "\n" );
 	}
-
+	
 	va_end( printArgs );
 }
 /*<<< END OF qp42_printError */
@@ -886,7 +886,7 @@ void qpDUNES_printError(	const qpData_t* const qpData,
 
 /* ----------------------------------------------
  * ...
- *
+ * 
  >>>>>                                            */
 void qpDUNES_printDebugInfo( const char* const string )
 {
@@ -898,7 +898,7 @@ void qpDUNES_printDebugInfo( const char* const string )
 
 /* ----------------------------------------------
  * ...
- *
+ * 
  >>>>>                                            */
 void qpDUNES_printMatrixData(	const real_t* const M,
 							const int_t dim0,
@@ -908,15 +908,15 @@ void qpDUNES_printMatrixData(	const real_t* const M,
 							)
 {
 	int_t ii, jj;
-
+	
 	/* get printf arguments list */
 	va_list printArgs;
 	va_start( printArgs, string );
-
+	
 	/* print */
 	qpDUNES_printStrArgsList( string, printArgs );
 	qpDUNES_printStrArgs( "\n[" );
-
+	
 	for( ii=0; ii<dim0; ++ii ) {
 		qpDUNES_printStrArgs( "[" );
 		for( jj=0; jj<dim1; ++jj ) {
@@ -927,9 +927,9 @@ void qpDUNES_printMatrixData(	const real_t* const M,
 			qpDUNES_printStrArgs( "\n" );
 		}
 	}
-
+	
 	qpDUNES_printStrArgs( "]\n" );
-
+	
 	va_end( printArgs );
 }
 /*<<< END OF qp42_printMatrix */
@@ -981,30 +981,30 @@ void qpDUNES_printMatrixDataToFile(	const real_t* const M,
 
 /* ----------------------------------------------
  * ...
- *
+ * 
  > >>>>                          *                  */
 void qpDUNES_printVectorData(	const real_t* const x,
 							const int_t dim0,
 							const char* const string,
-							...
+							... 
 							)
 {
 	int_t ii;
-
+	
 	/* get printf arguments list */
 	va_list printArgs;
 	va_start( printArgs, string );
-
+	
 	/* print */
 	qpDUNES_printStrArgsList( string, printArgs );
 	qpDUNES_printStrArgs( "\n[\n" );
-
+	
 	for( ii=0; ii<dim0; ++ii ) {
 		qpDUNES_printStrArgs( "% .*e\n", PRINTING_PRECISION, x[ii] );
 	}
-
+	
 	qpDUNES_printStrArgs( "]\n\n" );
-
+	
 	va_end( printArgs );
 }
 /*<<< END OF qp42_printMatrix */
@@ -1012,7 +1012,7 @@ void qpDUNES_printVectorData(	const real_t* const x,
 
 /* ----------------------------------------------
  * ...
- *
+ * 
  >>>>>                                            */
 void qpDUNES_printVector( const char* const string )
 {

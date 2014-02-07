@@ -26,11 +26,9 @@ SOFTWARE.
 #include <stdint.h>
 #include "config.h"
 
-#ifdef NMPC_SINGLE_PRECISION
+#if defined(NMPC_SINGLE_PRECISION) && !defined(__USE_SINGLE_PRECISION__)
 typedef float real_t;
-#endif
-
-#ifdef NMPC_DOUBLE_PRECISION
+#elif defined(NMPC_DOUBLE_PRECISION) && !defined(__USE_SINGLE_PRECISION__)
 typedef double real_t;
 #endif
 
@@ -45,8 +43,8 @@ struct nmpc_state_t {
     real_t angular_velocity[3];
 };
 
-void nmpc_init();
-void nmpc_preparation_step();
+void nmpc_init(void);
+void nmpc_preparation_step(void);
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]);
 void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]);
