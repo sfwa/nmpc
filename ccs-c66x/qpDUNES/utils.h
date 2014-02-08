@@ -2,7 +2,7 @@
  *	This file is part of qpDUNES.
  *
  *	qpDUNES -- A DUal NEwton Strategy for convex quadratic programming.
- *	Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al. 
+ *	Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al.
  *	All rights reserved.
  *
  *	qpDUNES is free software; you can redistribute it and/or
@@ -52,32 +52,6 @@
 #endif
 
 
-/** 
- *	\brief ...
- *
- *	...
- *
- *	\author Janick Frasch, Hans Joachim Ferreau
- *	\version 1.0beta
- *	\date 2012
- */
-void qpDUNES_free(	real_t** data
-				);
-
-
-/**
- *	\brief ...
- *
- *	...
- *
- *	\author Janick Frasch, Hans Joachim Ferreau
- *	\version 1.0beta
- *	\date 2012
- */
-void qpDUNES_intFree(	int_t** data
-					);
-
-
 
 /**
  *	\brief ...
@@ -96,7 +70,7 @@ const real_t* offsetArray(	const real_t* const data,
 
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -116,7 +90,7 @@ sparsityType_t qpDUNES_detectMatrixSparsity(	const real_t* const M,
 											);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -132,7 +106,7 @@ return_t qpDUNES_updateMatrixData(	matrix_t* const to,
 								);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -147,7 +121,7 @@ return_t qpDUNES_setupZeroMatrix(	int_t nRows,
 								);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -160,7 +134,7 @@ return_t qpDUNES_setMatrixNull(	matrix_t* const matrix
 								);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -173,7 +147,7 @@ return_t qpDUNES_existsMatrix(	matrix_t* matrix
 							);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -186,7 +160,7 @@ return_t qpDUNES_existsVector(	vector_t* vector
 							);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -199,7 +173,7 @@ return_t qpDUNES_setupIdentityMatrix(	matrix_t* to
 									);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -214,7 +188,7 @@ return_t qpDUNES_setupScaledIdentityMatrix(	int_t nRows,
 											);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -228,7 +202,7 @@ return_t qpDUNES_setupVector(	vector_t* const to,
 							int_t n
 							);
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -243,7 +217,7 @@ return_t qpDUNES_updateVector(	vector_t* const to,
 							);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -260,7 +234,7 @@ return_t qpDUNES_updateSimpleBoundVector(	qpData_t* qpData,
 										);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -275,7 +249,7 @@ return_t qpDUNES_updateConstraintVector( 	vector_t* const to,
 										);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -289,7 +263,7 @@ return_t qpDUNES_setupZeroVector(	vector_t* const to,
 								);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -304,7 +278,7 @@ return_t qpDUNES_setupUniformVector(	vector_t* const to,
 									);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -319,7 +293,7 @@ return_t qpDUNES_copyVector(	vector_t* const to,
 							);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -350,7 +324,7 @@ return_t qpDUNES_copyMatrix(	matrix_t* const to,
 							);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -359,7 +333,7 @@ return_t qpDUNES_copyMatrix(	matrix_t* const to,
  *	\version 1.0beta
  *	\date 2012
  */
-return_t qpDUNES_makeMatrixDense( matrix_t* const M, 
+return_t qpDUNES_makeMatrixDense( matrix_t* const M,
 								int_t dim0,
 								int_t dim1
 								);
@@ -384,7 +358,7 @@ return_t qpDUNES_copyArray(	real_t* const to,
 
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -431,7 +405,7 @@ int_t qpDUNES_sign(	const qpData_t* const qpData,
 
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -444,13 +418,13 @@ int_t qpDUNES_sign(	const qpData_t* const qpData,
 void qpDUNES_assertOK(	return_t statusFlag,
 							char* fileName,
 							int_t lineNumber,
-							char* errString 
+							char* errString
 );
 
 
 
 
-/** 
+/**
  *	\brief Prepare results struct
  *
  *	...
@@ -465,7 +439,7 @@ void qpDUNES_assertOK(	return_t statusFlag,
 
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -478,7 +452,7 @@ real_t getTime( );
 
 
 
-/** 
+/**
  *	\brief Customizable low-level printing routine
  *
  *	...
@@ -488,11 +462,11 @@ real_t getTime( );
  *	\date 2012
  */
 void qpDUNES_printStrArgs(	const char* const string,
-						... 
+						...
 						);
 
 
-/** 
+/**
  *	\brief Low-level print to file
  *
  *	...
@@ -517,11 +491,11 @@ void qpDUNES_printStrArgsToFile(	FILE* filePtr,
  *	\date 2012
  */
 void qpDUNES_printStrArgsList(	const char* const string,
-							va_list printArgs 
+							va_list printArgs
 							);
 
 
-/** 
+/**
  *	\brief Low-level print to file
  *
  *	...
@@ -546,14 +520,14 @@ void qpDUNES_printStrArgsListToFile(	FILE* filePtr,
  *	\date 2012
  */
 void qpDUNES_printf(	const char* const string,
-					... 
+					...
 					);
 
 
 
 
 
-/** 
+/**
  *	\brief Customizable printf routine
  *
  *	...
@@ -582,7 +556,7 @@ void qpDUNES_printSuccess( const qpData_t* const qpData,
 						);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -597,7 +571,7 @@ void qpDUNES_printWarning(	const qpData_t* const qpData,
 						const char* const errString );
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -614,7 +588,7 @@ void qpDUNES_printError(	const qpData_t* const qpData,
 						);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -626,7 +600,7 @@ void qpDUNES_printError(	const qpData_t* const qpData,
 void qpDUNES_printDebugInfo( const char* const string );
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...
@@ -643,7 +617,7 @@ void qpDUNES_printMatrixData(	const real_t* const M,
 							);
 
 
-/** 
+/**
  *	\brief ...
  *
  *	...

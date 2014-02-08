@@ -30,12 +30,18 @@
  */
 
 
-#include "types.h"
-#include "matrix_vector.h"
-#include "stage_qp_solver_clipping.h"
-#include "stage_qp_solver_qpoases.hpp"
-#include "dual_qp.h"
-#include "utils.h"
+/*
+Prevent this from typedef'ing real_t again, since it's done in the NMPC code
+as well.
+*/
+#define _REAL_T 1
+
+#include "./types.h"
+#include "./matrix_vector.h"
+#include "./stage_qp_solver_clipping.h"
+#include "./stage_qp_solver_qpoases.hpp"
+#include "./dual_qp.h"
+#include "./utils.h"
 
 
 

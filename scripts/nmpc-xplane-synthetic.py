@@ -85,7 +85,7 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e-1, 1e-1, 1e1, 1e0, 1e0, 1e0, 1e0, 1e1, 1e0, 7e0, 4e-1, 1e-2],
+    state_weights=[1e-1, 1e-1, 1e1, 1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 7e0, 7e-1, 1e-2],
     control_weights=[1e-7, 1e-3, 1e-3],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[MAX_THROTTLE, 0.8, 0.8],
@@ -94,7 +94,7 @@ nmpc.initialise_horizon()
 
 xplane_reference_points = []
 
-attitude = euler_to_q(0, 0, 0)
+attitude = euler_to_q(0, math.radians(3), 0)
 out = [
     0.0,  # t
     0.0, 0.0, 0.0,  # N, E, D
@@ -106,7 +106,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(0, 0, 0)
+attitude = euler_to_q(0, math.radians(3), 0)
 out = [
     29.0,  # t
     580.0, 0.0, 0.0,  # N, E, D
@@ -118,7 +118,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(math.radians(90), 0, 0)
+attitude = euler_to_q(math.radians(90), math.radians(3), 0)
 out = [
     31.0,  # t
     600.0, 20.0, 0.0,  # N, E, D
@@ -130,7 +130,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(math.radians(90), 0, 0)
+attitude = euler_to_q(math.radians(90), math.radians(3), 0)
 out = [
     60.0,  # t
     600.0, 600.0, 0.0,  # N, E, D

@@ -43,10 +43,16 @@ struct nmpc_state_t {
     real_t angular_velocity[3];
 };
 
+enum nmpc_result_t {
+    NMPC_OK,
+    NMPC_INFEASIBLE,
+    NMPC_ERROR
+};
+
 void nmpc_init(void);
 void nmpc_preparation_step(void);
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]);
-void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
+enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]);
 
 /* Functions for setting weights and bounds for the OCP solver. */

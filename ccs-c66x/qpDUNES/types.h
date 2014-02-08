@@ -82,13 +82,13 @@
 
 /** simple types */
 #ifndef __MATLAB__
-	#ifndef int_t
+	#ifndef _INT_T
 		typedef int int_t;
 	#endif
-	#ifndef uint_t
+	#ifndef _UINT_T
 		typedef unsigned int uint_t;
 	#endif
-	#ifndef real_t
+	#ifndef _REAL_T
 		typedef float real_t;
 	#endif
 #else	/* __MATLAB__ */

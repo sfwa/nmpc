@@ -42,46 +42,8 @@
 #include "utils.h"
 
 
-return_t qpDUNES_setup(	qpData_t* const qpData,
-						uint_t nI,
-						uint_t nX,
-						uint_t nU,
-						uint_t* nD,
-						qpOptions_t* options
-						);
-
-
-interval_t* qpDUNES_allocInterval(	qpData_t* const qpData,
-								uint_t nX,		/* FIXME: just use these temporary, work with nZ later on */
-								uint_t nU,		/* FIXME: just use these temporary, work with nZ later on */
-								uint_t nV,
-								uint_t nD
-								);
-
-
-return_t qpDUNES_cleanup(	qpData_t* const qpData
-						);
-
-
-void qpDUNES_freeInterval(	qpData_t* const qpData,
-						interval_t* const interval
-						);
-
 void qpDUNES_indicateDataChange(	qpData_t* const qpData
 									);
-
-
-return_t qpDUNES_init(	qpData_t* const qpData,
-						const real_t* const H_,
-						const real_t* const g_,
-						const real_t* const C_,
-						const real_t* const c_,
-						const real_t* const zLow_,
-						const real_t* const zUpp_,
-						const real_t* const D_,
-						const real_t* const dLow_,
-						const real_t* const dUpp_
-						);
 
 
 return_t qpDUNES_updateData(	qpData_t* const qpData,
@@ -95,21 +57,6 @@ return_t qpDUNES_updateData(	qpData_t* const qpData,
 								const real_t* const dLow_,
 								const real_t* const dUpp_
 								);
-
-
-return_t qpDUNES_setupSimpleBoundedInterval(	qpData_t* const qpData,
-											interval_t* interval,
-											const real_t* const Q,
-											const real_t* const R,
-											const real_t* const S,
-											const real_t* const A,
-											const real_t* const B,
-											const real_t* const c,
-											const real_t* const xLow,
-											const real_t* const xUpp,
-											const real_t* const uLow,
-											const real_t* const uUpp
-											);
 
 
 return_t qpDUNES_setupRegularInterval(	qpData_t* const qpData,
@@ -145,23 +92,6 @@ return_t qpDUNES_setupFinalInterval(	qpData_t* const qpData,
 									const real_t* const dLow_,
 									const real_t* const dUpp_
 									);
-
-
-/* WARNING: DEPRECATED! */
-return_t qpDUNES_updateSimpleBoundedInterval(	qpData_t* const qpData,
-									interval_t* interval,
-									const real_t* const Q,
-									const real_t* const R,
-									const real_t* const S,
-									const real_t* const A,
-									const real_t* const B,
-									const real_t* const c,
-									const real_t* const xLow,
-									const real_t* const xUpp,
-									const real_t* const uLow,
-									const real_t* const uUpp
-									);
-
 
 return_t qpDUNES_updateIntervalData(	qpData_t* const qpData,
 										interval_t* interval,

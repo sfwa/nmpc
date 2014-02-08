@@ -20,14 +20,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#define NMPC_SINGLE_PRECISION
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
-
-#include "qpDUNES.h"
+#include <stdbool.h>
 
 #ifndef __TI_COMPILER_VERSION__
     #include "config.h"
@@ -39,6 +36,94 @@ SOFTWARE.
     #include "cnmpc.h"
 #endif
 
+#include "qpDUNES/qpDUNES.h"
+
+/*
+Use static allocation for qpDUNES structures, since the sizes are all known at
+compile time -- see qpDUNES/setup_qp.c:40-267
+*/
+#define nX NMPC_DELTA_DIM
+#define nU NMPC_CONTROL_DIM
+#define nD 0
+#define nI OCP_HORIZON_LENGTH
+#define nZ (nX + nU)
+#define nV nZ
+
+struct static_interval_t { /* 2844B + sizeof(interval) */
+    interval_t interval;
+
+    /*
+    Statically-allocated storage for the interval matrices. Since nD is zero,
+    some of these are set to 1 to avoid non-standard zero-length arrays.
+    */
+    real_t H_data[nV * nV]; /* 900B */
+    real_t cholH_data[nV * nV]; /* 900B */
+    real_t g_data[nV]; /* 60B */
+    real_t q_data[nV]; /* 60B */
+    real_t C_data[nX * nV]; /* 180B */
+    real_t c_data[nX]; /* 48B */
+    real_t zLow_data[nV]; /* 60B */
+    real_t zUpp_data[nV]; /* 60B */
+    real_t D_data[1]; /* nD * nV: 4B */
+    real_t dLow_data[1]; /* nD: 4B */
+    real_t dUpp_data[1]; /* nD: 4B */
+    real_t z_data[nV]; /* 60B */
+    real_t y_data[2u * nV + 2u * nD]; /* 120B */
+    real_t lambdaK_data[nX]; /* 48B */
+    real_t lambdaK1_data[nX]; /* 48B */
+    real_t clippingSolver_qStep_data[nV]; /* 60B */
+    real_t clippingSolver_zUnconstrained_data[nV]; /* 60B */
+    real_t clippingSolver_dz_data[nV]; /* 60B */
+
+    /*
+    These are allocated in qpDUNES_setup rather than qpDUNES_allocInterval,
+    but they're still per-interval.
+    */
+    real_t xVecTmp_data[nX]; /* 48B */
+    real_t uVecTmp_data[nU]; /* 12B */
+    real_t zVecTmp_data[nZ]; /* 60B */
+};
+
+struct static_qpdata_t {
+    qpData_t qpdata;
+
+    /* QP solver data */
+    interval_t *intervals_data[nI + 1u]; /* 404B */
+    struct static_interval_t interval_recs[nI + 1u]; /* 287244B + 101*sizeof(interval) */
+    real_t lambda_data[nX * nI]; /* 4800B */
+    real_t deltaLambda_data[nX * nI]; /* 4800B */
+    real_t hessian_data[nX * 2u * nX * nI]; /* 115200B */
+    real_t cholHessian_data[nX * 2u * nX * nI]; /* 115200B */
+    real_t gradient_data[nX * nI]; /* 4800B */
+    real_t xVecTmp_data[nX]; /* 48B */
+    real_t uVecTmp_data[nU]; /* 12B */
+    real_t zVecTmp_data[nZ]; /* 60B */
+    real_t xnVecTmp_data[nX * nI]; /* 4800B */
+    real_t xnVecTmp2_data[nX * nI]; /* 4800B */
+    real_t xxMatTmp_data[nX * nX]; /* 576B */
+    real_t xxMatTmp2_data[nX * nX]; /* 576B */
+    real_t xzMatTmp_data[nX * nZ]; /* 720B */
+    real_t uxMatTmp_data[nU * nX]; /* 144B */
+    real_t zxMatTmp_data[nZ * nX]; /* 720B */
+    real_t zzMatTmp_data[nZ * nZ]; /* 900B */
+    real_t zzMatTmp2_data[nZ * nZ]; /* 900B */
+
+    /* Logging data */
+    itLog_t itLog_data;
+    int_t *ieqStatus_data[nI + 1u]; /* 404B */
+    int_t *prevIeqStatus_data[nI + 1u]; /* 404B */
+    int_t ieqStatus_n_data[(nI + 1u) * (nD + nZ)]; /* 6060B */
+    int_t prevIeqStatus_n_data[(nI + 1u) * (nD + nZ)]; /* 6060B */
+};
+
+#undef nX
+#undef nU
+#undef nD
+#undef nI
+#undef nZ
+#undef nV
+
+/* Math routines */
 #define X 0
 #define Y 1
 #define Z 2
@@ -154,7 +239,6 @@ const real_t *restrict q, const real_t *restrict v) {
     res[Z] = rz;
 }
 
-
 static inline void vector3_add(real_t *restrict res, const real_t v1[3],
 const real_t v2[3]) {
     assert(res && v1 && v2 && res != v1 && res != v2);
@@ -235,11 +319,11 @@ static real_t ocp_state_weights[NMPC_DELTA_DIM]; /* diagonal only */
 static real_t ocp_terminal_weights[NMPC_DELTA_DIM]; /* diagonal only */
 static real_t ocp_control_weights[NMPC_CONTROL_DIM]; /* diagonal only */
 
-static qpData_t qp_data;
-static qpOptions_t qp_options;
+static struct static_qpdata_t ocp_qp_data;
 
 /* Current control solution */
 static real_t ocp_control_value[NMPC_CONTROL_DIM];
+static bool ocp_last_result;
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
 const real_t *restrict control);
@@ -253,7 +337,7 @@ const real_t *restrict s2);
 static void _solve_interval_ivp(const real_t *restrict state_ref,
 const real_t *restrict control_ref, real_t *out_jacobian);
 static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]);
-static void _solve_qp(void);
+static bool _solve_qp(void);
 
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
@@ -451,11 +535,11 @@ const real_t *restrict state, const real_t *restrict control) {
            roll_rate = state[10 + X],
            left_aileron = control[1], right_aileron = control[2];
     pitch_moment = 0.01f - 0.03f * sin_cos_alpha - 0.002f * pitch_rate -
-                   0.3f * (left_aileron + right_aileron);
-    roll_moment = -0.03f * sin_beta - 0.01f * roll_rate +
-                  0.4f * (left_aileron - right_aileron);
+                   0.6f * (left_aileron + right_aileron);
+    roll_moment = -0.05f * sin_beta - 0.01f * roll_rate +
+                  0.45f * (left_aileron - right_aileron);
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
-                 0.01f * (absval(left_aileron) + absval(right_aileron));
+                 0.1f * (absval(left_aileron) + absval(right_aileron));
     pitch_moment *= qbar;
     roll_moment *= qbar;
     yaw_moment *= qbar;
@@ -622,35 +706,182 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
                                     ocp_control_reference[i];
     }
 
-    return_t status_flag = qpDUNES_updateIntervalData(
-        &qp_data, qp_data.intervals[0], 0, 0, 0, 0, z_low, z_upp, 0, 0, 0, 0);
+    return_t status_flag;
+    status_flag = qpDUNES_updateIntervalData(
+        &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[0], 0, 0, 0, 0,
+        z_low, z_upp, 0, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
-    qpDUNES_indicateDataChange(&qp_data);
+    qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
 
 /* Solves the QP using qpDUNES. */
-static void _solve_qp(void) {
+static bool _solve_qp(void) {
     return_t status_flag;
 
-    status_flag = qpDUNES_solve(&qp_data);
+    status_flag = qpDUNES_solve(&ocp_qp_data.qpdata);
     if (status_flag == QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND) {
         size_t i;
         real_t solution[NMPC_GRADIENT_DIM * (OCP_HORIZON_LENGTH + 1u)];
 
         /* Get the solution. */
-        qpDUNES_getPrimalSol(&qp_data, solution);
+        qpDUNES_getPrimalSol(&ocp_qp_data.qpdata, solution);
 
         /* Get the first set of control values */
         for (i = 0; i < NMPC_CONTROL_DIM; i++) {
             ocp_control_value[i] = ocp_control_reference[i] +
                                    solution[NMPC_DELTA_DIM + i];
         }
+        return true;
     } else {
         /* Flag an error in some appropriate way */
+        return false;
     }
 }
 
+/*
+Set up a qpDUNES interval with static allocation -- refer to
+qpDUNES_allocInterval at qpDUNES/setup_qp.c:210
+*/
+static void _init_static_interval(struct static_interval_t *i, size_t nV) {
+    assert(i);
+
+    i->interval.nD = 0;
+    i->interval.nV = (uint32_t)nV;
+
+    i->interval.H.data = i->H_data;
+    i->interval.H.sparsityType = QPDUNES_MATRIX_UNDEFINED;
+    i->interval.cholH.data = i->cholH_data;
+    i->interval.cholH.sparsityType = QPDUNES_MATRIX_UNDEFINED;
+
+    i->interval.g.data = i->g_data;
+
+    i->interval.q.data = i->q_data;
+
+    i->interval.C.data = i->C_data;
+    i->interval.C.sparsityType = QPDUNES_MATRIX_UNDEFINED;
+    i->interval.c.data = i->c_data;
+
+    i->interval.zLow.data = i->zLow_data;
+    i->interval.zUpp.data = i->zUpp_data;
+
+    i->interval.D.data = i->D_data;
+    i->interval.D.sparsityType = QPDUNES_MATRIX_UNDEFINED;
+
+    i->interval.dLow.data = i->dLow_data;
+    i->interval.dUpp.data = i->dUpp_data;
+
+    i->interval.z.data = i->z_data;
+
+    i->interval.y.data = i->y_data;
+
+    i->interval.lambdaK.data = i->lambdaK_data;
+    i->interval.lambdaK.isDefined = QPDUNES_TRUE;
+
+    i->interval.lambdaK1.data = i->lambdaK1_data;
+    i->interval.lambdaK1.isDefined = QPDUNES_TRUE;
+
+    i->interval.qpSolverClipping.qStep.data = i->clippingSolver_qStep_data;
+    i->interval.qpSolverClipping.zUnconstrained.data =
+        i->clippingSolver_zUnconstrained_data;
+    i->interval.qpSolverClipping.dz.data = i->clippingSolver_dz_data;
+    i->interval.qpSolverSpecification = QPDUNES_STAGE_QP_SOLVER_UNDEFINED;
+
+    i->interval.qpSolverQpoases.qpoasesObject = NULL;
+    i->interval.qpSolverQpoases.qFullStep.data = NULL;
+
+    /*
+    Per-interval allocation within qpDUNES_setup, migrated here for
+    convenience
+    */
+    i->interval.xVecTmp.data = i->xVecTmp_data;
+    i->interval.uVecTmp.data = i->uVecTmp_data;
+    i->interval.zVecTmp.data = i->zVecTmp_data;
+}
+
+/*
+Set up the qpDunes qpData_t structure with static allocation -- refer to
+qpDUNES_setup at qpDUNES/setup_qp.c:40.
+
+Equivalent to:
+    qpDUNES_setup(
+        &qp->qpdata,
+        OCP_HORIZON_LENGTH,
+        NMPC_DELTA_DIM,
+        NMPC_CONTROL_DIM,
+        0,
+        opts);
+*/
+static void _init_static_qp(struct static_qpdata_t *qp,
+const qpOptions_t *opts) {
+    assert(qp);
+    assert(opts);
+
+    size_t i, nV;
+
+    qp->qpdata.options = *opts;
+    qp->qpdata.nI = OCP_HORIZON_LENGTH;
+    qp->qpdata.nX = NMPC_DELTA_DIM;
+    qp->qpdata.nU = NMPC_CONTROL_DIM;
+    qp->qpdata.nZ = NMPC_DELTA_DIM + NMPC_CONTROL_DIM;
+    qp->qpdata.nDttl = 0;
+
+    qp->qpdata.intervals = qp->intervals_data;
+
+    for (i = 0; i < OCP_HORIZON_LENGTH + 1u; i++) {
+        if (i < OCP_HORIZON_LENGTH) {
+            nV = NMPC_DELTA_DIM + NMPC_CONTROL_DIM;
+        } else {
+            nV = NMPC_DELTA_DIM;
+        }
+
+        qp->qpdata.intervals[i] = &(qp->interval_recs[i].interval);
+        qp->qpdata.intervals[i]->id = (uint32_t)i;
+
+        _init_static_interval(&(qp->interval_recs[i]), nV);
+    }
+
+    /* Last interval doesn't need a Jacobian */
+    qpDUNES_setMatrixNull(&(qp->qpdata.intervals[OCP_HORIZON_LENGTH]->C));
+
+    qp->qpdata.intervals[0]->lambdaK.isDefined = QPDUNES_FALSE;
+    qp->qpdata.intervals[OCP_HORIZON_LENGTH]->lambdaK1.isDefined =
+        QPDUNES_FALSE;
+
+    qp->qpdata.lambda.data = qp->lambda_data;
+    qp->qpdata.deltaLambda.data = qp->deltaLambda_data;
+
+    qp->qpdata.hessian.data = qp->hessian_data;
+    qp->qpdata.cholHessian.data = qp->cholHessian_data;
+    qp->qpdata.gradient.data = qp->gradient_data;
+
+    qp->qpdata.xVecTmp.data = qp->xVecTmp_data;
+    qp->qpdata.uVecTmp.data = qp->uVecTmp_data;
+    qp->qpdata.zVecTmp.data = qp->zVecTmp_data;
+    qp->qpdata.xnVecTmp.data = qp->xnVecTmp_data;
+    qp->qpdata.xnVecTmp2.data = qp->xnVecTmp2_data;
+    qp->qpdata.xxMatTmp.data = qp->xxMatTmp_data;
+    qp->qpdata.xxMatTmp2.data = qp->xxMatTmp2_data;
+    qp->qpdata.xzMatTmp.data = qp->xzMatTmp_data;
+    qp->qpdata.uxMatTmp.data = qp->uxMatTmp_data;
+    qp->qpdata.zxMatTmp.data = qp->zxMatTmp_data;
+    qp->qpdata.zzMatTmp.data = qp->zzMatTmp_data;
+    qp->qpdata.zzMatTmp2.data = qp->zzMatTmp2_data;
+
+    qp->qpdata.optObjVal = -qp->qpdata.options.QPDUNES_INFTY;
+
+    qp->qpdata.log.itLog = &(qp->itLog_data);
+    qp->qpdata.log.itLog[0].ieqStatus = qp->ieqStatus_data;
+    qp->qpdata.log.itLog[0].prevIeqStatus = qp->prevIeqStatus_data;
+    for (i = 0; i < OCP_HORIZON_LENGTH + 1u; i++) {
+        qp->qpdata.log.itLog[0].ieqStatus[i] =
+            &(qp->ieqStatus_n_data[i * qp->qpdata.nZ]);
+        qp->qpdata.log.itLog[0].prevIeqStatus[i] =
+            &(qp->prevIeqStatus_n_data[i * qp->qpdata.nZ]);
+    }
+
+    qpDUNES_indicateDataChange(&qp->qpdata);
+}
 
 void nmpc_init(void) {
     real_t C[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
@@ -661,6 +892,7 @@ void nmpc_init(void) {
            Q[NMPC_DELTA_DIM * NMPC_DELTA_DIM], /* 576B */
            R[NMPC_CONTROL_DIM * NMPC_CONTROL_DIM];
     return_t status_flag;
+    qpOptions_t qp_options;
     size_t i;
 
     /* Initialise state inequality constraints to +/-infinity. */
@@ -676,13 +908,7 @@ void nmpc_init(void) {
     qp_options.stationarityTolerance = 1e-3f;
 
     /* Set up problem dimensions. */
-    qpDUNES_setup(
-        &qp_data,
-        OCP_HORIZON_LENGTH,
-        NMPC_DELTA_DIM,
-        NMPC_CONTROL_DIM,
-        0,
-        &qp_options);
+    _init_static_qp(&ocp_qp_data, &qp_options);
 
     /* Convert state and control diagonals into full matrices */
     memset(Q, 0, sizeof(Q));
@@ -715,7 +941,7 @@ void nmpc_init(void) {
     for (i = 0; i < OCP_HORIZON_LENGTH; i++) {
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_setupRegularInterval(
-            &qp_data, qp_data.intervals[i],
+            &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i],
             0, Q, R, 0, g, C, 0, 0, c, z_low, z_upp, 0, 0, 0, 0, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
     }
@@ -726,13 +952,13 @@ void nmpc_init(void) {
     }
 
     status_flag = qpDUNES_setupFinalInterval(
-        &qp_data, qp_data.intervals[OCP_HORIZON_LENGTH],
+        &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[OCP_HORIZON_LENGTH],
         Q, g, z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
-    qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_TRUE);
+    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_TRUE);
 
-    qpDUNES_indicateDataChange(&qp_data);
+    qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
 
 void nmpc_preparation_step(void) {
@@ -740,14 +966,20 @@ void nmpc_preparation_step(void) {
 
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]) {
     _initial_constraint(measurement);
-    _solve_qp();
+    ocp_last_result = _solve_qp();
 }
 
-void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
+enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     assert(controls);
 
     /* Return the next control state */
     memcpy(controls, ocp_control_value, sizeof(real_t) * NMPC_CONTROL_DIM);
+
+    if (ocp_last_result) {
+        return NMPC_OK;
+    } else {
+        return NMPC_INFEASIBLE;
+    }
 }
 
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
@@ -761,8 +993,8 @@ void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
             sizeof(real_t) * NMPC_CONTROL_DIM * (OCP_HORIZON_LENGTH - 1u));
 
     /* Prepare the QP for the next solution. */
-    qpDUNES_shiftLambda(&qp_data);
-    qpDUNES_shiftIntervals(&qp_data);
+    qpDUNES_shiftLambda(&ocp_qp_data.qpdata);
+    qpDUNES_shiftIntervals(&ocp_qp_data.qpdata);
 
     nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH - 1);
 }
@@ -847,7 +1079,7 @@ uint32_t i) {
 
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_updateIntervalData(
-            &qp_data, qp_data.intervals[i],
+            &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i],
             0, gradient, jacobian, 0, z_low, z_upp, 0, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
     }

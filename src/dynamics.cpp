@@ -75,11 +75,11 @@ const State &in, const ControlVector &control) const {
     side_force = 0.3 * sin_beta * cos_beta;
 
     pitch_moment = 0.01 + 0.03 * sin_cos_alpha - 0.002 * pitch_rate -
-                   0.3 * (control[1] + control[2]);
-    roll_moment = -0.03 * sin_beta - 0.01 * roll_rate +
-                  0.4 * (control[1] - control[2]);
+                   0.6 * (control[1] + control[2]);
+    roll_moment = -0.05 * sin_beta - 0.01 * roll_rate +
+                  0.45 * (control[1] - control[2]);
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
-                 0.01 * (std::abs(control[1]) + std::abs(control[2]));
+                 0.1 * (std::abs(control[1]) + std::abs(control[2]));
 
     /*
     Determine motor thrust and torque.
