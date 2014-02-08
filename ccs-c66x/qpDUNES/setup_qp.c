@@ -262,7 +262,6 @@ return_t qpDUNES_setupRegularInterval(	qpData_t* const qpData,
 	} /* end of Hessian */
 
 	if (H->sparsityType  < QPDUNES_DIAGONAL) {
-		qpDUNES_printError( qpData, __FILE__, __LINE__, "Sorry, only diagonal Hessians are supported so far." );
 		return QPDUNES_ERR_INVALID_ARGUMENT;
 	}
 
@@ -298,7 +297,6 @@ return_t qpDUNES_setupRegularInterval(	qpData_t* const qpData,
 			}
 		}
 		else {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Matrices either for C or for A and B need to be supplied." );
 			return QPDUNES_ERR_INVALID_ARGUMENT;
 		}
 	}
@@ -513,15 +511,9 @@ return_t qpDUNES_setupAllLocalQPs(	qpData_t* const qpData,
 				 ( interval->nD == 0 ) )
 			{
 				interval->qpSolverSpecification = QPDUNES_STAGE_QP_SOLVER_CLIPPING;
-				if( qpData->options.printLevel >= 3 ) {
-					qpDUNES_printf("INFO: using clipping QP solver on interval %d.", kk);
-				}
 			}
 			else	{
 				interval->qpSolverSpecification = QPDUNES_STAGE_QP_SOLVER_QPOASES;
-				if( qpData->options.printLevel >= 3 ) {
-					qpDUNES_printf("INFO: using qpOASES on interval %d.", kk);
-				}
 			}
 		}
 
@@ -587,8 +579,6 @@ return_t qpDUNES_setupStageQP(	qpData_t* const qpData,
 		statusFlag = directQpSolver_solveUnconstrained( qpData, interval, &(interval->qpSolverClipping.qStep) );
 		if ( statusFlag != QPDUNES_OK ) {
 			int kk = 1234567890;	/* TODO: get right interval number!*/
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "QP on interval %d infeasible!", kk );
-			if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS )	qpDUNES_logIteration( qpData, &(qpData->log.itLog[0]), qpData->options.QPDUNES_INFTY, _NI_ );
 			return statusFlag;
 		}
 
@@ -735,25 +725,6 @@ qpOptions_t qpDUNES_setupDefaultOptions(
 	return options;
 }
 /*<<< END OF qpDUNES_setupOptions */
-
-
-
-return_t qpDUNES_setupLog(	qpData_t* const qpData
-						)
-{
-	log_t* itLog = &(qpData->log);
-
-	itLog->nI = _NI_;
-	itLog->nX = _NX_;
-	itLog->nU = _NU_;
-	itLog->nZ = _NZ_;
-	itLog->nDttl = _NDTTL_;
-
-	itLog->qpOptions = qpData->options;	/* WARNING: this relies on qpOptions_t to only have primitive non-pointer data */
-
-	return QPDUNES_OK;
-}
-
 
 /*
  *	end of file

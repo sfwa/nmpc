@@ -89,14 +89,7 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 		}
 	}
 	objValIncumbent = qpDUNES_computeObjectiveValue(qpData);
-	#ifdef __MEASURE_TIMINGS__
-	tQpEnd = getTime();
-	#endif
 	if (statusFlag != QPDUNES_OK) {
-		qpDUNES_printError(qpData, __FILE__, __LINE__,	"QP infeasible: error-code %d.", (int) statusFlag);
-		if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)	{
-			qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
-		}
 		return statusFlag;
 	}
 	/* get active set of local constraints */
@@ -106,37 +99,10 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 												 	(const int_t * const * const ) itLogPtr->prevIeqStatus,
 												 	&lastActSetChangeIdx );
 
-	/** (3a) log and display */
-	if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)
-		qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
-
-	/** (3b) measure timings */
-	#ifdef __MEASURE_TIMINGS__
-	tDiff = tQpEnd - tQpStart;
-	if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS) {
-		itLogPtr->tQP = tDiff;
-		itLogPtr->tIt = tDiff;
-	}
-	if ((qpData->options.printIterationTiming == QPDUNES_TRUE) && (qpData->options.printLevel >= 2)) {
-		qpDUNES_printf("Time spent in first QP solution:              %f μs",	1.e6 * tDiff);
-	}
-	#endif
-
-
 
 	/** LOOP OF NONSMOOTH NEWTON ITERATIONS */
 	/*  ----------------------------------- */
 	for ((*itCntr) = 1; (*itCntr) <= qpData->options.maxIter; ++(*itCntr)) {
-
-		#ifdef __MEASURE_TIMINGS__
-		tItStart = getTime();
-		#endif
-
-
-		/** (0) prepare logging */
-		if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS) {
-			itLogPtr = &(qpData->log.itLog[(*itCntr)]);
-		}
 		itLogPtr->itNbr = *itCntr;
 
 
@@ -145,60 +111,26 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 		itLogPtr->isHessianRegularized = QPDUNES_FALSE;
 		if ((*itCntr > 1) && (*itCntr - 1 <= qpData->options.nbrInitialGradientSteps)) { /* always do one Newton step first */
 			/** (1Aa) get a gradient step */
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSetupStart = getTime();
-			#endif
 			qpDUNES_computeNewtonGradient(qpData, &(qpData->gradient),
 					&(qpData->xVecTmp));
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSetupEnd = getTime();
-			#endif
 
 			/** (1Ab) do gradient step */
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSolveStart = getTime();
-			#endif
 			qpDUNES_copyVector(&(qpData->deltaLambda), &(qpData->gradient),
 					_NI_ * _NX_);
 			statusFlag = QPDUNES_OK;
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSolveEnd = getTime();
-			#endif
 		}
 		else {
 			/** (1Ba) set up Newton system */
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSetupStart = getTime();
-			#endif
 			statusFlag = qpDUNES_setupNewtonSystem(qpData);
 			switch (statusFlag) {
 				case QPDUNES_OK:
 					break;
 				case QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND: /* zero gradient norm detected */
-					qpDUNES_printSuccess(qpData, "Optimal solution found: gradient norm %.1e",	vectorNorm(&(qpData->gradient), _NI_ * _NX_));
-					if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)  qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
-					/* save active set corresponding to last Hessian factorization */
-					if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS) {
-						/* the Hessian was factorized in the previous iteration, and it was computed at the point before the step was taken */
-						for (kk = 0; kk < _NI_ + 1; ++kk) {
-							for (ii = 0; ii < _ND(kk)+_NV(kk); ++ii ) {
-								qpData->log.itLog[0].prevIeqStatus[kk][ii] = qpData->log.itLog[(*itCntr) - 1].prevIeqStatus[kk][ii];
-							}
-						}
-					}
-					else {
-						/* if iterations logging is switched off, the last active set is already saved in itLog[0].prevIeqStatus */
-					}
 					/* ...and leave */
 					return QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND;
 				default:
-					qpDUNES_printError(qpData, __FILE__, __LINE__,	"Setup of Newton Equation failed.");
-					if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)  qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
 					return statusFlag;
 			}
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSetupEnd = getTime();
-			#endif
 
 			/** (1Bb) factorize Newton system */
 			#ifdef __MEASURE_TIMINGS__
@@ -209,8 +141,6 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 				case QPDUNES_OK:
 					break;
 				default:
-					qpDUNES_printError(qpData, __FILE__, __LINE__,	"Factorization of Newton Equation failed.");
-					if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)	 qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
 					return statusFlag;
 			}
 			#ifdef __MEASURE_TIMINGS__
@@ -231,63 +161,32 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 				break;
 
 			default:
-				qpDUNES_printError(qpData, __FILE__, __LINE__, "Unknown Newton Hessian factorization algorithm. Cannot do backsolve.");
 				return QPDUNES_ERR_INVALID_ARGUMENT;
 			}
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSolveEnd = getTime();
-			#endif
 			if (statusFlag != QPDUNES_OK) {
-				qpDUNES_printError(qpData, __FILE__, __LINE__,	"Could not compute Newton step direction.");
-				if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)	 qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
 				return statusFlag;
 			}
 		}
 
 
 		/** (2) do QP solution for full step */
-		#ifdef __MEASURE_TIMINGS__
-		tQpStart = getTime();
-		#endif
 		qpDUNES_solveAllLocalQPs(qpData, &(qpData->deltaLambda));
-		#ifdef __MEASURE_TIMINGS__
-		tQpEnd = getTime();
-		#endif
 		/* clipping solver: now unsaturated dz is available locally */
-
-
-		/** (3) do infeasibility check */
-		if ( qpData->options.checkForInfeasibility == QPDUNES_TRUE )
-		{
-			qpDUNES_printWarning(qpData, __FILE__, __LINE__, "Infeasibility check not yet implemented.");
-		}
-
-
 
 		/** (4) determine step length: do line search along the way of the full step
 		 * 		and do the step */
-		#ifdef __MEASURE_TIMINGS__
-		tLineSearchStart = getTime();
-		#endif
 		statusFlag = qpDUNES_determineStepLength(qpData, &(qpData->lambda),
 				&(qpData->deltaLambda), &(itLogPtr->numLineSearchIter),
 				&(qpData->alpha), &objValIncumbent,
 				itLogPtr->isHessianRegularized);
-		#ifdef __MEASURE_TIMINGS__
-		tLineSearchEnd = getTime();
-		#endif
 		switch (statusFlag) {
 			case QPDUNES_OK:
 			case QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED:
 			case QPDUNES_ERR_EXCEEDED_MAX_LINESEARCH_STEPSIZE:
 				break;
 			case QPDUNES_ERR_DECEEDED_MIN_LINESEARCH_STEPSIZE: /* deltaLambda is no ascent direction */
-				qpDUNES_printError(qpData, __FILE__, __LINE__, "Search direction is not an ascent direction. QP could not be solved.");
-				if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)  qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
 				return QPDUNES_ERR_NEWTON_SYSTEM_NO_ASCENT_DIRECTION;
 			default:
-				qpDUNES_printError(qpData, __FILE__, __LINE__, "Could not determine step length.");
-				if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS)  qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
 				return statusFlag;
 		}
 
@@ -314,64 +213,12 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 													 (const int_t * const * const ) itLogPtr->prevIeqStatus,
 													 &lastActSetChangeIdx);
 		qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
-		/* display */
-		if ((*itCntr) % qpData->options.printIntervalHeader == 1) {
-			qpDUNES_printIterationHeader(qpData);
-		}
-		qpDUNES_printIteration(qpData, itLogPtr);
-
-
-		/** (7) display timings */
-		#ifdef __MEASURE_TIMINGS__
-		tItEnd = getTime();
-		if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS) {
-			qpData->log.itLog[(*itCntr)].tIt = tItEnd - tItStart;
-			qpData->log.itLog[(*itCntr)].tNwtnSetup = tNwtnSetupEnd
-					- tNwtnSetupStart;
-			qpData->log.itLog[(*itCntr)].tNwtnSolve = tNwtnSolveEnd
-					- tNwtnSolveStart;
-			qpData->log.itLog[(*itCntr)].tQP = tQpEnd - tQpStart;
-			qpData->log.itLog[(*itCntr)].tLineSearch = tLineSearchEnd
-					- tLineSearchStart;
-		}
-		if ((qpData->options.printIterationTiming == QPDUNES_TRUE)
-				&& (qpData->options.printLevel >= 2)) {
-			qpDUNES_printf("\nTimings Iteration %d:", (*itCntr));
-			qpDUNES_printf("Setup of Newton system:         %7.3f ms (%5.2f%%)",
-					1e3 * (tNwtnSetupEnd - tNwtnSetupStart) / 1,
-					(tNwtnSetupEnd - tNwtnSetupStart) / (tItEnd - tItStart)
-							* 100);
-			qpDUNES_printf("Factorization of Newton system: %7.3f ms (%5.2f%%)",
-					1e3 * (tNwtnFactorEnd - tNwtnFactorStart) / 1,
-					(tNwtnFactorEnd - tNwtnFactorStart) / (tItEnd - tItStart)
-							* 100);
-			qpDUNES_printf("Backsolve of newton system:     %7.3f ms (%5.2f%%)",
-					1e3 * (tNwtnSolveEnd - tNwtnSolveStart) / 1,
-					(tNwtnSolveEnd - tNwtnSolveStart) / (tItEnd - tItStart)
-							* 100);
-			qpDUNES_printf("QP solution:                    %7.3f ms (%5.2f%%)",
-					1e3 * (tQpEnd - tQpStart) / 1,
-					(tQpEnd - tQpStart) / (tItEnd - tItStart) * 100);
-			qpDUNES_printf("Line search:                    %7.3f ms (%5.2f%%)",
-					1e3 * (tLineSearchEnd - tLineSearchStart) / 1,
-					(tLineSearchEnd - tLineSearchStart) / (tItEnd - tItStart)
-							* 100);
-			qpDUNES_printf("                               -----------");
-			qpDUNES_printf("Full iteration:                 %7.3f ms\n",
-					1e3 * (tItEnd - tItStart) / 1);
-			qpDUNES_printf("Begin:  %.3f ms\n",
-					1e3 * (tNwtnSetupStart - tItStart) / 1);
-			qpDUNES_printf("End:  %.3f ms\n", 1e3 * (tItEnd - tLineSearchEnd) / 1);
-		}
-		#endif
 	}
 
 
 	/* get number of performed iterations right (itCntr is going one up before realizing it's too big) */
 	qpData->log.numIter = qpData->options.maxIter;
 
-
-	qpDUNES_printError(qpData, __FILE__, __LINE__, "Exceeded iteration limit. QP could not be solved." );
 	return QPDUNES_ERR_ITERATION_LIMIT_REACHED;
 }
 /*<<< END OF qpDUNES_solve */
@@ -489,7 +336,6 @@ return_t qpDUNES_updateAllLocalQPs(	qpData_t* const qpData,
 			qpOASES_updateStageData( qpData, interval, &(interval->lambdaK), &(interval->lambdaK1) );
 			break;
 		default:
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Stage QP solver undefined! Bailing out..." );
 			return QPDUNES_ERR_UNKNOWN_ERROR;
 		}
 	}
@@ -521,12 +367,8 @@ return_t qpDUNES_solveAllLocalQPs(	qpData_t* const qpData,
 		for (kk = 0; kk < _NI_ + 1; ++kk) {
 			statusFlag = qpDUNES_solveLocalQP(qpData, qpData->intervals[kk]);
 			if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
-				qpDUNES_printError(qpData, __FILE__, __LINE__,	"QP on interval %d infeasible!", kk);
 				errCntr++;
 			}
-			#if defined (__QPDUNES_PARALLEL__)
-			/*			qpDUNES_printf("Computed QP %d by thread %d/%d.", kk, omp_get_thread_num(), omp_get_num_threads() );*/
-			#endif
 		}
 /*	}*/ /* END of omp parallel */
 	if (errCntr > 0) {
@@ -553,7 +395,6 @@ return_t qpDUNES_solveLocalQP(	qpData_t* const qpData,
 	case QPDUNES_STAGE_QP_SOLVER_CLIPPING:
 		statusFlag = directQpSolver_solveUnconstrained(qpData, interval, &(interval->qpSolverClipping.qStep)); /* solve QPs in first-order term updates only, to mimic homotopy */
 		if (statusFlag != QPDUNES_OK) {
-			qpDUNES_printError(qpData, __FILE__, __LINE__, "Direct QP solver infeasible.");
 			return statusFlag;
 		}
 		break;
@@ -563,15 +404,11 @@ return_t qpDUNES_solveLocalQP(	qpData_t* const qpData,
 				interval->qpSolverQpoases.qpoasesObject, interval,
 				&(interval->qpSolverQpoases.qFullStep)); /* qpOASES has homotopy internally, so we work with full first-order terms */
 		if (statusFlag != QPDUNES_OK) {
-			qpDUNES_printError(qpData, __FILE__, __LINE__,
-					"Direct QP solver infeasible.");
 			return statusFlag;
 		}
 		break;
 
 	default:
-		qpDUNES_printError(qpData, __FILE__, __LINE__,
-				"Stage QP solver undefined! Bailing out...");
 		return QPDUNES_ERR_UNKNOWN_ERROR;
 	}
 
@@ -623,11 +460,6 @@ return_t qpDUNES_setupNewtonSystem(	qpData_t* const qpData
 	for (kk = 0; kk < _NI_; ++kk) {
 		/* check whether block needs to be recomputed */
 		if ( (intervals[kk]->actSetHasChanged == QPDUNES_TRUE) || (intervals[kk+1]->actSetHasChanged == QPDUNES_TRUE) ) {
-			#ifdef __DEBUG__
-			if (qpData->options.printLevel >= 4) {
-				qpDUNES_printf("rebuilt diagonal block %d of %d", kk, _NI_-1);
-			}
-			#endif
 			/* get EPE part */
 			if (intervals[kk + 1]->qpSolverSpecification == QPDUNES_STAGE_QP_SOLVER_QPOASES)
 			{
@@ -685,11 +517,6 @@ return_t qpDUNES_setupNewtonSystem(	qpData_t* const qpData
 	/* 2) sub-diagonal blocks */
 	for (kk = 1; kk < _NI_; ++kk) {
 		if (intervals[kk]->actSetHasChanged == QPDUNES_TRUE) {
-			#ifdef __DEBUG__
-			if (qpData->options.printLevel >= 4) {
-				qpDUNES_printf("rebuilt off-diag block %d of %d", kk, _NI_-1);
-			}
-			#endif
 			if (intervals[kk]->qpSolverSpecification == QPDUNES_STAGE_QP_SOLVER_QPOASES) {
 				/* get data from qpOASES */
 				qpOASES_getZT(qpData, intervals[kk]->qpSolverQpoases.qpoasesObject,	&nFree, ZT);
@@ -735,8 +562,6 @@ return_t qpDUNES_setupNewtonSystem(	qpData_t* const qpData
 			}
 		}
 	}	/* END OF sub-diagonal block for loop */
-
-/*	qpDUNES_printMatrixData( qpData->hessian.data, _NI_*_NX_, 2*_NX_, "H = ");*/
 
 	return QPDUNES_OK;
 }
@@ -799,7 +624,6 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 			break;
 
 		default:
-			qpDUNES_printError(qpData, __FILE__, __LINE__, "Unknown Newton Hessian factorization algorithm.");
 			return QPDUNES_ERR_INVALID_ARGUMENT;
 	}
 
@@ -815,11 +639,6 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 			}
 		}
 	}
-	#ifdef __DEBUG__
-		if (qpData->options.printLevel >= 4) {
-			qpDUNES_printf( "Minimum NH diagonal element: % .5e", minDiagElem );
-		}
-	#endif
 
 
 	if ( ( statusFlag == QPDUNES_ERR_DIVISION_BY_ZERO ) || 					/* regularize if Cholesky failed */
@@ -835,7 +654,6 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 			break;
 
 			case QPDUNES_REG_NORMALIZED_LEVENBERG_MARQUARDT :
-			qpDUNES_printError(qpData, __FILE__, __LINE__, "QPDUNES_REG_NORMALIZED_LEVENBERG_MARQUARDT is deprecated.");
 			break;
 
 			case QPDUNES_REG_SINGULAR_DIRECTIONS :
@@ -843,7 +661,6 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 			return QPDUNES_OK;
 
 			case QPDUNES_REG_UNCONSTRAINED_HESSIAN :
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Regularization with unconstrained Hessian not yet implemented." );
 			return QPDUNES_ERR_UNKNOWN_ERROR;
 
 			case QPDUNES_REG_GRADIENT_STEP :
@@ -851,7 +668,6 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 			return QPDUNES_ERR_DIVISION_BY_ZERO;
 
 			default:
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown regularization type.");
 			break;
 		}
 		*isHessianRegularized = QPDUNES_TRUE;
@@ -867,17 +683,14 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 			break;
 
 			default:
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown Newton Hessian factorization algorithm." );
 			return QPDUNES_ERR_INVALID_ARGUMENT;
 		}
 		if ( statusFlag != QPDUNES_OK ) {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Regularization of Newton Hessian failed." );
 			return statusFlag;
 		}
 	}
 	else {
 		if ( statusFlag != QPDUNES_OK ) {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Factorization of Newton Hessian failed for unknown reason." );
 			return statusFlag;
 		}
 	}
@@ -930,13 +743,6 @@ return_t qpDUNES_factorizeNewtonHessian( qpData_t* const qpData,
 			if((qpData->options.regType == QPDUNES_REG_SINGULAR_DIRECTIONS) &&	/* Add regularization on too small values already in factorization */
 			   (sum < qpData->options.newtonHessDiagRegTolerance) ) 		/* TODO: take branching in options.regType out of the loop if too slow */
 			{
-				/* FIXME: maybe log which elements were regularized */
-				#ifdef __DEBUG__
-				if ( qpData->options.printLevel >= 3 ) {
-					qpDUNES_printf( "Regularized NH[k=%d,j=%d] = %.2e + %.2e", kk, jj, sum, qpData->options.regParam );
-				}
-				#endif
-/*				sum += qpData->options.regParam;*/
 				sum += qpData->options.QPDUNES_INFTY * qpData->options.QPDUNES_INFTY + 1.;
 				*isHessianRegularized = QPDUNES_TRUE;
 			}
@@ -1020,13 +826,6 @@ return_t qpDUNES_factorizeNewtonHessianBottomUp( qpData_t* const qpData,
 	real_t sum;
 
 	int_t blockIdxStart = (lastActSetChangeIdx>=0)  ?  qpDUNES_min(lastActSetChangeIdx, _NI_-1)  :  -1;
-/*	int_t blockIdxStart = _NI_-1; */
-
-	#ifdef __DEBUG__
-	if (qpData->options.printLevel >= 3) {
-		qpDUNES_printf( "Restarting reverse Cholesky factorization at block %d of %d", blockIdxStart, _NI_-1 );
-	}
-	#endif
 
 	/* go by block columns */
 	for (kk = blockIdxStart; kk >= 0; --kk) {
@@ -1056,12 +855,6 @@ return_t qpDUNES_factorizeNewtonHessianBottomUp( qpData_t* const qpData,
 			{
 				sum += qpData->options.regParam;
 				*isHessianRegularized = QPDUNES_TRUE;
-				#ifdef __DEBUG__
-				if (sum < qpData->options.newtonHessDiagRegTolerance) {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "On-the-fly regularization failed. Your problem might be too ill-conditioned.");
-					return QPDUNES_ERR_DIVISION_BY_ZERO;
-				}
-				#endif
 			}
 			else {
 				if ( sum < 1.e2*qpData->options.equalityTolerance ) {	/* matrix not positive definite */
@@ -1150,7 +943,6 @@ return_t qpDUNES_solveNewtonEquation(	qpData_t* const qpData,
 			/* divide by diagonal element */
 			#if defined(__USE_ASSERTS__)
 			if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDenseL.\nsum = %.3e, diag = %.3e\nRank-deficient Matrix?", sum, accCholHessian(kk,0,ii,ii) );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 			#endif
@@ -1183,7 +975,6 @@ return_t qpDUNES_solveNewtonEquation(	qpData_t* const qpData,
 			/* divide by diagonal element */
 			#if defined(__USE_ASSERTS__)
 				if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDenseL.\nsum = %.3e, diag = %.3e\nRank-deficient Matrix?", sum, accCholHessian(kk,0,ii,ii) );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			#endif
@@ -1228,7 +1019,6 @@ return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 			/* divide by diagonal element */
 			#if defined(__USE_ASSERTS__)
 				if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDenseL.\nsum = %.3e, diag = %.3e\nRank-deficient Matrix?", sum, accCholHessian(kk,0,ii,ii) );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			#endif
@@ -1255,7 +1045,6 @@ return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 			/* divide by diagonal element */
 			#if defined(__USE_ASSERTS__)
 				if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDenseL.\nsum = %.3e, diag = %.3e\nRank-deficient Matrix?", sum, accCholHessian(kk,0,ii,ii) );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			#endif
@@ -1397,8 +1186,6 @@ return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 				break;
 
 			default:
-				qpDUNES_printError(qpData, __FILE__, __LINE__,
-						"Stage QP solver undefined! Bailing out...");
 				return QPDUNES_ERR_UNKNOWN_ERROR;
 			}
 		}
@@ -1491,8 +1278,6 @@ return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 			break;
 
 		default:
-			qpDUNES_printError(qpData, __FILE__, __LINE__,
-					"Stage QP solver undefined! Bailing out...");
 			return QPDUNES_ERR_UNKNOWN_ERROR;
 		}
 	}
@@ -1542,16 +1327,11 @@ return_t qpDUNES_backTrackingLineSearch(	qpData_t* const qpData,
 
 		/* ensure minimum step size */
 		if (normDeltaLambda * (*alpha - alphaMin) < qpData->options.equalityTolerance) {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Backtracking line search: Deceeded minimum step size.\n        Itertation %d\n        alpha = %.3e\n        alphaMin = %.3e\n        normDeltaLambda = %.3e\n        minimumProgress = %.3e\n        last objVal = %.12e\n        objValIncumbet = %.12e", *itCntr, *alpha, alphaMin, normDeltaLambda, minimumProgress, objVal, objValIncumbent );
 			*alpha = alphaMin;
 			return QPDUNES_ERR_DECEEDED_MIN_LINESEARCH_STEPSIZE;
 		}
 	}
 
-	if ( qpData->options.printLevel >= 3 ) {
-		qpDUNES_printf("Leaving backtracking line search due to iteration limit, with alpha = %.3e. ObjVal = %.3e, incumbent objVal = %.3e", *alpha, objVal, objValIncumbent );
-	}
-	qpDUNES_printWarning( qpData, __FILE__, __LINE__, "Backtracking line search: Maximum number of iterations reached" );
 	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
 }
 /*<<< END OF qpDUNES_backTrackingLineSearch */
@@ -1596,7 +1376,6 @@ return_t qpDUNES_reductionLineSearchWithASChange(	qpData_t* const qpData,
 		if (objVal < objValIncumbent + minimumProgress) { /* no progress */
 			alphaMax = (*alpha);
 		} else { /* we make progress at current candidate */
-			qpDUNES_printf(	"qpDUNES_reductionLineSearchWithASChange() currently not usable" );
 			assert(1 == 0);
 			if (nChgdConstr <= 0) { /* no active set changes */
 				alphaMin = (*alpha);
@@ -1606,8 +1385,6 @@ return_t qpDUNES_reductionLineSearchWithASChange(	qpData_t* const qpData,
 		}
 	}
 
-	qpDUNES_printError(qpData, __FILE__, __LINE__,
-			"Backtracking line search: Maximum number of iterations reached");
 	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
 }
 /*<<< END OF qpDUNES_backTrackingLineSearch */
@@ -1719,8 +1496,6 @@ return_t qpDUNES_goldenSectionIntervalSearch(	qpData_t* const qpData,
 	}
 
 	*alpha = alphaCheckedLast;
-	qpDUNES_printError(qpData, __FILE__, __LINE__,
-			"Golden section interval search: Maximum number of iterations reached");
 	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
 }
 /*<<< END OF qpDUNES_goldenSectionIntervalSearch */
@@ -1804,12 +1579,6 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 		/* break if maximum step size reached */
 		if (alphaMax > qpData->options.lineSearchMaxStepSize) {
 			*alpha = alphaMin;
-			if ( qpData->options.printLevel >= 3 ) {
-				qpDUNES_printWarning(qpData, __FILE__, __LINE__, "(info) Bisection interval search: Maximum step size reached");
-			}
-			if ( qpData->options.printLevel >= 3 ) {
-				qpDUNES_printf("Alpha = %.15e taken prior to stationarity, alphaSlope = %.15e, normalization = %.15e", *alpha, alphaSlope, slopeNormalization );
-			}
 			return QPDUNES_ERR_EXCEEDED_MAX_LINESEARCH_STEPSIZE;
 		}
 	}
@@ -1848,9 +1617,6 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 
 		/* check for stationarity in search direction */
 		if ( fabs(alphaSlope / slopeNormalization) <= qpData->options.lineSearchStationarityTolerance ) {
-			if ( qpData->options.printLevel >= 3 ) {
-				qpDUNES_printf("AlphaC = %.5e is stationary, alphaSlope = %.3e, normalization = %.3e", alphaC, alphaSlope, slopeNormalization );
-			}
 			*alpha = alphaC;
 			return QPDUNES_OK;
 		}
@@ -1865,12 +1631,6 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 		}
 	}
 
-	#ifdef __DEBUG__
-	if( qpData->options.printLevel >= 3 ) {
-		qpDUNES_printf( "Bisection interval search: itCntr = %d, last alpha: %.3e", *itCntr, alphaC );
-	}
-	#endif
-	qpDUNES_printWarning( qpData, __FILE__, __LINE__,	"Bisection interval search: Maximum number of iterations reached!" );
 	*alpha = alphaC;
 
 	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
@@ -1936,8 +1696,6 @@ void qpDUNES_getPrimalSol(const qpData_t* const qpData, real_t* const z) {
  >>>>>>                                           */
 void qpDUNES_getDualSol(const qpData_t* const qpData, real_t* const lambda,
 		real_t* const y) {
-
-	qpDUNES_printWarning( qpData, __FILE__, __LINE__, "getDualSol currently not working" );	/* TODO: fix getDualSol */
 
 	return;
 }
@@ -2009,7 +1767,6 @@ real_t qpDUNES_computeParametricObjectiveValue(	qpData_t* const qpData,
 			break;
 
 		default:
-			qpDUNES_printError(qpData, __FILE__, __LINE__,	"Stage QP solver undefined! Bailing out...");
 			return QPDUNES_ERR_UNKNOWN_ERROR;
 		}
 
@@ -2044,11 +1801,6 @@ uint_t qpDUNES_getActSet( const qpData_t* const qpData,
 	/* temporary hack to make sure newton hessian is refactorized even with qpOASES: */
 	static int counter = 0;
 
-	#ifdef __DEBUG__
-	if (qpData->options.printLevel >= 4) {
-		qpDUNES_printf_noNewLine( "AS:\t" );
-	}
-	#endif
 	for (kk = 0; kk < _NI_ + 1; ++kk) {
 		if (qpData->intervals[kk]->qpSolverSpecification == QPDUNES_STAGE_QP_SOLVER_CLIPPING) {
 			for (ii = 0; ii < _ND(kk) + _NV(kk); ++ii ) {
@@ -2067,32 +1819,17 @@ uint_t qpDUNES_getActSet( const qpData_t* const qpData,
 						actSetStatus[kk][ii] = 0;
 					}
 				}
-				#ifdef __DEBUG__
-				if (qpData->options.printLevel >= 4) {
-					if( actSetStatus[kk][ii] != 0 ) {
-						qpDUNES_printf_noNewLine( "[%d,%d]: %+d\t", kk, ii,actSetStatus[kk][ii] );
-					}
-				}
-				#endif
 			}
 		}
 		else {	/* qpOASES */
-			qpDUNES_printError(qpData, __FILE__, __LINE__,	"getActSet currently not working with general constraints (qpOASES)");/* TODO: fix getActSet */
-
 			/* TODO : THIS IS A TEMPORARY HACK to make sure hessian is refactorized even with qpOASES...*/
 			for (ii = 0; ii < _ND(kk) + _NV(kk); ++ii ) {
 				/* TODO: make this quick hack clean for general multiplier usage...! */
 				counter ++;
 				actSetStatus[kk][ii] = counter;
-				qpDUNES_printWarning(qpData, __FILE__, __LINE__, "'Get active set' is not yet supported by qpOASES interface. This might result in a corrupted Newton Hessian.");
 			}
 		}
 	}
-#ifdef __DEBUG__
-	if (qpData->options.printLevel >= 4) {
-		qpDUNES_printf_noNewLine( "\n" );
-	}
-#endif
 
 	return nActConstr;
 }
@@ -2121,62 +1858,13 @@ uint_t qpDUNES_compareActSets( const qpData_t* const qpData,
 				++nChgdConstr;
 				qpData->intervals[kk]->actSetHasChanged = QPDUNES_TRUE;
 				*lastActSetChangeIdx = kk;
-				#ifdef __DEBUG__
-				if (qpData->options.printLevel >= 4) {
-					qpDUNES_printf( "AS change in [%d,%d]: %+d => %+d", kk, ii,oldActSetStatus[kk][ii], newActSetStatus[kk][ii] );
-				}
-				#endif
 			}
 		}
 	}
 
-
-	#ifdef __DEBUG__
-	if (qpData->options.printLevel >= 3) {
-		qpDUNES_printf( "Last AS change occurred on stage %d of %d", *lastActSetChangeIdx, _NI_ );
-	}
-	#endif
-
 	return nChgdConstr;
 }
 /*<<< END OF qpDUNES_compareActSets */
-
-
-/* ----------------------------------------------
- * ...
- *
- >>>>>                                            */
-void qpDUNES_printIterationHeader(qpData_t* qpData) {
-	if (qpData->options.printLevel >= 2) {
-		qpDUNES_printf(
-				"\n iter |     gradNorm |     stepNorm |    stepSize | LS iter | reg. NHess |    obj. Val |   #conAct |   #chgAS |  lambdaNorm");
-		qpDUNES_printf(
-				" ---- | ------------ | ------------ | ----------- | ------- | ---------- | ----------- | --------- | -------- | -----------");
-	}
-}
-/*<<< END OF qpDUNES_printIterationHeader */
-
-
-/* ----------------------------------------------
- * ...
- *
- >>>>>>                                           */
-void qpDUNES_printIteration(qpData_t* qpData, itLog_t* itLogPtr) {
-	/* TODO: correct printing! Right now gradNorm gets overwritten in line search, is not the one used for Newton's method */
-
-	if (qpData->options.printLevel >= 2) {
-		/*            iter | gradNorm| stepNorm| stepLen | LS iter |   regNH? | objVal |   nAct |  nChg | multiplierNorm  */
-		qpDUNES_printf(
-				" %4d |    %.3e |    %.3e |    %.2e |     %3d |      %5s |  % .3e |    %6d |   %6d |   %.3e ",
-				itLogPtr->itNbr, itLogPtr->gradNorm, itLogPtr->stepNorm,
-				itLogPtr->stepSize, itLogPtr->numLineSearchIter,
-				(itLogPtr->lastActSetChangeIdx >= 0) ? ( itLogPtr->isHessianRegularized ? "true" : "false" ) : "n/a",
-				itLogPtr->objVal, itLogPtr->nActConstr, itLogPtr->nChgdConstr,
-				itLogPtr->lambdaNorm);
-	}
-
-}
-/*<<< END OF qpDUNES_printIteration */
 
 /*
  *	end of file

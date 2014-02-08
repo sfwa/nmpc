@@ -233,15 +233,6 @@ uint_t qpDUNES_compareActSets(	const qpData_t* const qpData,
 							int_t *const lastActSetChangeIdx
 							);
 
-
-void qpDUNES_printIterationHeader( qpData_t* qpData );
-
-
-void qpDUNES_printIteration( 	qpData_t* qpData,
-							itLog_t* itLogPtr
-							);
-
-
 #endif	/* QP42_DUAL_QP_H */
 
 

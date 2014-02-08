@@ -221,7 +221,6 @@ return_t multiplyAInvQ(	qpData_t* const qpData,
 		/* cholH dense */
 		case QPDUNES_DENSE		:
 		case QPDUNES_SPARSE	:
-			qpDUNES_printError(qpData, __FILE__, __LINE__, "multiplyAInvQ is currently not supported for dense primal Hessians");
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 
 		/* cholH diagonal */
@@ -229,18 +228,8 @@ return_t multiplyAInvQ(	qpData_t* const qpData,
 			/* scale A part of C column-wise */
 			for( ii=0; ii<_NX_; ++ii )	{
 				for( jj=0; jj<_NX_; ++jj ) {
-					#ifdef __DEBUG__
-					if ( fabs( cholH->data[ii] ) >= qpData->options.QPDUNES_ZERO * fabs( accC(ii,jj) ) ) {
-					#endif
-						/* cholH is the actual matrix in diagonal case */
-						res->data[ii*_NX_+jj] = accC(ii,jj) / cholH->data[jj];
-					#ifdef __DEBUG__
-					}
-					else {
-						qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in multiplyAInvQ. Rank-deficient Hessian?" );
-						return QPDUNES_ERR_DIVISION_BY_ZERO;
-					}
-					#endif
+					/* cholH is the actual matrix in diagonal case */
+					res->data[ii*_NX_+jj] = accC(ii,jj) / cholH->data[jj];
 				}
 			}
 			break;
@@ -256,7 +245,6 @@ return_t multiplyAInvQ(	qpData_t* const qpData,
 			break;
 
 		default				:
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown sparsity type of first matrix argument" );
 			break;
 	}
 
@@ -280,7 +268,6 @@ return_t getInvQ(	qpData_t* const qpData,
 		/* cholM1 dense */
 		case QPDUNES_DENSE		:
 		case QPDUNES_SPARSE	:
-			qpDUNES_printError(qpData, __FILE__, __LINE__, "getInvQ not supported for dense primal Hessians.");
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 
 		/* cholM1 diagonal */
@@ -294,7 +281,6 @@ return_t getInvQ(	qpData_t* const qpData,
 			return QPDUNES_OK;
 
 		default				:
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown sparsity type of primal Hessian" );
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 	}
 }
@@ -784,7 +770,6 @@ return_t backsolveDenseL(	qpData_t* const qpData,
 				res[ii] = sum / accL(ii,ii,n);
 			}
 			else {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDenseL. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 		}
@@ -803,7 +788,6 @@ return_t backsolveDenseL(	qpData_t* const qpData,
 				res[ii] = sum / accL(ii,ii,n);
 			}
 			else {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDenseL. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 		}
@@ -831,17 +815,7 @@ return_t backsolveDiagonal(	qpData_t* const qpData,
 	/* Solve M*res = b */
 	for( ii=0; ii<n; ++ii )
 	{
-		#ifdef __DEBUG__
-		if ( fabs( accM(0,ii,n) ) >= qpData->options.QPDUNES_ZERO * fabs( b[ii] ) ) {
-		#endif
-			res[ii] = b[ii] / accM(0,ii,n);
-		#ifdef __DEBUG__
-		}
-		else {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveDiagonal. Rank-deficient Matrix?" );
-			return QPDUNES_ERR_DIVISION_BY_ZERO;
-		}
-		#endif
+		res[ii] = b[ii] / accM(0,ii,n);
 	}
 
 	return QPDUNES_OK;
@@ -886,7 +860,6 @@ return_t backsolveMatrixDenseDenseL( qpData_t* const qpData,
 					res[ii * dim1 + kk] = sums[kk] / accL(ii,ii,dim0);
 				}
 				else {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseDenseL. Rank-deficient Matrix?" );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			}
@@ -912,7 +885,6 @@ return_t backsolveMatrixDenseDenseL( qpData_t* const qpData,
 					res[ii * dim1 + kk] = sums[kk] / accL(ii,ii,dim0);
 				}
 				else {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseDenseL. Rank-deficient Matrix?" );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			}
@@ -966,7 +938,6 @@ return_t backsolveMatrixDenseDenseTL( qpData_t* const qpData,
 				#ifdef __DEBUG__
 				}
 				else {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseDenseL. Rank-deficient Matrix?" );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 				#endif
@@ -996,7 +967,6 @@ return_t backsolveMatrixDenseDenseTL( qpData_t* const qpData,
 				#ifdef __DEBUG__
 				}
 				else {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseDenseL. Rank-deficient Matrix?" );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 				#endif
@@ -1042,7 +1012,6 @@ return_t backsolveMatrixDenseIdentityL( qpData_t* const qpData,
 				res[ii * dim0 + kk] = sums[kk] / accL(ii,ii,dim0);
 			}
 			else {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseIdentityL. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 		}
@@ -1074,7 +1043,6 @@ return_t backsolveMatrixDiagonalDense( qpData_t* const qpData,
 				res[ii * dim1 + jj] = M2[ii * dim1 + jj] / M1[ii];
 			}
 			else {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDiagonalDense. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 		}
@@ -1101,18 +1069,8 @@ return_t backsolveMatrixDiagonalDenseT( qpData_t* const qpData,
 
 	for( ii=0; ii<dim; ++ii )	{
 		for( jj=0; jj<dim; ++jj ) {
-			#ifdef __DEBUG__
-			if ( fabs( L[ii] ) >= qpData->options.QPDUNES_ZERO * fabs( accM(ii,jj,dim) ) ) {
-			#endif
-				/* L is the actual matrix in diagonal case */
-				res[ii * dim + jj] = accMT(ii,jj,dim) / L[ii];
-			#ifdef __DEBUG__
-			}
-			else {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDiagonalDenseT. Rank-deficient Matrix?" );
-				return QPDUNES_ERR_DIVISION_BY_ZERO;
-			}
-			#endif
+			/* L is the actual matrix in diagonal case */
+			res[ii * dim + jj] = accMT(ii,jj,dim) / L[ii];
 		}
 	}
 
@@ -1142,7 +1100,6 @@ return_t backsolveMatrixDiagonalDiagonal( qpData_t* const qpData,
 			res[ii] = M2[ii] / M1[ii];
 		}
 		else {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDiagonalDiagonal. Rank-deficient Matrix?" );
 			return QPDUNES_ERR_DIVISION_BY_ZERO;
 		}
 	}
@@ -1172,7 +1129,6 @@ return_t backsolveMatrixDiagonalIdentity( qpData_t* const qpData,
 			res[ii] = 1. / M1[ii];
 		}
 		else {
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDiagonalIdentity. Rank-deficient Matrix?" );
 			return QPDUNES_ERR_DIVISION_BY_ZERO;
 		}
 	}
@@ -1219,7 +1175,6 @@ return_t backsolveMatrixTDenseDenseL( qpData_t* const qpData,
 					res[ii * dim0 + kk] = sums[kk] / accL(ii,ii,dim1);
 				}
 				else {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixTDenseDenseL. Rank-deficient Matrix?" );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			}
@@ -1245,7 +1200,6 @@ return_t backsolveMatrixTDenseDenseL( qpData_t* const qpData,
 					res[ii * dim0 + kk] = sums[kk] / accL(ii,ii,dim1);
 				}
 				else {
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixTDenseDenseL. Rank-deficient Matrix?" );
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			}
@@ -1278,7 +1232,6 @@ return_t backsolveMatrixTDiagonalDense( qpData_t* const qpData,
 				res[ii * dim0 + jj] = M2[jj * dim1 + ii] / M1[ii];
 			}
 			else {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixTDiagonalDenseL. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 		}
@@ -1313,7 +1266,6 @@ return_t backsolveRT_ZTET(qpData_t* const qpData, zx_matrix_t* const res,
 		for (kk = 0; kk < dim1SkipIdx; ++kk) {
 #if defined(__USE_ASSERTS__)
 			if ( fabs( accL(ii,ii,dim0) ) < qpData->options.QPDUNES_ZERO * fabs( sums[kk] ) ) {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseDenseL. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 #endif
@@ -1352,7 +1304,6 @@ return_t backsolveRT_ZTCT(qpData_t* const qpData, zx_matrix_t* const res,
 		for (kk = 0; kk < dim2; ++kk) {
 #if defined(__USE_ASSERTS__)
 			if ( fabs( accL(ii,ii,dim0) ) < qpData->options.QPDUNES_ZERO * fabs( sums[kk] ) ) {
-				qpDUNES_printError( qpData, __FILE__, __LINE__, "Division by 0 in backsolveMatrixDenseDenseL. Rank-deficient Matrix?" );
 				return QPDUNES_ERR_DIVISION_BY_ZERO;
 			}
 #endif
@@ -1637,7 +1588,6 @@ return_t multiplyInvMatrixVector(	qpData_t* const qpData,
 			return statusFlag;
 
 		case QPDUNES_SPARSE	:
-			qpDUNES_printWarning( qpData, __FILE__, __LINE__, "Sparse inverse matrix-vector product not implemented. Using dense multiplication instead." );
 			/* first backsolve: L*y = z */
 			statusFlag = backsolveDenseL( qpData, res->data, cholH->data, x->data, QPDUNES_FALSE, dim0 );
 			/* second backsolve: L^T*res = y */
@@ -1690,7 +1640,6 @@ return_t multiplyInvBlockDiagMatrixVector(	qpData_t* const qpData,
 			break;
 
 		case QPDUNES_SPARSE	:
-			qpDUNES_printWarning( qpData, __FILE__, __LINE__, "Sparse inverse matrix-vector product not implemented. Using dense multiplication instead." );
 			/* first backsolve: L*y = z */
 			statusFlag = backsolveDenseL( qpData, res->data, cholM1->data, x->data, QPDUNES_FALSE, dimM1 );
 			/* second backsolve: L^T*res = y */
@@ -1726,7 +1675,6 @@ return_t multiplyInvBlockDiagMatrixVector(	qpData_t* const qpData,
 			break;
 
 		case QPDUNES_SPARSE	:
-			qpDUNES_printWarning( qpData, __FILE__, __LINE__, "Sparse inverse matrix-vector product not implemented. Using dense multiplication instead." );
 			/* first backsolve: L*y = z */
 			statusFlag = backsolveDenseL( qpData, &(res->data[dimM1]), cholM2->data, &(x->data[dimM1]), QPDUNES_FALSE, dimM2 );
 			/* second backsolve: L^T*res = y */
@@ -1798,7 +1746,6 @@ return_t multiplyInvMatrixMatrixT(	qpData_t* const qpData,
 					return statusFlag;
 
 				default				:
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown sparsity type of second matrix argument" );
 					return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 			}
 
@@ -1821,7 +1768,6 @@ return_t multiplyInvMatrixMatrixT(	qpData_t* const qpData,
 					return backsolveMatrixDiagonalIdentity( qpData, res->data, cholM1->data, dim0 );
 
 				default				:
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown sparsity type of second matrix argument" );
 					return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 			}
 
@@ -1841,12 +1787,10 @@ return_t multiplyInvMatrixMatrixT(	qpData_t* const qpData,
 					return QPDUNES_OK;
 
 				default				:
-					qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown sparsity type of second matrix argument" );
 					return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 			}
 
 		default				:
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Unknown sparsity type of first matrix argument" );
 			return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
 	}
 }
@@ -2242,7 +2186,6 @@ return_t denseCholeskyFactorization(	qpData_t* const qpData,
 		}
 		else {
 			/* matrix not positive definite */
-			qpDUNES_printError( qpData, __FILE__, __LINE__, "Matrix not positive definite. Cholesky factorization could not be performed." );
 			return QPDUNES_ERR_DIVISION_BY_ZERO;
 		}
 

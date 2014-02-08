@@ -1,20 +1,70 @@
-The MIT License (MIT)
+Except where otherwise indicated, all code is distributed under the MIT
+license:
 
-Copyright (c) 2013 sfwa
+    Copyright (c) 2013 Daniel Dyer
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+
+The C++ version of this library (in src/ and include/) statically links
+against:
+
+* Eigen 3 (from https://bitbucket.org/eigen/eigen) -- only MPL2 and
+  BSD-licensed code is used:
+
+    http://www.mozilla.org/MPL/2.0/
+
+* qpDUNES (from https://github.com/sfwa/qpDUNES, originally from
+  https://github.com/jfrasch/qpDUNES):
+
+    qpDUNES -- A DUal NEwton Strategy for convex quadratic programming.
+
+    Copyright (C) 2012 by Janick Frasch, Hans Joachim Ferreau et al.
+    All rights reserved.
+
+    qpDUNES is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+    qpDUNES is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See the GNU Lesser General Public License for more details.
+    You should have received a copy of the GNU Lesser General Public
+    License along with qpDUNES; if not, write to the Free Software
+    Foundation, Inc.,
+    51 Franklin Street, Fifth Floor,
+    Boston, MA  02110-1301
+    USA
+
+
+The C66x version of this library (in ccs-c66x/) statically links against a
+modified version of qpDUNES, available from:
+
+    https://github.com/sfwa/nmpc/ccs-c66x/qpDUNES
+
+
+Thus, closed-source binaries linking to either version of this code can be
+distributed freely, provided the binaries are available in a format that
+allows at least the qpDUNES component of the code to be modified and
+re-linked. See https://www.gnu.org/licenses/gpl-faq.html#LGPLStaticVsDynamic
+for further details.
+
+No licensing restrictions are imposed on projects linking against this
+library.

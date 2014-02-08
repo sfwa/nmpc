@@ -35,7 +35,6 @@
 
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
 #include "types.h"
 #include "matrix_vector.h"
@@ -132,10 +131,6 @@ return_t qpDUNES_shiftLambda(	qpData_t* const qpData
 
 qpOptions_t qpDUNES_setupDefaultOptions(	/*qpData_t* const qpData*/
 										);
-
-return_t qpDUNES_setupLog(	qpData_t* const qpData
-						);
-
 
 #endif	/* QP42_SETUP_QP_H */
 
