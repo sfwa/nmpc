@@ -24,8 +24,8 @@ SOFTWARE.
 #define CONFIG_H_
 
 /* Uncomment one of the following to select the float-point precision */
-/* #define NMPC_SINGLE_PRECISION */
-#define NMPC_DOUBLE_PRECISION
+#define NMPC_SINGLE_PRECISION
+/* #define NMPC_DOUBLE_PRECISION */
 
 /*
 Choose the integration method here:
@@ -52,5 +52,11 @@ Definitions for parameters used to calculated MRP vectors.
 #define NMPC_MRP_A_2 (NMPC_MRP_A*NMPC_MRP_A)
 #define NMPC_MRP_F ((real_t)2.0*(NMPC_MRP_A + 1))
 #define NMPC_MRP_F_2 (NMPC_MRP_F*NMPC_MRP_F)
+
+/* OCP control and prediction horizon (number of steps). */
+#define OCP_HORIZON_LENGTH 100
+
+/* OCP control step length (seconds). */
+#define OCP_STEP_LENGTH ((real_t)(1.0/50.0))
 
 #endif

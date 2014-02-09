@@ -26,11 +26,9 @@ SOFTWARE.
 #include <stdint.h>
 #include "config.h"
 
-#ifdef NMPC_SINGLE_PRECISION
+#if defined(NMPC_SINGLE_PRECISION) && !defined(__USE_SINGLE_PRECISION__)
 typedef float real_t;
-#endif
-
-#ifdef NMPC_DOUBLE_PRECISION
+#elif defined(NMPC_DOUBLE_PRECISION) && !defined(__USE_SINGLE_PRECISION__)
 typedef double real_t;
 #endif
 
@@ -45,10 +43,16 @@ struct nmpc_state_t {
     real_t angular_velocity[3];
 };
 
-void nmpc_init();
-void nmpc_preparation_step();
+enum nmpc_result_t {
+    NMPC_OK,
+    NMPC_INFEASIBLE,
+    NMPC_ERROR
+};
+
+void nmpc_init(void);
+void nmpc_preparation_step(void);
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]);
-void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
+enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]);
 
 /* Functions for setting weights and bounds for the OCP solver. */
@@ -57,7 +61,8 @@ void nmpc_set_control_weights(real_t coeffs[NMPC_CONTROL_DIM]);
 void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]);
 void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
 void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]);
-void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM], uint32_t i);
+void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM],
+uint32_t i);
 
 /* Function to set the wind estimate for the dynamics model. */
 void nmpc_set_wind_velocity(real_t x, real_t y, real_t z);
@@ -72,12 +77,12 @@ void nmpc_fixedwingdynamics_set_attitude(
 void nmpc_fixedwingdynamics_set_angular_velocity(
     real_t x, real_t y, real_t z);
 
-/* Functions for getting the state vector and covariance. */
+/* Functions for getting the state vector. */
 void nmpc_fixedwingdynamics_set_state(struct nmpc_state_t *in);
 void nmpc_fixedwingdynamics_get_state(struct nmpc_state_t *in);
 
-void nmpc_fixedwingdynamics_integrate(
-    float dt, real_t control_vector[NMPC_CONTROL_DIM]);
+void nmpc_fixedwingdynamics_integrate(float dt,
+real_t control_vector[NMPC_CONTROL_DIM]);
 
 /*
 Functions to access the compiled configuration

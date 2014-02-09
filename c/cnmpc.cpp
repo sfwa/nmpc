@@ -57,9 +57,10 @@ void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]) {
     ocp.feedback_step(m);
 }
 
-void nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
+enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     Eigen::Map<ControlVector> control_map(controls);
     control_map = ocp.get_controls();
+    return NMPC_OK;
 }
 
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
