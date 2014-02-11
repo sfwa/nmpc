@@ -229,7 +229,7 @@ void OptimalControlProblem::initialise_qp() {
         P, g, zLow, zUpp, 0, 0, 0);
     AssertOK(status_flag);
 
-    qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_TRUE);
+    qpDUNES_setupAllLocalQPs(&qp_data, QPDUNES_FALSE);
 
     qpDUNES_indicateDataChange(&qp_data);
 }
