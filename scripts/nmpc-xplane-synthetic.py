@@ -270,7 +270,7 @@ update = "set sim/operation/override/override_planepath [0,0,0,0,0,0,0,0,0,0,0,0
 
 sock.setblocking(0)
 
-for i in xrange(10000):
+for i in xrange(1451):
     start_iteration = datetime.datetime.now()
 
     nmpc.prepare()
@@ -356,7 +356,7 @@ for i in xrange(10000):
 
     # Add one to the index because of the terminal point.
     horizon_point = [a for a in interpolate_reference(
-        (i+1+mpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
+        (i+1+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
     nmpc.update_horizon(horizon_point[1:])
 
