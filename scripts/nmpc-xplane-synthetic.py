@@ -273,9 +273,6 @@ sock.setblocking(0)
 for i in xrange(10000):
     start_iteration = datetime.datetime.now()
 
-    horizon_point = [a for a in interpolate_reference(
-        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
-
     nmpc.prepare()
 
     # Get latest "measured" data.
@@ -357,8 +354,9 @@ for i in xrange(10000):
     update += "set sim/flightmodel/controls/wing1l_ail1def %.6f\n" % math.degrees(control_vec[1])
     update += "set sim/flightmodel/controls/wing1r_ail1def %.6f\n" % math.degrees(control_vec[2])
 
+    # Add one to the index because of the terminal point.
     horizon_point = [a for a in interpolate_reference(
-        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
+        (i+1+mpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
     nmpc.update_horizon(horizon_point[1:])
 
