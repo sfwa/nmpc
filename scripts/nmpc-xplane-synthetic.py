@@ -94,7 +94,7 @@ nmpc.initialise_horizon()
 
 xplane_reference_points = []
 
-attitude = euler_to_q(0, math.radians(3), 0)
+attitude = euler_to_q(0, 0, 0)
 out = [
     0.0,  # t
     0.0, 0.0, 0.0,  # N, E, D
@@ -106,7 +106,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(0, math.radians(3), 0)
+attitude = euler_to_q(0, 0, 0)
 out = [
     29.0,  # t
     580.0, 0.0, 0.0,  # N, E, D
@@ -118,7 +118,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(math.radians(90), math.radians(3), 0)
+attitude = euler_to_q(math.radians(90), 0, 0)
 out = [
     31.0,  # t
     600.0, 20.0, 0.0,  # N, E, D
@@ -130,7 +130,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(math.radians(90), math.radians(3), 0)
+attitude = euler_to_q(math.radians(90), 0, 0)
 out = [
     60.0,  # t
     600.0, 600.0, 0.0,  # N, E, D
@@ -270,7 +270,7 @@ update = "set sim/operation/override/override_planepath [0,0,0,0,0,0,0,0,0,0,0,0
 
 sock.setblocking(0)
 
-for i in xrange(1451):
+for i in xrange(10000):
     start_iteration = datetime.datetime.now()
 
     nmpc.prepare()
