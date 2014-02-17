@@ -158,6 +158,14 @@ void OptimalControlProblem::solve_ivps(uint32_t i) {
             state_to_delta(integrated_state_horizon[i], new_state) /
             perturbation;
     }
+
+    /*
+    Calculate integration residuals; these are needed for the continuity
+    constraints.
+    */
+    integration_residuals[i] = state_to_delta(
+        state_reference[i+1],
+        integrated_state_horizon[i]);
 }
 
 /*
@@ -238,7 +246,26 @@ void OptimalControlProblem::initialise_qp() {
 Updates the QP with the latest linearisations.
 */
 void OptimalControlProblem::update_qp() {
+    uint32_t i;
 
+    for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
+        solve_ivps(i);
+
+        real_t c[NMPC_DELTA_DIM];
+        Eigen::Map<DeltaVector> c_map(c);
+
+        return_t status_flag;
+
+        /* Continuity constraint constant term fixed to zero. */
+        c_map = integration_residuals[i];
+
+        status_flag = qpDUNES_updateIntervalData(
+            &qp_data, qp_data.intervals[i],
+            0, 0, 0, c, 0, 0, 0, 0, 0, 0);
+        AssertOK(status_flag);
+
+        qpDUNES_indicateDataChange(&qp_data);
+    }
 }
 
 /*
