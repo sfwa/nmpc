@@ -246,26 +246,7 @@ void OptimalControlProblem::initialise_qp() {
 Updates the QP with the latest linearisations.
 */
 void OptimalControlProblem::update_qp() {
-    uint32_t i;
 
-    for(i = 0; i < OCP_HORIZON_LENGTH-1; i++) {
-        solve_ivps(i);
-
-        real_t c[NMPC_DELTA_DIM];
-        Eigen::Map<DeltaVector> c_map(c);
-
-        return_t status_flag;
-
-        /* Continuity constraint constant term fixed to zero. */
-        c_map = integration_residuals[i];
-
-        status_flag = qpDUNES_updateIntervalData(
-            &qp_data, qp_data.intervals[i],
-            0, 0, 0, c, 0, 0, 0, 0, 0, 0);
-        AssertOK(status_flag);
-
-        qpDUNES_indicateDataChange(&qp_data);
-    }
 }
 
 /*
@@ -358,7 +339,7 @@ trajectory.
 */
 void OptimalControlProblem::update_horizon(ReferenceVector new_reference) {
     memmove(state_reference, &state_reference[1],
-            sizeof(StateVector) * (OCP_HORIZON_LENGTH - 1));
+            sizeof(StateVector) * OCP_HORIZON_LENGTH);
     memmove(control_reference, &control_reference[1],
             sizeof(ControlVector) * (OCP_HORIZON_LENGTH - 1));
 
@@ -366,18 +347,18 @@ void OptimalControlProblem::update_horizon(ReferenceVector new_reference) {
     qpDUNES_shiftLambda(&qp_data);
     qpDUNES_shiftIntervals(&qp_data);
 
-    set_reference_point(new_reference, OCP_HORIZON_LENGTH - 1);
+    set_reference_point(new_reference, OCP_HORIZON_LENGTH);
 }
 
 void OptimalControlProblem::set_reference_point(const ReferenceVector &in,
 uint32_t i) {
     state_reference[i] = in.segment<NMPC_STATE_DIM>(0);
 
-    if(i < OCP_HORIZON_LENGTH) {
-        control_reference[i] =
+    if(i > 0 && i <= OCP_HORIZON_LENGTH) {
+        control_reference[i-1] =
             in.segment<NMPC_CONTROL_DIM>(NMPC_STATE_DIM);
 
-        solve_ivps(i);
+        solve_ivps(i-1);
 
         real_t g[NMPC_GRADIENT_DIM];
         Eigen::Map<GradientVector> g_map(g);
@@ -399,18 +380,18 @@ uint32_t i) {
         g_map = GradientVector::Zero();
 
         /* Continuity constraint constant term fixed to zero. */
-        c_map = DeltaVector::Zero();
+        c_map = integration_residuals[i-1];
 
         /* Copy the relevant data into the qpDUNES arrays. */
-        C_map = jacobians[i];
+        C_map = jacobians[i-1];
         zLow_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            lower_control_bound - control_reference[i];
+            lower_control_bound - control_reference[i-1];
         zUpp_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM) =
-            upper_control_bound - control_reference[i];
+            upper_control_bound - control_reference[i-1];
 
         status_flag = qpDUNES_updateIntervalData(
-            &qp_data, qp_data.intervals[i],
-            0, g, C, 0, zLow, zUpp, 0, 0, 0, 0);
+            &qp_data, qp_data.intervals[i-1],
+            0, g, C, c, zLow, zUpp, 0, 0, 0, 0);
         AssertOK(status_flag);
 
         qpDUNES_indicateDataChange(&qp_data);
