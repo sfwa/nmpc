@@ -64,7 +64,7 @@ const State &in, const ControlVector &control) const {
     a2 = alpha * alpha;
 
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
-    lift = -5 * a2 * alpha + a2 + 2.0 * alpha + 0.3;
+    lift = -5 * a2 * alpha + a2 + 2.0 * alpha + 0.0;
     if (alpha < -0.25) {
         lift = std::min(lift, (real_t)0.8 * sin_cos_alpha);
     } else {
