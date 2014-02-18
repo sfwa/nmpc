@@ -85,11 +85,11 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e1, 1e1, 1e1, 1e0, 1e0, 1e0, 1e1, 1e1, 1e1, 7e2, 7e1, 1e1],
-    control_weights=[1e-6, 3e4, 3e4],
+    state_weights=[1e0, 1e0, 1e1, 1e1, 1e1, 1e1, 1e1, 1e1, 1e2, 7e0, 7e0, 1e2],
+    control_weights=[1e-6, 1e4, 1e4],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    upper_control_bound=[MAX_THROTTLE, 0.25, 0.25],
-    lower_control_bound=[0, -0.25, -0.25])
+    upper_control_bound=[MAX_THROTTLE, 0.5, 0.5],
+    lower_control_bound=[0, -0.5, -0.5])
 nmpc.initialise_horizon()
 
 xplane_reference_points = []

@@ -79,7 +79,7 @@ const State &in, const ControlVector &control) const {
     roll_moment = 0.03 * sin_beta - 0.015 * roll_rate +
                   0.1 * control[1] - 0.1 * control[2];
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
-                 0.04 * std::abs(control[1]) + 0.04 * std::abs(control[2]);
+                 0.01 * std::abs(control[1]) + 0.01 * std::abs(control[2]);
 
     /*
     Determine motor thrust and torque.
