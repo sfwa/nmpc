@@ -85,7 +85,7 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e0, 1e0, 1e1, 1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 7e0, 7e-1, 1e0],
+    state_weights=[1e-1, 1e-1, 1e1, 1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 7e0, 7e-1, 1e-2],
     control_weights=[1e-7, 1e-3, 1e-3],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[MAX_THROTTLE, 0.8, 0.8],
