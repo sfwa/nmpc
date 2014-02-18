@@ -85,7 +85,7 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e-1, 1e-1, 1e1, 1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 7e0, 7e-1, 1e-2],
+    state_weights=[1e0, 1e0, 1e1, 1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 7e0, 7e-1, 1e0],
     control_weights=[1e-7, 1e-3, 1e-3],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     upper_control_bound=[MAX_THROTTLE, 0.8, 0.8],
@@ -190,16 +190,11 @@ except socket.error:
     pass
 
 # Set up the NMPC reference trajectory using correct interpolation.
-for i in xrange(0, nmpc.HORIZON_LENGTH):
+for i in xrange(0, nmpc.HORIZON_LENGTH+1):
     horizon_point = [a for a in interpolate_reference(
         i*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
     nmpc.set_reference(horizon_point[1:], i)
-
-# Set up terminal reference. No need for control values as they'd be ignored.
-terminal_point = [a for a in interpolate_reference(
-    nmpc.HORIZON_LENGTH*nmpc.STEP_LENGTH, xplane_reference_points)]
-nmpc.set_reference(terminal_point[1:], nmpc.HORIZON_LENGTH)
 
 # Set up initial attitude, velocity and angular velocity.
 initial_point = interpolate_reference(0, xplane_reference_points)
