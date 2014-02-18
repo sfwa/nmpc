@@ -28,22 +28,6 @@ sock.sendall("sub sim/flightmodel/position/local_y\n")
 sock.sendall("sub sim/flightmodel/position/local_z\n")
 sock.sendall("extplane-set update_interval 0.02\n")
 
-nmpc.configure_airframe(
-    mass=3.8,
-    inertia_tensor=[
-        2.59e-1, 0, -0.334e-1,
-        0, 1.47e-1, 0,
-        -0.334e-1, 0, 4.05e-1],
-    prop_coeffs=[0.025, 0.00250],
-    drag_coeffs=[0.0, 0.0, 0.2, 0.0, 0.05],
-    lift_coeffs=[-3.7, -5.4, 1.3, 1.7, 0.05],
-    side_coeffs=[
-        0, 2.35e-01, -1.87e-03, 4.53e-04,
-        0.0, 1.1e-02, -1.1e-02, 0.0],
-    pitch_moment_coeffs=[-0.01, -0.0018, 0.0, -0.001, -0.001, 0.0],
-    roll_moment_coeffs=[-0.002, 0.0, -0.003, 0.003, 0.0],
-    yaw_moment_coeffs=[0, -0.005, 0.0, 0.0, 0.0, 0.0])
-
 sock.recv(1024)
 sock.sendall("world-set -37.8136 144.9 200\n")
 position_offset = [0, 0, 0]
@@ -62,30 +46,25 @@ print position_offset
 TIMESTEP = 1.0/500.0  # 50Hz updates.
 _cnmpc.nmpc_fixedwingdynamics_set_position(0, 0, 0)
 _cnmpc.nmpc_fixedwingdynamics_set_velocity(20, 0, 0)
-_cnmpc.nmpc_fixedwingdynamics_set_acceleration(0, 0, 0)
 _cnmpc.nmpc_fixedwingdynamics_set_attitude(1, 0, 0, 0)
 _cnmpc.nmpc_fixedwingdynamics_set_angular_velocity(0, 0, 0)
-_cnmpc.nmpc_fixedwingdynamics_set_angular_acceleration(0, 0, 0)
-_cnmpc.nmpc_fixedwingdynamics_set_wind_velocity(0, 0, 0)
 _cnmpc.nmpc_fixedwingdynamics_get_state(state)
 
-control_vec = [0, 0, 0, 0]
+control_vec = [0, 0, 0]
 
 while 1:
-
     keys = pygame.event.get()
     axes = [joystick.get_axis(i) for i in range(joystick.get_numaxes())]
-    axes[0] = -2.0*(axes[0]+0.239)
-    axes[1] = -2.0*(axes[1]+0.239)
+    axes[0] = -0.5*(axes[0]+0.239)
+    axes[1] = -0.5*(axes[1]+0.239)
     control_vec = [
         (-(axes[3] - 0.35) * 0.8) * 19000,
         axes[1] - axes[0],
-        axes[1] + axes[0],
-        0]
+        axes[1] + axes[0]]
 
-    #control_vec = [0, 0, 0, 0]
+    # print control_vec
 
-    nmpc.integrate(TIMESTEP, (ctypes.c_double * 4)(*control_vec))
+    nmpc.integrate(TIMESTEP, (ctypes.c_double * 3)(*control_vec))
 
     update = ""
     update += "set sim/flightmodel/position/local_x %.9f\n" \
