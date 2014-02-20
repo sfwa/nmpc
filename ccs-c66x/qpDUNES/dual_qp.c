@@ -363,7 +363,6 @@ return_t qpDUNES_solveAllLocalQPs(	qpData_t* const qpData,
 	/* 2) solve local QPs */
 	/* TODO: check what happens in case of errors (return)*/
 	/* Note: const variables are predetermined shared (at least on apple)*/
-	#pragma omp parallel for private(kk) shared(statusFlag) schedule(static) /*shared(qpData)*/  /* TODO: manage threads outside!*/
 		for (kk = 0; kk < _NI_ + 1; ++kk) {
 			statusFlag = qpDUNES_solveLocalQP(qpData, qpData->intervals[kk]);
 			if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
@@ -1217,8 +1216,7 @@ return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 		break;
 
 	case QPDUNES_LS_GOLDEN_SECTION_LS:
-		/* TODO: add zi and dz at some point after finishing line search!!! */
-		statusFlag = qpDUNES_goldenSectionIntervalSearch(qpData, alpha, itCntr, lambda, deltaLambdaFS, lambdaTry, nV, alphaMin, alphaMax);
+		assert(0);
 		break;
 
 	case QPDUNES_LS_GRADIENT_BISECTION_LS:
@@ -1335,171 +1333,6 @@ return_t qpDUNES_backTrackingLineSearch(	qpData_t* const qpData,
 	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
 }
 /*<<< END OF qpDUNES_backTrackingLineSearch */
-
-
-/* ----------------------------------------------
- * ...
- *
- >>>>>>                                           */
-return_t qpDUNES_reductionLineSearchWithASChange(	qpData_t* const qpData,
-													real_t* const alpha,
-													uint_t* const itCntr,
-													xn_vector_t* const lambda,
-													const xn_vector_t* const deltaLambdaFS,
-													xn_vector_t* const lambdaTry,
-													int_t nV, real_t alphaMin, real_t alphaMax,
-													real_t const objValIncumbent)
-{
-	real_t minimumProgress;
-	real_t objVal;
-
-	int_t nChgdConstr;
-
-	assert(1 == 0);
-	printf("qpDUNES_reductionLineSearchWithASChange not fixed yet!");
-
-	minimumProgress = qpData->options.lineSearchMinRelProgress
-			* fabs(objValIncumbent) + qpData->options.lineSearchMinAbsProgress;
-
-	/** perform bisection */
-	/* We know that objVal(alphaMax) < objValIncumbent, and objVal(alphaMin) > objValIncumbent
-	 * We also know that alphaMax induces AS changes, while alphaMin does not induce AS changes
-	 */
-	for ( /*continuous itCntr*/;
-			(*itCntr) < qpData->options.maxNumLineSearchRefinementIterations;
-			++(*itCntr)) {
-		*alpha = 0.5 * (alphaMin + alphaMax);
-		addVectorScaledVector(lambdaTry, lambda, *alpha, deltaLambdaFS, nV);
-		qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-		objVal = qpDUNES_computeObjectiveValue(qpData);
-
-		if (objVal < objValIncumbent + minimumProgress) { /* no progress */
-			alphaMax = (*alpha);
-		} else { /* we make progress at current candidate */
-			assert(1 == 0);
-			if (nChgdConstr <= 0) { /* no active set changes */
-				alphaMin = (*alpha);
-			} else { /* both progress and AS changes */
-				return QPDUNES_OK;
-			}
-		}
-	}
-
-	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
-}
-/*<<< END OF qpDUNES_backTrackingLineSearch */
-
-
-/* ----------------------------------------------
- * golden section interval reduction search on interval ]alphaMin,alphaMax[
- * WARNING: currently no direct check for full steps implemented
- *
- >>>>>>                                           */
-return_t qpDUNES_goldenSectionIntervalSearch(	qpData_t* const qpData,
-											real_t* const alpha,
-											uint_t* const itCntr,
-											xn_vector_t* const lambda,
-											const xn_vector_t* const deltaLambdaFS,
-											xn_vector_t* const lambdaTry,
-											int_t nV,
-											real_t alphaMin,
-											real_t alphaMax	)
-{
-	real_t objValLL, objValL, objValR, objValRR;
-	real_t aLL, aL, aR, aRR;
-	real_t alphaCheckedLast;
-
-	real_t goldSec = 0.6180339887; /**< golden section ratio for interval line search (sqrt(5)-1)/2 */
-
-	assert(1 == 0);
-	printf("qpDUNES_goldenSectionIntervalSearch not fixed yet!");
-
-	aLL = alphaMin;
-	addVectorScaledVector(lambdaTry, lambda, aLL, deltaLambdaFS, nV);
-	qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-	objValLL = qpDUNES_computeObjectiveValue(qpData);
-
-	aRR = alphaMax;
-	addVectorScaledVector(lambdaTry, lambda, aRR, deltaLambdaFS, nV);
-	qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-	objValRR = qpDUNES_computeObjectiveValue(qpData);
-
-	/** (1) ensure that L, R have bigger objective Values than LL and RR, respectively */
-	for ( /*continuous itCntr*/; (*itCntr) < qpData->options.maxNumLineSearchRefinementIterations; ++(*itCntr)) {
-		aL = aRR - goldSec * (aRR);
-		addVectorScaledVector(lambdaTry, lambda, aL, deltaLambdaFS, nV);
-		qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-		objValL = qpDUNES_computeObjectiveValue(qpData);
-
-		if (objValLL > objValL) { /* minimum has to lie on left-most interval */
-			aRR = aL;
-			objValRR = objValL;
-			continue;
-		} else {
-			break;
-		}
-	}
-	for ( /*continuous itCntr*/; (*itCntr) < qpData->options.maxNumLineSearchRefinementIterations; ++(*itCntr)) {
-		aR = aLL + goldSec * (aRR - aLL);
-		addVectorScaledVector(lambdaTry, lambda, aR, deltaLambdaFS, nV);
-		qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-		objValR = qpDUNES_computeObjectiveValue(qpData);
-
-		if (objValRR > objValR) { /* minimum has to lie on right-most interval */
-			aLL = aR;
-			objValLL = objValR;
-			continue;
-		} else {
-			break;
-		}
-	}
-	alphaCheckedLast = aR;
-
-	/** (2) regular golden section interval search */
-	for ( /*continuous itCntr*/; (*itCntr) < qpData->options.maxNumLineSearchRefinementIterations; ++(*itCntr)) {
-		/* check for stationarity */
-		if ( (2 * objValL - objValR - objValLL <= 2 * qpData->options.lineSearchStationarityTolerance)
-			 || (2 * objValR - objValL - objValRR <= 2 * qpData->options.lineSearchStationarityTolerance))
-		{
-			/* use last computed a in case of stationarity for consistent lambda and alpha.
-			 * This can lead to a slightly worse IS performance than always taking the minimum,
-			 * but is easier to handle in terms of memory management, etc.
-			 */
-			*alpha = alphaCheckedLast;
-			return QPDUNES_OK;
-		}
-
-		/* remove one interval */
-		if (objValL >= objValR) { /* throw out right interval */
-			aRR = aR;
-			aR = aL;
-			objValRR = objValR;
-			objValR = objValL;
-
-			aL = aRR - goldSec * (aRR - aLL);
-			addVectorScaledVector(lambdaTry, lambda, aL, deltaLambdaFS, nV);
-			qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-			alphaCheckedLast = aL;
-			objValL = qpDUNES_computeObjectiveValue(qpData);
-		} else { /* throw out left interval */
-			aLL = aL;
-			aL = aR;
-			objValLL = objValL;
-			objValL = objValR;
-
-			aR = aLL + goldSec * (aRR - aLL);
-			addVectorScaledVector(lambdaTry, lambda, aR, deltaLambdaFS, nV);
-			qpDUNES_solveAllLocalQPs(qpData, lambdaTry);
-			alphaCheckedLast = aR;
-			objValR = qpDUNES_computeObjectiveValue(qpData);
-		}
-	}
-
-	*alpha = alphaCheckedLast;
-	return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
-}
-/*<<< END OF qpDUNES_goldenSectionIntervalSearch */
-
 
 /* ----------------------------------------------
  * ...

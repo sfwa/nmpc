@@ -319,8 +319,6 @@ return_t addCInvHCT(	qpData_t* const qpData,
 	/* TODO: summarize to one function */
 	return addMultiplyMatrixInvMatrixMatrixT(qpData, res, cholH, C, y->data,
 			zxMatTmp, &(qpData->xVecTmp), _NX_, _NZ_);
-
-	return QPDUNES_OK;
 }
 /*<<< END OF addCInvHC */
 

@@ -239,30 +239,6 @@ const real_t *restrict q, const real_t *restrict v) {
     res[Z] = rz;
 }
 
-static inline void vector3_add(real_t *restrict res, const real_t v1[3],
-const real_t v2[3]) {
-    assert(res && v1 && v2 && res != v1 && res != v2);
-    _nassert((size_t)res % 4 == 0);
-    _nassert((size_t)v1 % 4 == 0);
-    _nassert((size_t)v2 % 4 == 0);
-
-    res[X] = v1[X] + v2[X];
-    res[Y] = v1[Y] + v2[Y];
-    res[Z] = v1[Z] + v2[Z];
-}
-
-static inline void vector3_subtract(real_t *restrict res, const real_t v1[3],
-const real_t v2[3]) {
-    assert(res && v1 && v2 && res != v1 && res != v2);
-    _nassert((size_t)res % 4 == 0);
-    _nassert((size_t)v1 % 4 == 0);
-    _nassert((size_t)v2 % 4 == 0);
-
-    res[X] = v1[X] - v2[X];
-    res[Y] = v1[Y] - v2[Y];
-    res[Z] = v1[Z] - v2[Z];
-}
-
 static inline void state_scale_add(
 real_t *restrict res, const real_t *restrict s1, const real_t a,
 const real_t *restrict s2) {
@@ -368,12 +344,11 @@ const real_t *restrict control) {
     Change in attitude (XYZW): delta_att = 0.5 * (omega_v.conj() * att)
     */
     a[W] = -a[W];
-    real_t omega_q_conj[4] = {
-        -state[10 + X],
-        -state[10 + Y],
-        -state[10 + Z],
-        0
-    };
+    real_t omega_q_conj[4];
+    omega_q_conj[X] = -state[10 + X];
+    omega_q_conj[Y] = -state[10 + Y];
+    omega_q_conj[Z] = -state[10 + Z];
+    omega_q_conj[W] = 0.0;
     quaternion_multiply(&out[6], omega_q_conj, a);
     out[6 + X] *= 0.5;
     out[6 + Y] *= 0.5;
@@ -494,7 +469,7 @@ const real_t *restrict state, const real_t *restrict control) {
     sin_beta = airflow[Y] * v_inv;
     cos_beta = vertical_v * v_inv;
 
-    alpha = (float)atan2(-airflow[Z], -airflow[X]);
+    alpha = fatan2(-airflow[Z], -airflow[X]);
     a2 = alpha * alpha;
 
     sin_alpha = -airflow[Z] * vertical_v_inv;

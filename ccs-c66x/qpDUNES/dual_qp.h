@@ -147,29 +147,6 @@ return_t qpDUNES_backTrackingLineSearch(	qpData_t* const qpData,
 										real_t const objValIncumbent
 										);
 
-return_t qpDUNES_reductionLineSearchWithASChange(	qpData_t* const qpData,
-													real_t* const alpha,
-													uint_t* const itCntr,
-													xn_vector_t* const lambda,
-													const xn_vector_t* const deltaLambdaFS,
-													xn_vector_t* const lambdaTry,
-													int_t nV,
-													real_t alphaMin,
-													real_t alphaMax,
-													real_t const objValIncumbent
-													);
-
-return_t qpDUNES_goldenSectionIntervalSearch(	qpData_t* const qpData,
-											real_t* const alpha,
-											uint_t* const itCntr,
-											xn_vector_t* const lambda,
-											const xn_vector_t* const deltaLambdaFS,
-											xn_vector_t* const lambdaTry,
-											int_t nV,
-											real_t alphaMin,
-											real_t alphaMax
-											);
-
 return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 										real_t* const alpha,
 										uint_t* const itCntr,

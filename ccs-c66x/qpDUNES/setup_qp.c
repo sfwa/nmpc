@@ -578,7 +578,6 @@ return_t qpDUNES_setupStageQP(	qpData_t* const qpData,
 		/*     - solve */
 		statusFlag = directQpSolver_solveUnconstrained( qpData, interval, &(interval->qpSolverClipping.qStep) );
 		if ( statusFlag != QPDUNES_OK ) {
-			int kk = 1234567890;	/* TODO: get right interval number!*/
 			return statusFlag;
 		}
 
@@ -689,7 +688,7 @@ qpOptions_t qpDUNES_setupDefaultOptions(
 	options.equalityTolerance     		= 2.221e-16;
 	options.newtonHessDiagRegTolerance  = 1.e-10;
 	options.activenessTolerance			= 1e4*options.equalityTolerance;
-	options.QPDUNES_ZERO             		= 1.e-50;
+	options.QPDUNES_ZERO             		= 1.e-20;
 	options.QPDUNES_INFTY            		= 1.e12;
 	options.ascentCurvatureTolerance	= 1.e-6;
 
