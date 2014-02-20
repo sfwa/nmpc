@@ -75,16 +75,17 @@ const State &in, const ControlVector &control) const {
     side_force = 0.3 * sin_beta * cos_beta;
 
     pitch_moment = 0.001 - 0.1 * sin_cos_alpha - 0.003 * pitch_rate -
-                   0.04 * control[1] - 0.04 * control[2];
+                   0.04 * (control[1] - 0.5) - 0.04 * (control[2] - 0.5);
     roll_moment = 0.03 * sin_beta - 0.015 * roll_rate +
-                  0.1 * control[1] - 0.1 * control[2];
+                  0.1 * (control[1] - 0.5) - 0.1 * (control[2] - 0.5);
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
-                 0.01 * std::abs(control[1]) + 0.01 * std::abs(control[2]);
+                 0.01 * std::abs(control[1] - 0.5) +
+                 0.01 * std::abs(control[2] - 0.5);
 
     /*
     Determine motor thrust and torque.
     */
-    real_t thrust, ve = 0.0025 * control[0], v0 = airflow.x();
+    real_t thrust, ve = 0.0025 * (control[0] * 25000.0), v0 = airflow.x();
     thrust = (real_t)0.5 * RHO * 0.025 * (ve * ve - v0 * v0);
     if (thrust < 0.0) {
         /* Folding prop, so assume no drag */

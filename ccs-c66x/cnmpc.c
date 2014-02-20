@@ -311,7 +311,8 @@ const real_t *restrict state, const real_t *restrict control);
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
 const real_t *restrict s2);
 static void _solve_interval_ivp(const real_t *restrict state_ref,
-const real_t *restrict control_ref, real_t *out_jacobian);
+const real_t *restrict control_ref, real_t *restrict out_jacobian,
+const real_t *restrict next_state_ref, real_t *restrict out_residuals);
 static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]);
 static bool _solve_qp(void);
 
@@ -445,7 +446,8 @@ const real_t *restrict state, const real_t *restrict control) {
     Determine airflow magnitude, and the magnitudes of the components in
     the vertical and horizontal planes
     */
-    real_t thrust, ve2 = (0.0025f * 0.0025f) * control[0] * control[0];
+    real_t rpm = control[0] * 25000.0f, thrust,
+           ve2 = (0.0025f * 0.0025f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
     thrust = max(0.0f, ve2 - airflow_x2) *
              (0.26315789473684f * 0.5f * RHO * 0.025f);
@@ -478,7 +480,7 @@ const real_t *restrict state, const real_t *restrict control) {
     /* Work out aerodynamic forces in wind frame */
     real_t lift, alt_lift, drag, side_force;
 
-    lift = (-5.0f * alpha + 1.0f) * a2 + 2.0f * alpha + 0.3f;
+    lift = (-5.0f * alpha + 1.0f) * a2 + 2.5f * alpha + 0.12f;
     /* Generalize lift force for very high / very low alpha */
     sin_cos_alpha = sin_alpha * cos_alpha;
     alt_lift = 0.8f * sin_cos_alpha;
@@ -490,7 +492,7 @@ const real_t *restrict state, const real_t *restrict control) {
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
     lift = (qbar * 0.26315789473684f) * lift;
     drag = (qbar * 0.26315789473684f) *
-           (0.05f + 0.8f * sin_alpha * sin_alpha);
+           (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.3f * sin_beta * cos_beta;
 
     /* Convert aerodynamic forces from wind frame to body frame */
@@ -508,13 +510,14 @@ const real_t *restrict state, const real_t *restrict control) {
            yaw_rate = state[10 + Z],
            pitch_rate = state[10 + Y],
            roll_rate = state[10 + X],
-           left_aileron = control[1], right_aileron = control[2];
-    pitch_moment = 0.01f - 0.03f * sin_cos_alpha - 0.002f * pitch_rate -
-                   0.6f * (left_aileron + right_aileron);
-    roll_moment = -0.05f * sin_beta - 0.01f * roll_rate +
-                  0.45f * (left_aileron - right_aileron);
+           left_aileron = control[1] - 0.5f,
+           right_aileron = control[2] - 0.5f;
+    pitch_moment = 0.001f - 0.1f * sin_cos_alpha - 0.003f * pitch_rate -
+                   0.04f * (left_aileron + right_aileron);
+    roll_moment = 0.03f * sin_beta - 0.015f * roll_rate +
+                  0.1f * (left_aileron - right_aileron);
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
-                 0.1f * (absval(left_aileron) + absval(right_aileron));
+                 0.01f * (absval(left_aileron) + absval(right_aileron));
     pitch_moment *= qbar;
     roll_moment *= qbar;
     yaw_moment *= qbar;
@@ -578,7 +581,8 @@ const real_t *restrict s2) {
 #define IVP_PERTURBATION NMPC_EPS_4RT
 #define IVP_PERTURBATION_RECIP (real_t)(1.0 / NMPC_EPS_4RT)
 static void _solve_interval_ivp(const real_t *restrict state_ref,
-const real_t *restrict control_ref, real_t *out_jacobian) {
+const real_t *restrict control_ref, real_t *restrict out_jacobian,
+const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
     size_t i, j;
     real_t integrated_state[NMPC_STATE_DIM], new_state[NMPC_STATE_DIM];
 
@@ -586,6 +590,13 @@ const real_t *restrict control_ref, real_t *out_jacobian) {
     _state_integrate_rk4(integrated_state, state_ref, control_ref,
                          OCP_STEP_LENGTH);
 
+    /*
+    Calculate integration residuals -- the difference between the integrated
+    state and the next state.
+    */
+    _state_to_delta(out_residuals, next_state_ref, integrated_state);
+
+    /* Calculate the Jacobian */
     for (i = 0; i < NMPC_GRADIENT_DIM; i++) {
         real_t perturbed_reference[NMPC_REFERENCE_DIM];
         real_t perturbation = IVP_PERTURBATION,
@@ -931,7 +942,7 @@ void nmpc_init(void) {
         Q, g, z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
-    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_TRUE);
+    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_FALSE);
 
     qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
@@ -963,7 +974,7 @@ void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
     so we can calculate the appropriate delta in _initial_constraint
     */
     memmove(ocp_state_reference, &ocp_state_reference[NMPC_STATE_DIM],
-            sizeof(real_t) * NMPC_STATE_DIM * (OCP_HORIZON_LENGTH - 1u));
+            sizeof(real_t) * NMPC_STATE_DIM * OCP_HORIZON_LENGTH);
     memmove(ocp_control_reference, &ocp_control_reference[NMPC_CONTROL_DIM],
             sizeof(real_t) * NMPC_CONTROL_DIM * (OCP_HORIZON_LENGTH - 1u));
 
@@ -971,7 +982,7 @@ void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
     qpDUNES_shiftLambda(&ocp_qp_data.qpdata);
     qpDUNES_shiftIntervals(&ocp_qp_data.qpdata);
 
-    nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH - 1);
+    nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH);
 }
 
 void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]) {
@@ -1019,17 +1030,21 @@ uint32_t i) {
     /*
     Only set control and solve IVPs for regular points, not the final one
     */
-    if (i < OCP_HORIZON_LENGTH) {
+    if (i > 0 && i <= OCP_HORIZON_LENGTH) {
         real_t jacobian[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
                z_low[NMPC_GRADIENT_DIM],
                z_upp[NMPC_GRADIENT_DIM],
-               gradient[NMPC_GRADIENT_DIM];
+               gradient[NMPC_GRADIENT_DIM],
+               residuals[NMPC_STATE_DIM];
         return_t status_flag;
+        real_t *state_ref = &ocp_state_reference[(i - 1u) * NMPC_STATE_DIM];
+        real_t *control_ref =
+                    &ocp_control_reference[(i - 1u) * NMPC_CONTROL_DIM];
         size_t j;
 
         /* Copy the control reference */
-        memcpy(&ocp_control_reference[i * NMPC_CONTROL_DIM],
-               &coeffs[NMPC_STATE_DIM], sizeof(real_t) * NMPC_CONTROL_DIM);
+        memcpy(control_ref, &coeffs[NMPC_STATE_DIM],
+               sizeof(real_t) * NMPC_CONTROL_DIM);
 
         /* Zero the gradient */
         memset(gradient, 0, sizeof(gradient));
@@ -1041,21 +1056,25 @@ uint32_t i) {
         #pragma MUST_ITERATE(NMPC_CONTROL_DIM, NMPC_CONTROL_DIM)
         for (j = 0; j < NMPC_CONTROL_DIM; j++) {
             z_low[NMPC_DELTA_DIM + j] = ocp_lower_control_bound[j] -
-                                        coeffs[NMPC_STATE_DIM + j];
+                                        control_ref[j];
             z_upp[NMPC_DELTA_DIM + j] = ocp_upper_control_bound[j] -
-                                        coeffs[NMPC_STATE_DIM + j];
+                                        control_ref[j];
         }
 
         /*
-        Solve the IVP for the new reference point to get the Jacobian (aka
-        continuity constraint matrix, C).
+        Solve the IVP for the previous reference point to get the Jacobian
+        (aka continuity constraint matrix, C) and integration residuals (c).
+
+        We do this for the previous point because we need the current point to
+        work out the residuals.
         */
-        _solve_interval_ivp(coeffs, &coeffs[NMPC_STATE_DIM], jacobian);
+        _solve_interval_ivp(state_ref, control_ref, jacobian, coeffs,
+                            residuals);
 
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_updateIntervalData(
-            &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i],
-            0, gradient, jacobian, 0, z_low, z_upp, 0, 0, 0, 0);
+            &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i - 1u],
+            0, gradient, jacobian, residuals, z_low, z_upp, 0, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
     }
 }

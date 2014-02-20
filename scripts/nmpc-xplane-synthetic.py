@@ -85,11 +85,11 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e0, 1e0, 1e1, 1e1, 1e1, 1e1, 1e1, 1e1, 1e2, 7e0, 7e0, 1e2],
-    control_weights=[1e-6, 1e4, 1e4],
+    state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1e1, 7e-1, 7e-1, 1e1],
+    control_weights=[1e-1, 1e3, 1e3],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    upper_control_bound=[MAX_THROTTLE, 0.5, 0.5],
-    lower_control_bound=[0, -0.5, -0.5])
+    upper_control_bound=[1.0, 1.0, 1.0],
+    lower_control_bound=[0, 0, 0])
 nmpc.initialise_horizon()
 
 xplane_reference_points = []
@@ -193,7 +193,7 @@ except socket.error:
 for i in xrange(0, nmpc.HORIZON_LENGTH+1):
     horizon_point = [a for a in interpolate_reference(
         i*nmpc.STEP_LENGTH, xplane_reference_points)]
-    horizon_point.extend([15000, 0, 0])
+    horizon_point.extend([0.5, 0.5, 0.5])
     nmpc.set_reference(horizon_point[1:], i)
 
 # Set up initial attitude, velocity and angular velocity.
@@ -345,14 +345,14 @@ for i in xrange(10000):
     control_vec = nmpc.get_controls()
     print ("t: %.2f " % (i*nmpc.STEP_LENGTH)) + repr(control_vec)
 
-    update += "set sim/flightmodel/engine/ENGN_thro_use [%.6f,0,0,0,0,0,0,0]\n" % (control_vec[0] / MAX_THROTTLE)
-    update += "set sim/flightmodel/controls/wing1l_ail1def %.6f\n" % math.degrees(control_vec[1])
-    update += "set sim/flightmodel/controls/wing1r_ail1def %.6f\n" % math.degrees(control_vec[2])
+    update += "set sim/flightmodel/engine/ENGN_thro_use [%.6f,0,0,0,0,0,0,0]\n" % control_vec[0]
+    update += "set sim/flightmodel/controls/wing1l_ail1def %.6f\n" % math.degrees(control_vec[1] - 0.5)
+    update += "set sim/flightmodel/controls/wing1r_ail1def %.6f\n" % math.degrees(control_vec[2] - 0.5)
 
     # Add one to the index because of the terminal point.
     horizon_point = [a for a in interpolate_reference(
         (i+1+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
-    horizon_point.extend([15000, 0, 0])
+    horizon_point.extend([0.5, 0.5, 0.5])
     nmpc.update_horizon(horizon_point[1:])
 
     sock.sendall(update)
