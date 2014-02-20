@@ -32,7 +32,7 @@ fields = ["time", "pos_x", "pos_y", "pos_z", "att_x", "att_y", "att_z", "att_w"]
 for line in sys.stdin:
     if line.strip() == "":
         continue
-    readings = dict(zip(fields, map(float, line.strip("\n").split("\t"))))
+    readings = dict(zip(fields, map(float, [f for f in line.strip("\n").split("\t") if f.strip() != ""])))
 
     update = ""
     update += "set sim/flightmodel/position/local_x %.9f\n" \

@@ -10,7 +10,7 @@ import datetime
 import copy
 
 import nmpc
-nmpc.init(implementation="c66x")
+nmpc.init(implementation="c")
 from nmpc import _cnmpc, state
 
 def socket_readlines(socket):
@@ -85,16 +85,16 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e-1, 1e-1, 1e1, 1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 7e0, 7e-1, 1e-2],
-    control_weights=[1e-7, 1e-3, 1e-3],
+    state_weights=[1e0, 1e0, 1e1, 1e1, 1e1, 1e1, 1e1, 1e1, 1e2, 7e0, 7e0, 1e2],
+    control_weights=[1e-6, 1e4, 1e4],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    upper_control_bound=[MAX_THROTTLE, 0.8, 0.8],
-    lower_control_bound=[0, -0.8, -0.8])
+    upper_control_bound=[MAX_THROTTLE, 0.5, 0.5],
+    lower_control_bound=[0, -0.5, -0.5])
 nmpc.initialise_horizon()
 
 xplane_reference_points = []
 
-attitude = euler_to_q(0, math.radians(3), 0)
+attitude = euler_to_q(0, 0, 0)
 out = [
     0.0,  # t
     0.0, 0.0, 0.0,  # N, E, D
@@ -106,7 +106,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(0, math.radians(3), 0)
+attitude = euler_to_q(0, 0, 0)
 out = [
     29.0,  # t
     580.0, 0.0, 0.0,  # N, E, D
@@ -118,7 +118,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(math.radians(90), math.radians(3), 0)
+attitude = euler_to_q(math.radians(90), 0, 0)
 out = [
     31.0,  # t
     600.0, 20.0, 0.0,  # N, E, D
@@ -130,7 +130,7 @@ out = [
     0.0, 0.0, 0.0]
 xplane_reference_points.append(out)
 
-attitude = euler_to_q(math.radians(90), math.radians(3), 0)
+attitude = euler_to_q(math.radians(90), 0, 0)
 out = [
     60.0,  # t
     600.0, 600.0, 0.0,  # N, E, D
@@ -190,16 +190,11 @@ except socket.error:
     pass
 
 # Set up the NMPC reference trajectory using correct interpolation.
-for i in xrange(0, nmpc.HORIZON_LENGTH):
+for i in xrange(0, nmpc.HORIZON_LENGTH+1):
     horizon_point = [a for a in interpolate_reference(
         i*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
     nmpc.set_reference(horizon_point[1:], i)
-
-# Set up terminal reference. No need for control values as they'd be ignored.
-terminal_point = [a for a in interpolate_reference(
-    nmpc.HORIZON_LENGTH*nmpc.STEP_LENGTH, xplane_reference_points)]
-nmpc.set_reference(terminal_point[1:], nmpc.HORIZON_LENGTH)
 
 # Set up initial attitude, velocity and angular velocity.
 initial_point = interpolate_reference(0, xplane_reference_points)
@@ -272,9 +267,6 @@ sock.setblocking(0)
 
 for i in xrange(10000):
     start_iteration = datetime.datetime.now()
-
-    horizon_point = [a for a in interpolate_reference(
-        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
 
     nmpc.prepare()
 
@@ -357,8 +349,9 @@ for i in xrange(10000):
     update += "set sim/flightmodel/controls/wing1l_ail1def %.6f\n" % math.degrees(control_vec[1])
     update += "set sim/flightmodel/controls/wing1r_ail1def %.6f\n" % math.degrees(control_vec[2])
 
+    # Add one to the index because of the terminal point.
     horizon_point = [a for a in interpolate_reference(
-        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
+        (i+1+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
     horizon_point.extend([15000, 0, 0])
     nmpc.update_horizon(horizon_point[1:])
 
