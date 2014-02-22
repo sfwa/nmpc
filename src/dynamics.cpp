@@ -64,27 +64,28 @@ const State &in, const ControlVector &control) const {
     a2 = alpha * alpha;
 
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
-    lift = -5 * a2 * alpha + a2 + 2.0 * alpha + 0.3;
+    lift = -5 * a2 * alpha + a2 + 2.5 * alpha + 0.12;
     if (alpha < -0.25) {
         lift = std::min(lift, (real_t)0.8 * sin_cos_alpha);
     } else {
         lift = std::max(lift, (real_t)0.8 * sin_cos_alpha);
     }
 
-    drag = 0.05 + 0.8 * sin_alpha * sin_alpha;
+    drag = 0.05 + 0.7 * sin_alpha * sin_alpha;
     side_force = 0.3 * sin_beta * cos_beta;
 
-    pitch_moment = 0.01 + 0.03 * sin_cos_alpha - 0.002 * pitch_rate -
-                   0.6 * (control[1] + control[2]);
-    roll_moment = -0.05 * sin_beta - 0.01 * roll_rate +
-                  0.45 * (control[1] - control[2]);
+    pitch_moment = 0.001 - 0.1 * sin_cos_alpha - 0.003 * pitch_rate -
+                   0.04 * (control[1] - 0.5) - 0.04 * (control[2] - 0.5);
+    roll_moment = 0.03 * sin_beta - 0.015 * roll_rate +
+                  0.1 * (control[1] - 0.5) - 0.1 * (control[2] - 0.5);
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
-                 0.1 * (std::abs(control[1]) + std::abs(control[2]));
+                 0.01 * std::abs(control[1] - 0.5) +
+                 0.01 * std::abs(control[2] - 0.5);
 
     /*
     Determine motor thrust and torque.
     */
-    real_t thrust, ve = 0.0025 * control[0], v0 = airflow.x();
+    real_t thrust, ve = 0.0025 * (control[0] * 25000.0), v0 = airflow.x();
     thrust = (real_t)0.5 * RHO * 0.025 * (ve * ve - v0 * v0);
     if (thrust < 0.0) {
         /* Folding prop, so assume no drag */
