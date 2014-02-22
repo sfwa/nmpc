@@ -130,17 +130,7 @@ void OptimalControlProblem::solve_ivps(uint32_t i) {
             Quaternionr temp = delta_q *
                 Quaternionr(perturbed_state.segment<4>(6));
             perturbed_state.segment<4>(6) << temp.vec(), temp.w();
-        } else if(j < NMPC_DELTA_DIM) {
-            perturbed_state[j+1] += perturbation;
         } else {
-            /*
-            Perturbations for the control inputs should be proportional
-            to the control range to make sure we don't lose too much
-            precision.
-            */
-            perturbation *=
-                (upper_control_bound[j-NMPC_DELTA_DIM] -
-                lower_control_bound[j-NMPC_DELTA_DIM]);
             perturbed_state[j+1] += perturbation;
         }
 

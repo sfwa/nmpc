@@ -302,12 +302,12 @@ static real_t ocp_control_value[NMPC_CONTROL_DIM];
 static bool ocp_last_result;
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
-const real_t *restrict control);
+const real_t *restrict control, bool print);
 static void _state_integrate_rk4(real_t *restrict out,
 const real_t *restrict state, const real_t *restrict control,
-const real_t delta);
+const real_t delta, bool print);
 static void _state_x8_dynamics(real_t *restrict out,
-const real_t *restrict state, const real_t *restrict control);
+const real_t *restrict state, const real_t *restrict control, bool print);
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
 const real_t *restrict s2);
 static void _solve_interval_ivp(const real_t *restrict state_ref,
@@ -318,7 +318,7 @@ static bool _solve_qp(void);
 
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
-const real_t *restrict control) {
+const real_t *restrict control, bool print) {
     assert(out && state && control);
     _nassert((size_t)out % 4 == 0);
     _nassert((size_t)state % 4 == 0);
@@ -326,7 +326,7 @@ const real_t *restrict control) {
 
     /* See src/state.cpp */
     real_t accel[6];
-    _state_x8_dynamics(accel, state, control);
+    _state_x8_dynamics(accel, state, control, print);
 
     /* Change in position */
     out[0] = state[3];
@@ -364,7 +364,7 @@ const real_t *restrict control) {
 
 static void _state_integrate_rk4(real_t *restrict out,
 const real_t *restrict state, const real_t *restrict control,
-const real_t delta) {
+const real_t delta, bool print) {
     assert(out && state && control);
     _nassert((size_t)out % 4 == 0);
     _nassert((size_t)state % 4 == 0);
@@ -375,19 +375,19 @@ const real_t delta) {
            d[NMPC_STATE_DIM], temp[NMPC_STATE_DIM];
 
     /* a = in.model() */
-    _state_model(a, state, control);
+    _state_model(a, state, control, print);
 
     /* b = (in + 0.5 * delta * a).model() */
     state_scale_add(temp, a, delta * 0.5f, state);
-    _state_model(b, temp, control);
+    _state_model(b, temp, control, false);
 
     /* c = (in + 0.5 * delta * b).model() */
     state_scale_add(temp, b, delta * 0.5f, state);
-    _state_model(c, temp, control);
+    _state_model(c, temp, control, false);
 
     /* d = (in + delta * c).model */
     state_scale_add(temp, c, delta, state);
-    _state_model(d, temp, control);
+    _state_model(d, temp, control, false);
 
     /* in = in + (delta / 6.0) * (a + (b * 2.0) + (c * 2.0) + d) */
     real_t delta_on_3 = delta * (1.0f/3.0f), delta_on_6 = delta * (1.0f/6.0f);
@@ -399,8 +399,9 @@ const real_t delta) {
     }
 }
 
+#include <stdio.h>
 static void _state_x8_dynamics(real_t *restrict out,
-const real_t *restrict state, const real_t *restrict control) {
+const real_t *restrict state, const real_t *restrict control, bool print) {
     assert(out && state && control);
     _nassert((size_t)out % 4 == 0);
     _nassert((size_t)state % 4 == 0);
@@ -413,6 +414,10 @@ const real_t *restrict state, const real_t *restrict control) {
     ned_airflow[Y] = wind_velocity[Y] - state[4];
     ned_airflow[Z] = wind_velocity[Z] - state[5];
     quaternion_vector3_multiply(airflow, &state[6], ned_airflow);
+
+    if (print) {
+        printf("airflow X %6.3f Y %6.3f Z %6.3f\n", airflow[X], airflow[Y], airflow[Z]);
+    }
 
     /*
     Rotate G_ACCEL by current attitude, and set acceleration to that initially
@@ -447,10 +452,10 @@ const real_t *restrict state, const real_t *restrict control) {
     the vertical and horizontal planes
     */
     real_t rpm = control[0] * 25000.0f, thrust,
-           ve2 = (0.0025f * 0.0025f) * rpm * rpm;
+           ve2 = (0.005f * 0.005f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
-    thrust = max(0.0f, ve2 - airflow_x2) *
-             (0.26315789473684f * 0.5f * RHO * 0.025f);
+    thrust = (/*0.0f,*/ ve2 - airflow_x2) *
+             (0.26315789473684f * 0.5f * RHO * 0.0025f);
 
     /*
     Calculate airflow in the horizontal and vertical planes, as well as
@@ -465,35 +470,35 @@ const real_t *restrict state, const real_t *restrict control) {
     vertical_v = fsqrt(airflow_x2 + airflow_z2);
     vertical_v_inv = recip(max(1.0f, vertical_v));
 
+    //printf("vertical v %.6f v %.6f\n", vertical_v, horizontal_v2 + airflow_z2);
+
     /* Work out sin/cos of alpha and beta */
-    real_t alpha, sin_alpha, cos_alpha, sin_beta, cos_beta, a2, sin_cos_alpha;
+    real_t sin_alpha, cos_alpha, sin_beta, cos_beta, sin_cos_alpha;
 
     sin_beta = airflow[Y] * v_inv;
     cos_beta = vertical_v * v_inv;
 
-    alpha = fatan2(-airflow[Z], -airflow[X]);
-    a2 = alpha * alpha;
-
     sin_alpha = -airflow[Z] * vertical_v_inv;
     cos_alpha = -airflow[X] * vertical_v_inv;
 
-    /* Work out aerodynamic forces in wind frame */
-    real_t lift, alt_lift, drag, side_force;
+    //printf("sb %.6f cb %.6f sa %.6f ca %.6f\n", sin_beta, cos_beta, sin_alpha, cos_alpha);
 
-    lift = (-5.0f * alpha + 1.0f) * a2 + 2.5f * alpha + 0.12f;
+    /* Work out aerodynamic forces in wind frame */
+    real_t lift, drag, side_force;
+
     /* Generalize lift force for very high / very low alpha */
     sin_cos_alpha = sin_alpha * cos_alpha;
-    alt_lift = 0.8f * sin_cos_alpha;
-    if ((alpha < -0.25f && lift > alt_lift) ||
-        (alpha > 0.0f && lift < alt_lift)) {
-        lift = alt_lift;
-    }
+    lift = 0.7f * sin_cos_alpha + 0.10;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
     lift = (qbar * 0.26315789473684f) * lift;
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.3f * sin_beta * cos_beta;
+
+    //printf("Alpha %.3f, beta %.3f\n", alpha, acos(cos_beta));
+    //printf("Forces - L %6.3f D %6.3f S %6.3f T %6.3f\n",
+    //       lift, drag, side_force, thrust);
 
     /* Convert aerodynamic forces from wind frame to body frame */
     real_t x_aero_f = lift * sin_alpha - drag * cos_alpha -
@@ -505,6 +510,10 @@ const real_t *restrict state, const real_t *restrict control) {
     out[0 + X] += x_aero_f + thrust;
     out[0 + Z] -= z_aero_f;
 
+    if (print) {
+        printf("Net force - X %6.3f Y %6.3f Z %6.3f\n", out[X], out[Y], out[Z]);
+    }
+
     /* Determine moments */
     real_t pitch_moment, yaw_moment, roll_moment,
            yaw_rate = state[10 + Z],
@@ -512,15 +521,20 @@ const real_t *restrict state, const real_t *restrict control) {
            roll_rate = state[10 + X],
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
-    pitch_moment = 0.001f - 0.1f * sin_cos_alpha - 0.003f * pitch_rate -
-                   0.04f * (left_aileron + right_aileron);
-    roll_moment = 0.03f * sin_beta - 0.015f * roll_rate +
-                  0.1f * (left_aileron - right_aileron);
+    pitch_moment = 0.0f - 0.04f * sin_cos_alpha - 0.005f * pitch_rate -
+                   0.05f * (left_aileron + right_aileron);
+    roll_moment = 0.01f * sin_beta - 0.1f * roll_rate +
+                  0.08f * (left_aileron - right_aileron);
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron));
     pitch_moment *= qbar;
     roll_moment *= qbar;
     yaw_moment *= qbar;
+
+    if (print) {
+        printf("Net moment - roll %6.3f pitch %6.3f yaw %6.3f\n", roll_moment,
+           pitch_moment, yaw_moment);
+    }
 
     /*
     Calculate angular acceleration (tau / inertia tensor).
@@ -578,8 +592,10 @@ const real_t *restrict s2) {
     delta[8] = err_q[Z] * d;
 }
 
+#include <stdio.h>
+
 #define IVP_PERTURBATION NMPC_EPS_4RT
-#define IVP_PERTURBATION_RECIP (real_t)(1.0 / NMPC_EPS_4RT)
+#define IVP_PERTURBATION_RECIP (real_t)(1.0 / IVP_PERTURBATION)
 static void _solve_interval_ivp(const real_t *restrict state_ref,
 const real_t *restrict control_ref, real_t *restrict out_jacobian,
 const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
@@ -588,19 +604,25 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
 
     /* Solve the initial value problem at this horizon step. */
     _state_integrate_rk4(integrated_state, state_ref, control_ref,
-                         OCP_STEP_LENGTH);
+                         OCP_STEP_LENGTH, true);
 
     /*
     Calculate integration residuals -- the difference between the integrated
     state and the next state.
+
+    FIXME: this allows delta positions to be specified, rather than absolute.
     */
+    integrated_state[0] -= state_ref[0];
+    integrated_state[1] -= state_ref[1];
+    integrated_state[2] -= state_ref[2];
     _state_to_delta(out_residuals, next_state_ref, integrated_state);
+    integrated_state[0] += state_ref[0];
+    integrated_state[1] += state_ref[1];
+    integrated_state[2] += state_ref[2];
 
     /* Calculate the Jacobian */
     for (i = 0; i < NMPC_GRADIENT_DIM; i++) {
         real_t perturbed_reference[NMPC_REFERENCE_DIM];
-        real_t perturbation = IVP_PERTURBATION,
-               perturbation_recip = IVP_PERTURBATION_RECIP;
 
         #pragma MUST_ITERATE(NMPC_STATE_DIM, NMPC_STATE_DIM)
         for (j = 0; j < NMPC_STATE_DIM; j++) {
@@ -632,24 +654,13 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
             perturbed_reference[7] = temp[1];
             perturbed_reference[8] = temp[2];
             perturbed_reference[9] = temp[3];
-        } else if (i < NMPC_DELTA_DIM) {
-            perturbed_reference[i + 1u] += IVP_PERTURBATION;
         } else {
-            /*
-            Perturbations for the control inputs should be proportional
-            to the control range to make sure we don't lose too much
-            precision.
-            */
-            perturbation *=
-                (ocp_upper_control_bound[i - NMPC_DELTA_DIM] -
-                ocp_lower_control_bound[i - NMPC_DELTA_DIM]);
-            perturbation_recip = (real_t)1.0 / perturbation;
-            perturbed_reference[i + 1u] += perturbation;
+            perturbed_reference[i + 1u] += IVP_PERTURBATION;
         }
 
         _state_integrate_rk4(new_state, perturbed_reference,
                              &perturbed_reference[NMPC_STATE_DIM],
-                             OCP_STEP_LENGTH);
+                             OCP_STEP_LENGTH, false);
 
         /*
         Calculate delta between perturbed state and original state, to
@@ -661,7 +672,7 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
         #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM)
         for (j = 0; j < NMPC_DELTA_DIM; j++) {
             out_jacobian[NMPC_GRADIENT_DIM * j + i] = jacobian_col[j] *
-                                                      perturbation_recip;
+                                                      IVP_PERTURBATION_RECIP;
         }
     }
 }
@@ -704,6 +715,7 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
 /* Solves the QP using qpDUNES. */
 static bool _solve_qp(void) {
     return_t status_flag;
+    real_t objective_value;
 
     status_flag = qpDUNES_solve(&ocp_qp_data.qpdata);
     if (status_flag == QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND) {
@@ -713,13 +725,26 @@ static bool _solve_qp(void) {
         /* Get the solution. */
         qpDUNES_getPrimalSol(&ocp_qp_data.qpdata, solution);
 
+        /* Check the objective value. */
+        objective_value = qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata);
+        printf("Objective value: %f\n", objective_value);
+
         /* Get the first set of control values */
         for (i = 0; i < NMPC_CONTROL_DIM; i++) {
             ocp_control_value[i] = ocp_control_reference[i] +
                                    solution[NMPC_DELTA_DIM + i];
         }
+
+        for (i = 0; i <= OCP_HORIZON_LENGTH; i++) {
+            qpDUNES_setupStageQP(&ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i], QPDUNES_FALSE);
+            ocp_qp_data.qpdata.intervals[i]->p = 0;
+        }
         return true;
     } else {
+        /* Check the objective value. */
+        objective_value = qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata);
+        printf("FAILED objective value: %f\n", objective_value);
+
         /* Flag an error in some appropriate way */
         return false;
     }
@@ -889,7 +914,7 @@ void nmpc_init(void) {
 
     /* qpDUNES configuration */
     qp_options = qpDUNES_setupDefaultOptions();
-    qp_options.maxIter = 5;
+    qp_options.maxIter = 15;
     qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-3f;
 
@@ -942,7 +967,7 @@ void nmpc_init(void) {
         Q, g, z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
-    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_FALSE);
+    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_TRUE);
 
     qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
