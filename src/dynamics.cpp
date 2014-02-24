@@ -52,8 +52,7 @@ const State &in, const ControlVector &control) const {
     vertical_v_inv = (real_t)1.0 / std::max(vertical_v, (real_t)1.0);
 
     /* Determine alpha and beta: alpha = atan(wz/wx), beta = atan(wy/|wxz|) */
-    real_t alpha, sin_alpha, cos_alpha, sin_beta, cos_beta, a2, sin_cos_alpha;
-    alpha = std::atan2(-airflow.z(), -airflow.x());
+    real_t sin_alpha, cos_alpha, sin_beta, cos_beta, sin_cos_alpha;
 
     sin_alpha = -airflow.z() * vertical_v_inv;
     cos_alpha = -airflow.x() * vertical_v_inv;
@@ -61,22 +60,15 @@ const State &in, const ControlVector &control) const {
     sin_beta = airflow.y() * v_inv;
     cos_beta = vertical_v * v_inv;
 
-    a2 = alpha * alpha;
-
     real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
-    lift = -5 * a2 * alpha + a2 + 2.5 * alpha + 0.12;
-    if (alpha < -0.25) {
-        lift = std::min(lift, (real_t)0.8 * sin_cos_alpha);
-    } else {
-        lift = std::max(lift, (real_t)0.8 * sin_cos_alpha);
-    }
 
+    lift = 0.8 * sin_cos_alpha + 0.15;
     drag = 0.05 + 0.7 * sin_alpha * sin_alpha;
     side_force = 0.3 * sin_beta * cos_beta;
 
-    pitch_moment = 0.001 - 0.1 * sin_cos_alpha - 0.003 * pitch_rate -
+    pitch_moment = 0.0 - 0.05 * sin_cos_alpha - 0.003 * pitch_rate -
                    0.04 * (control[1] - 0.5) - 0.04 * (control[2] - 0.5);
-    roll_moment = 0.03 * sin_beta - 0.015 * roll_rate +
+    roll_moment = 0.03 * sin_beta - 0.05 * roll_rate +
                   0.1 * (control[1] - 0.5) - 0.1 * (control[2] - 0.5);
     yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
                  0.01 * std::abs(control[1] - 0.5) +
@@ -87,10 +79,6 @@ const State &in, const ControlVector &control) const {
     */
     real_t thrust, ve = 0.0025 * (control[0] * 25000.0), v0 = airflow.x();
     thrust = (real_t)0.5 * RHO * 0.025 * (ve * ve - v0 * v0);
-    if (thrust < 0.0) {
-        /* Folding prop, so assume no drag */
-        thrust = 0.0;
-    }
 
     /*
     Sum and apply forces and moments

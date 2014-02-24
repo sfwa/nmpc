@@ -299,15 +299,15 @@ static struct static_qpdata_t ocp_qp_data;
 
 /* Current control solution */
 static real_t ocp_control_value[NMPC_CONTROL_DIM];
-static bool ocp_last_result;
+static real_t ocp_last_result;
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
-const real_t *restrict control, bool print);
+const real_t *restrict control);
 static void _state_integrate_rk4(real_t *restrict out,
 const real_t *restrict state, const real_t *restrict control,
-const real_t delta, bool print);
+const real_t delta);
 static void _state_x8_dynamics(real_t *restrict out,
-const real_t *restrict state, const real_t *restrict control, bool print);
+const real_t *restrict state, const real_t *restrict control);
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
 const real_t *restrict s2);
 static void _solve_interval_ivp(const real_t *restrict state_ref,
@@ -318,7 +318,7 @@ static bool _solve_qp(void);
 
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
-const real_t *restrict control, bool print) {
+const real_t *restrict control) {
     assert(out && state && control);
     _nassert((size_t)out % 4 == 0);
     _nassert((size_t)state % 4 == 0);
@@ -326,7 +326,7 @@ const real_t *restrict control, bool print) {
 
     /* See src/state.cpp */
     real_t accel[6];
-    _state_x8_dynamics(accel, state, control, print);
+    _state_x8_dynamics(accel, state, control);
 
     /* Change in position */
     out[0] = state[3];
@@ -364,7 +364,7 @@ const real_t *restrict control, bool print) {
 
 static void _state_integrate_rk4(real_t *restrict out,
 const real_t *restrict state, const real_t *restrict control,
-const real_t delta, bool print) {
+const real_t delta) {
     assert(out && state && control);
     _nassert((size_t)out % 4 == 0);
     _nassert((size_t)state % 4 == 0);
@@ -375,19 +375,19 @@ const real_t delta, bool print) {
            d[NMPC_STATE_DIM], temp[NMPC_STATE_DIM];
 
     /* a = in.model() */
-    _state_model(a, state, control, print);
+    _state_model(a, state, control);
 
     /* b = (in + 0.5 * delta * a).model() */
     state_scale_add(temp, a, delta * 0.5f, state);
-    _state_model(b, temp, control, false);
+    _state_model(b, temp, control);
 
     /* c = (in + 0.5 * delta * b).model() */
     state_scale_add(temp, b, delta * 0.5f, state);
-    _state_model(c, temp, control, false);
+    _state_model(c, temp, control);
 
     /* d = (in + delta * c).model */
     state_scale_add(temp, c, delta, state);
-    _state_model(d, temp, control, false);
+    _state_model(d, temp, control);
 
     /* in = in + (delta / 6.0) * (a + (b * 2.0) + (c * 2.0) + d) */
     real_t delta_on_3 = delta * (1.0f/3.0f), delta_on_6 = delta * (1.0f/6.0f);
@@ -399,9 +399,8 @@ const real_t delta, bool print) {
     }
 }
 
-#include <stdio.h>
 static void _state_x8_dynamics(real_t *restrict out,
-const real_t *restrict state, const real_t *restrict control, bool print) {
+const real_t *restrict state, const real_t *restrict control) {
     assert(out && state && control);
     _nassert((size_t)out % 4 == 0);
     _nassert((size_t)state % 4 == 0);
@@ -414,10 +413,6 @@ const real_t *restrict state, const real_t *restrict control, bool print) {
     ned_airflow[Y] = wind_velocity[Y] - state[4];
     ned_airflow[Z] = wind_velocity[Z] - state[5];
     quaternion_vector3_multiply(airflow, &state[6], ned_airflow);
-
-    if (print) {
-        printf("airflow X %6.3f Y %6.3f Z %6.3f\n", airflow[X], airflow[Y], airflow[Z]);
-    }
 
     /*
     Rotate G_ACCEL by current attitude, and set acceleration to that initially
@@ -452,10 +447,9 @@ const real_t *restrict state, const real_t *restrict control, bool print) {
     the vertical and horizontal planes
     */
     real_t rpm = control[0] * 25000.0f, thrust,
-           ve2 = (0.005f * 0.005f) * rpm * rpm;
+           ve2 = (0.0025f * 0.0025f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
-    thrust = (/*0.0f,*/ ve2 - airflow_x2) *
-             (0.26315789473684f * 0.5f * RHO * 0.0025f);
+    thrust = (ve2 - airflow_x2) * (0.26315789473684f * 0.5f * RHO * 0.025f);
 
     /*
     Calculate airflow in the horizontal and vertical planes, as well as
@@ -470,8 +464,6 @@ const real_t *restrict state, const real_t *restrict control, bool print) {
     vertical_v = fsqrt(airflow_x2 + airflow_z2);
     vertical_v_inv = recip(max(1.0f, vertical_v));
 
-    //printf("vertical v %.6f v %.6f\n", vertical_v, horizontal_v2 + airflow_z2);
-
     /* Work out sin/cos of alpha and beta */
     real_t sin_alpha, cos_alpha, sin_beta, cos_beta, sin_cos_alpha;
 
@@ -481,24 +473,16 @@ const real_t *restrict state, const real_t *restrict control, bool print) {
     sin_alpha = -airflow[Z] * vertical_v_inv;
     cos_alpha = -airflow[X] * vertical_v_inv;
 
-    //printf("sb %.6f cb %.6f sa %.6f ca %.6f\n", sin_beta, cos_beta, sin_alpha, cos_alpha);
+    sin_cos_alpha = sin_alpha * cos_alpha;
 
     /* Work out aerodynamic forces in wind frame */
     real_t lift, drag, side_force;
 
-    /* Generalize lift force for very high / very low alpha */
-    sin_cos_alpha = sin_alpha * cos_alpha;
-    lift = 0.7f * sin_cos_alpha + 0.10;
-
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * lift;
+    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.15);
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.3f * sin_beta * cos_beta;
-
-    //printf("Alpha %.3f, beta %.3f\n", alpha, acos(cos_beta));
-    //printf("Forces - L %6.3f D %6.3f S %6.3f T %6.3f\n",
-    //       lift, drag, side_force, thrust);
 
     /* Convert aerodynamic forces from wind frame to body frame */
     real_t x_aero_f = lift * sin_alpha - drag * cos_alpha -
@@ -510,10 +494,6 @@ const real_t *restrict state, const real_t *restrict control, bool print) {
     out[0 + X] += x_aero_f + thrust;
     out[0 + Z] -= z_aero_f;
 
-    if (print) {
-        printf("Net force - X %6.3f Y %6.3f Z %6.3f\n", out[X], out[Y], out[Z]);
-    }
-
     /* Determine moments */
     real_t pitch_moment, yaw_moment, roll_moment,
            yaw_rate = state[10 + Z],
@@ -521,20 +501,15 @@ const real_t *restrict state, const real_t *restrict control, bool print) {
            roll_rate = state[10 + X],
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
-    pitch_moment = 0.0f - 0.04f * sin_cos_alpha - 0.005f * pitch_rate -
-                   0.05f * (left_aileron + right_aileron);
-    roll_moment = 0.01f * sin_beta - 0.1f * roll_rate +
-                  0.08f * (left_aileron - right_aileron);
+    pitch_moment = 0.0f - 0.05f * sin_cos_alpha - 0.003f * pitch_rate -
+                   0.04f * (left_aileron + right_aileron);
+    roll_moment = 0.03f * sin_beta - 0.05f * roll_rate +
+                  0.1f * (left_aileron - right_aileron);
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron));
     pitch_moment *= qbar;
     roll_moment *= qbar;
     yaw_moment *= qbar;
-
-    if (print) {
-        printf("Net moment - roll %6.3f pitch %6.3f yaw %6.3f\n", roll_moment,
-           pitch_moment, yaw_moment);
-    }
 
     /*
     Calculate angular acceleration (tau / inertia tensor).
@@ -592,8 +567,6 @@ const real_t *restrict s2) {
     delta[8] = err_q[Z] * d;
 }
 
-#include <stdio.h>
-
 #define IVP_PERTURBATION NMPC_EPS_4RT
 #define IVP_PERTURBATION_RECIP (real_t)(1.0 / IVP_PERTURBATION)
 static void _solve_interval_ivp(const real_t *restrict state_ref,
@@ -604,7 +577,7 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
 
     /* Solve the initial value problem at this horizon step. */
     _state_integrate_rk4(integrated_state, state_ref, control_ref,
-                         OCP_STEP_LENGTH, true);
+                         OCP_STEP_LENGTH);
 
     /*
     Calculate integration residuals -- the difference between the integrated
@@ -660,7 +633,7 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
 
         _state_integrate_rk4(new_state, perturbed_reference,
                              &perturbed_reference[NMPC_STATE_DIM],
-                             OCP_STEP_LENGTH, false);
+                             OCP_STEP_LENGTH);
 
         /*
         Calculate delta between perturbed state and original state, to
@@ -713,7 +686,7 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
 }
 
 /* Solves the QP using qpDUNES. */
-static bool _solve_qp(void) {
+static real_t _solve_qp(void) {
     return_t status_flag;
     real_t objective_value;
 
@@ -727,7 +700,6 @@ static bool _solve_qp(void) {
 
         /* Check the objective value. */
         objective_value = qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata);
-        printf("Objective value: %f\n", objective_value);
 
         /* Get the first set of control values */
         for (i = 0; i < NMPC_CONTROL_DIM; i++) {
@@ -739,14 +711,13 @@ static bool _solve_qp(void) {
             qpDUNES_setupStageQP(&ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i], QPDUNES_FALSE);
             ocp_qp_data.qpdata.intervals[i]->p = 0;
         }
-        return true;
+        return objective_value;
     } else {
         /* Check the objective value. */
         objective_value = qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata);
-        printf("FAILED objective value: %f\n", objective_value);
 
         /* Flag an error in some appropriate way */
-        return false;
+        return -1.0;
     }
 }
 
@@ -967,7 +938,7 @@ void nmpc_init(void) {
         Q, g, z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
-    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_TRUE);
+    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_FALSE);
 
     qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
@@ -986,7 +957,7 @@ enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     /* Return the next control state */
     memcpy(controls, ocp_control_value, sizeof(real_t) * NMPC_CONTROL_DIM);
 
-    if (ocp_last_result) {
+    if (ocp_last_result >= 0.0) {
         return NMPC_OK;
     } else {
         return NMPC_INFEASIBLE;
