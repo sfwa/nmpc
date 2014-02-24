@@ -294,6 +294,12 @@ void OptimalControlProblem::solve_qp() {
         control_horizon[0] =
             control_reference[0] +
             solution_map.segment<NMPC_CONTROL_DIM>(NMPC_DELTA_DIM);
+
+        for (i = 0; i <= OCP_HORIZON_LENGTH; i++) {
+            qpDUNES_setupStageQP(
+                &qp_data, qp_data.intervals[i], QPDUNES_FALSE);
+            qp_data.intervals[i]->p = 0;
+        }
     }
 }
 
