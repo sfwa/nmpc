@@ -67,7 +67,7 @@ def set_reference(point, index):
         index)
 
 def initialise_horizon():
-    _cnmpc.nmpc_init()
+    _cnmpc.nmpc_init(False)
 
 def prepare():
     _cnmpc.nmpc_preparation_step()
@@ -108,7 +108,7 @@ def init(implementation="c"):
 
     _cnmpc = cdll.LoadLibrary(lib)
 
-    _cnmpc.nmpc_init.argtypes = []
+    _cnmpc.nmpc_init.argtypes = [c_ubyte]
     _cnmpc.nmpc_init.restype = None
 
     _cnmpc.nmpc_config_get_precision.argtypes = []

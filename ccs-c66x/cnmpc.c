@@ -296,10 +296,12 @@ static real_t ocp_terminal_weights[NMPC_DELTA_DIM]; /* diagonal only */
 static real_t ocp_control_weights[NMPC_CONTROL_DIM]; /* diagonal only */
 
 static struct static_qpdata_t ocp_qp_data;
+static bool ocp_state_position_is_delta = false;
 
 /* Current control solution */
 static real_t ocp_control_value[NMPC_CONTROL_DIM];
 static real_t ocp_last_result;
+
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
 const real_t *restrict control);
@@ -314,7 +316,7 @@ static void _solve_interval_ivp(const real_t *restrict state_ref,
 const real_t *restrict control_ref, real_t *restrict out_jacobian,
 const real_t *restrict next_state_ref, real_t *restrict out_residuals);
 static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]);
-static bool _solve_qp(void);
+static real_t _solve_qp(void);
 
 
 static void _state_model(real_t *restrict out, const real_t *restrict state,
@@ -585,13 +587,17 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
 
     FIXME: this allows delta positions to be specified, rather than absolute.
     */
-    integrated_state[0] -= state_ref[0];
-    integrated_state[1] -= state_ref[1];
-    integrated_state[2] -= state_ref[2];
+    if (ocp_state_position_is_delta) {
+        integrated_state[0] -= state_ref[0];
+        integrated_state[1] -= state_ref[1];
+        integrated_state[2] -= state_ref[2];
+    }
     _state_to_delta(out_residuals, next_state_ref, integrated_state);
-    integrated_state[0] += state_ref[0];
-    integrated_state[1] += state_ref[1];
-    integrated_state[2] += state_ref[2];
+    if (ocp_state_position_is_delta) {
+        integrated_state[0] += state_ref[0];
+        integrated_state[1] += state_ref[1];
+        integrated_state[2] += state_ref[2];
+    }
 
     /* Calculate the Jacobian */
     for (i = 0; i < NMPC_GRADIENT_DIM; i++) {
@@ -865,7 +871,7 @@ const qpOptions_t *opts) {
     qpDUNES_indicateDataChange(&qp->qpdata);
 }
 
-void nmpc_init(void) {
+void nmpc_init(bool state_position_delta) {
     real_t C[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
            z_low[NMPC_GRADIENT_DIM],
            z_upp[NMPC_GRADIENT_DIM],
@@ -877,6 +883,8 @@ void nmpc_init(void) {
     qpOptions_t qp_options;
     size_t i;
 
+    ocp_state_position_is_delta = state_position_delta;
+
     /* Initialise state inequality constraints to +/-infinity. */
     for (i = 0; i < NMPC_DELTA_DIM; i++) {
         ocp_lower_state_bound[i] = -NMPC_INFTY;
@@ -885,7 +893,7 @@ void nmpc_init(void) {
 
     /* qpDUNES configuration */
     qp_options = qpDUNES_setupDefaultOptions();
-    qp_options.maxIter = 15;
+    qp_options.maxIter = 5;
     qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-3f;
 

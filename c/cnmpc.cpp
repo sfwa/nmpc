@@ -42,7 +42,7 @@ static State current;
 static OptimalControlProblem ocp =
     OptimalControlProblem(&dynamics_model);
 
-void nmpc_init() {
+void nmpc_init(bool state_position_delta) {
     ocp.initialise();
 }
 
