@@ -20,8 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef INTERFACE_H
-#define INTERFACE_H
+#ifndef CNMPC_INTERFACE_H
+#define CNMPC_INTERFACE_H
 
 #include <stdint.h>
 #include "config.h"
