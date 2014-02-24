@@ -481,7 +481,7 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.15);
+    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.15f);
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.3f * sin_beta * cos_beta;
