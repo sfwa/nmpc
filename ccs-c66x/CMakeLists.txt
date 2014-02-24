@@ -3,7 +3,7 @@ PROJECT(c66nmpc)
 
 INCLUDE_DIRECTORIES(qpDUNES ../include ../c)
 
-set(CMAKE_C_FLAGS "-O3 -Weverything -Wno-documentation -Wno-padded -Wno-unknown-pragmas -Wno-float-equal -fPIC")
+set(CMAKE_C_FLAGS "-O3 -Weverything -Wno-documentation -Wno-padded -Wno-unknown-pragmas -Wno-float-equal -Wunreachable-code -fPIC")
 
 ADD_LIBRARY(c66nmpc SHARED
     cnmpc.c
