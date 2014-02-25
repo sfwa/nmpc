@@ -423,10 +423,10 @@ const real_t *restrict state, const real_t *restrict control) {
     Determine airflow magnitude, and the magnitudes of the components in
     the vertical and horizontal planes
     */
-    real_t rpm = control[0] * 25000.0f, thrust,
+    real_t rpm = control[0] * 12000.0f, thrust,
            ve2 = (0.0025f * 0.0025f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
-    thrust = (ve2 - airflow_x2) * (0.26315789473684f * 0.5f * RHO * 0.025f);
+    thrust = (ve2 - airflow_x2) * (0.26315789473684f * 0.5f * RHO * 0.02f);
 
     /*
     Calculate airflow in the horizontal and vertical planes, as well as
@@ -478,12 +478,13 @@ const real_t *restrict state, const real_t *restrict control) {
            roll_rate = state[10 + X],
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
-    pitch_moment = 0.0f - 0.05f * sin_cos_alpha - 0.003f * pitch_rate -
-                   0.04f * (left_aileron + right_aileron);
+    pitch_moment = 0.0f - 0.001f * sin_cos_alpha - 0.003f * pitch_rate -
+                   0.04f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.03f * sin_beta - 0.05f * roll_rate +
-                  0.1f * (left_aileron - right_aileron);
+                  0.1f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
-                 0.01f * (absval(left_aileron) + absval(right_aileron));
+                 0.01f * (absval(left_aileron) + absval(right_aileron)) *
+                 vertical_v * 0.1f;
     pitch_moment *= qbar;
     roll_moment *= qbar;
     yaw_moment *= qbar;
