@@ -77,12 +77,12 @@ sparsityType_t qpDUNES_detectMatrixSparsity(	const real_t* const M,
 	int_t i,j;
 
 	if ( ( nRows < 1 ) || ( nCols < 1 ) || ( M == 0 ) )
-		return QPDUNES_OK;
+		return (sparsityType_t)QPDUNES_OK;
 
 	if ( nRows != nCols )
 	{
 		sparsityM = QPDUNES_DENSE;
-		return QPDUNES_OK;
+		return (sparsityType_t)QPDUNES_OK;
 	}
 
 	/* check for sparsity */
@@ -187,10 +187,10 @@ return_t qpDUNES_existsMatrix(	matrix_t* matrix
 							)
 {
 	if( matrix->data == 0 ) {
-		return QPDUNES_FALSE;
+		return (return_t)QPDUNES_FALSE;
 	}
 	else {
-		return QPDUNES_TRUE;
+		return (return_t)QPDUNES_TRUE;
 	}
 }
 
@@ -199,10 +199,10 @@ return_t qpDUNES_existsVector(	vector_t* vector
 							)
 {
 	if( vector->data == 0 ) {
-		return QPDUNES_FALSE;
+		return (return_t)QPDUNES_FALSE;
 	}
 	else {
-		return QPDUNES_TRUE;
+		return (return_t)QPDUNES_TRUE;
 	}
 }
 

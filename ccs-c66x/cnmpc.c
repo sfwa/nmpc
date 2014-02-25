@@ -254,31 +254,6 @@ const real_t *restrict s2) {
     }
 }
 
-static inline float fatan2(float y, float x) {
-#define PI_FLOAT     (real_t)3.14159265
-#define PIBY2_FLOAT  (real_t)1.5707963
-    if (x == (real_t)0.0) {
-        if (y > (real_t)0.0) return PIBY2_FLOAT;
-        if (y == (real_t)0.0) return (real_t)0.0;
-        return -PIBY2_FLOAT;
-    }
-    float res;
-    float z = divide(y, x);
-    if (absval(z) < (real_t)1.0) {
-        res = divide(z, ((real_t)1.0 + (real_t)0.28 * z * z));
-        if (x < (real_t)0.0) {
-            if (y < (real_t)0.0) return res - PI_FLOAT;
-            return res + PI_FLOAT;
-        }
-    } else {
-        res = PIBY2_FLOAT - z / (z * z + (real_t)0.28);
-        if (y < (real_t)0.0) return res - PI_FLOAT;
-    }
-    return res;
-#undef PI_FLOAT
-#undef PIBY2_FLOAT
-}
-
 static real_t wind_velocity[3];
 
 /* 26052B */
