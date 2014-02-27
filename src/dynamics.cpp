@@ -60,19 +60,23 @@ const State &in, const ControlVector &control) const {
     sin_beta = airflow.y() * v_inv;
     cos_beta = vertical_v * v_inv;
 
-    real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment;
+    real_t lift, drag, side_force, roll_moment, pitch_moment, yaw_moment,
+           left_aileron, right_aileron;
 
     lift = 0.8 * sin_cos_alpha + 0.15;
     drag = 0.05 + 0.7 * sin_alpha * sin_alpha;
     side_force = 0.3 * sin_beta * cos_beta;
 
-    pitch_moment = 0.0 - 0.05 * sin_cos_alpha - 0.003 * pitch_rate -
-                   0.04 * (control[1] - 0.5) - 0.04 * (control[2] - 0.5);
-    roll_moment = 0.03 * sin_beta - 0.05 * roll_rate +
-                  0.1 * (control[1] - 0.5) - 0.1 * (control[2] - 0.5);
-    yaw_moment = -0.02 * sin_beta - 0.05 * yaw_rate -
-                 0.01 * std::abs(control[1] - 0.5) +
-                 0.01 * std::abs(control[2] - 0.5);
+    left_aileron = control[1] - 0.5f;
+    right_aileron = control[2] - 0.5f;
+
+    pitch_moment = 0.0 + 0.015f * sin_cos_alpha - 0.003f * pitch_rate -
+                   0.05f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+    roll_moment = 0.02f * sin_beta - 0.08f * roll_rate +
+                  0.1f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+    yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
+                 0.01f * (std::abs(left_aileron) + std::abs(right_aileron)) *
+                 vertical_v * 0.1f;
 
     /*
     Determine motor thrust and torque.

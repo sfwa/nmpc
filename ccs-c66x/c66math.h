@@ -124,4 +124,9 @@ static inline float recip_f(float b) {
 
 #endif
 
+/* Non-TI compatibility */
+#ifndef __TI_COMPILER_VERSION__
+#define _nassert(x) assert(x)
+#endif
+
 #endif

@@ -50,11 +50,11 @@ enum nmpc_result_t {
 };
 
 /*
-If state_position_delta is true, the position component of each state vector
+If use_relative_positions is true, the position component of each state vector
 in the reference trajectory is assumed to be relative to the previous state
 vector.
 */
-void nmpc_init(bool state_position_delta);
+void nmpc_init(bool use_relative_positions);
 void nmpc_preparation_step(void);
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]);
 enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]);

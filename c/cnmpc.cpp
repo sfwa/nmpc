@@ -39,10 +39,10 @@ static State current;
     IntegratorEuler integrator;
 #endif
 
-static OptimalControlProblem ocp =
-    OptimalControlProblem(&dynamics_model);
+static OptimalControlProblem ocp;
 
-void nmpc_init(bool state_position_delta) {
+void nmpc_init(bool use_relative_positions) {
+    ocp = OptimalControlProblem(&dynamics_model, use_relative_positions);
     ocp.initialise();
 }
 

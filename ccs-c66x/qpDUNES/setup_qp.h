@@ -34,107 +34,38 @@
 #define QP42_SETUP_QP_H
 
 
-#include <stdlib.h>
-#include <assert.h>
 #include "types.h"
 #include "matrix_vector.h"
 #include "utils.h"
 
 
-void qpDUNES_indicateDataChange(	qpData_t* const qpData
-									);
+void qpDUNES_indicateDataChange(qpData_t* const qpData);
 
+return_t qpDUNES_setupRegularInterval(qpData_t* const qpData,
+interval_t* interval, const real_t* const Q_, const real_t* const R_,
+const real_t* const g_, const real_t* const C_, const real_t* const c_,
+const real_t* const zLow_, const real_t* const zUpp_, const real_t* const D_,
+const real_t* const dLow_, const real_t* const dUpp_);
 
-return_t qpDUNES_updateData(	qpData_t* const qpData,
-								const real_t* const H_,
-								const real_t* const g_,
-								const real_t* const C_,
-								const real_t* const c_,
-								const real_t* const zLow_,
-								const real_t* const zUpp_,
-								const real_t* const D_,
-								const real_t* const dLow_,
-								const real_t* const dUpp_
-								);
+return_t qpDUNES_setupFinalInterval(qpData_t* const qpData,
+interval_t* interval, const real_t* const H_, const real_t* const g_,
+const real_t* const zLow_, const real_t* const zUpp_, const real_t* const D_,
+const real_t* const dLow_, const real_t* const dUpp_);
 
+return_t qpDUNES_updateIntervalData(qpData_t* const qpData,
+interval_t* interval, const real_t* const g_, const real_t* const C_,
+const real_t* const c_, const real_t* const zLow_, const real_t* const zUpp_,
+const real_t* const D_, const real_t* const dLow_, const real_t* const dUpp_);
 
-return_t qpDUNES_setupRegularInterval(	qpData_t* const qpData,
-									interval_t* interval,
-									const real_t* const H_,
-									const real_t* const Q_,
-									const real_t* const R_,
-									const real_t* const S_,
-									const real_t* const g_,
-									const real_t* const C_,
-									const real_t* const A_,
-									const real_t* const B_,
-									const real_t* const c_,
-									const real_t* const zLow_,
-									const real_t* const zUpp_,
-									const real_t* const xLow_,
-									const real_t* const xUpp_,
-									const real_t* const uLow_,
-									const real_t* const uUpp_,
-									const real_t* const D_,
-									const real_t* const dLow_,
-									const real_t* const dUpp_
-									);
+return_t qpDUNES_setupAllLocalQPs(qpData_t* const qpData);
 
+return_t qpDUNES_setupStageQP(qpData_t* const qpData,
+interval_t* const interval, boolean_t copyCholH);
 
-return_t qpDUNES_setupFinalInterval(	qpData_t* const qpData,
-									interval_t* interval,
- 									const real_t* const H_,
- 									const real_t* const g_,
-									const real_t* const zLow_,
-									const real_t* const zUpp_,
-									const real_t* const D_,
-									const real_t* const dLow_,
-									const real_t* const dUpp_
-									);
+return_t qpDUNES_shiftIntervals(qpData_t* const qpData);
 
-return_t qpDUNES_updateIntervalData(	qpData_t* const qpData,
-										interval_t* interval,
-										const real_t* const H_,
-										const real_t* const g_,
-										const real_t* const C_,
-										const real_t* const c_,
-										const real_t* const zLow_,
-										const real_t* const zUpp_,
-										const real_t* const D_,
-										const real_t* const dLow_,
-										const real_t* const dUpp_,
-										vv_matrix_t* const cholH
-										);
+return_t qpDUNES_shiftLambda(qpData_t* const qpData);
 
-
-/* ----------------------------------------------
- * first set up of local QP
- *
- >>>>>>                                           */
-return_t qpDUNES_setupAllLocalQPs(	qpData_t* const qpData,
-								boolean_t isLTI
-								);
-
-
-return_t qpDUNES_setupStageQP(	qpData_t* const qpData,
-								interval_t* const interval,
-								boolean_t copyCholH
-								);
-
-
-return_t qpDUNES_shiftIntervals(	qpData_t* const qpData
-								);
-
-return_t qpDUNES_shiftLambda(	qpData_t* const qpData
-							);
-
-
-qpOptions_t qpDUNES_setupDefaultOptions(	/*qpData_t* const qpData*/
-										);
+qpOptions_t qpDUNES_setupDefaultOptions(void);
 
 #endif	/* QP42_SETUP_QP_H */
-
-
-/*
- *	end of file
- */

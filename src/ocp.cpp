@@ -32,7 +32,8 @@ extern "C"
 #include "state.h"
 #include "debug.h"
 
-OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
+OptimalControlProblem::OptimalControlProblem(DynamicsModel *d,
+bool use_relative_positions) {
 #if defined(NMPC_INTEGRATOR_RK4)
     integrator = IntegratorRK4();
 #elif defined(NMPC_INTEGRATOR_HEUN)
@@ -42,6 +43,7 @@ OptimalControlProblem::OptimalControlProblem(DynamicsModel *d) {
 #endif
 
     dynamics = d;
+    relative_positions = use_relative_positions;
 
     /* Initialise inequality constraints to +/-infinity. */
     lower_state_bound = StateConstraintVector::Ones() * -NMPC_INFTY;
@@ -152,10 +154,19 @@ void OptimalControlProblem::solve_ivps(uint32_t i) {
     /*
     Calculate integration residuals; these are needed for the continuity
     constraints.
+
+    If we're set to use relative positions, remove the initial reference state
+    position value in the integration residuals.
     */
+    StateVector position_delta;
+    if (relative_positions) {
+        position_delta << state_reference[i][0], state_reference[i][1],
+                          state_reference[i][2];
+    }
+
     integration_residuals[i] = state_to_delta(
         state_reference[i+1],
-        integrated_state_horizon[i]);
+        integrated_state_horizon[i] - position_delta);
 }
 
 /*

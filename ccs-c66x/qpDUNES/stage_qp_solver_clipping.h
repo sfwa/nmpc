@@ -21,15 +21,6 @@
  *
  */
 
-
-/**
- *	\file include/qp/stage_qp_solver_clipping.h
- *	\author Janick Frasch
- *	\version 1.0beta
- *	\date 2012
- */
-
-
 #ifndef QP42_STAGE_QP_SOLVER_CLIPPING_H
 #define QP42_STAGE_QP_SOLVER_CLIPPING_H
 
@@ -37,75 +28,36 @@
 #include "types.h"
 #include "matrix_vector.h"
 #include "utils.h"
-#include <assert.h>
 
-/** ... */
-return_t directQpSolver_solve( qpData_t* qpData,
-									 interval_t* interval );
+return_t directQpSolver_solve(qpData_t* qpData, interval_t* interval);
 
-/** ... */
-return_t clippingQpSolver_updateStageData(	qpData_t* const qpData,
-												interval_t* const interval,
-												const z_vector_t* const lambdaK,
-												const z_vector_t* const lambdaK1
-												);
+return_t clippingQpSolver_updateStageData(qpData_t* const qpData,
+interval_t* const interval, const z_vector_t* const lambdaK,
+const z_vector_t* const lambdaK1);
 
+return_t directQpSolver_solveUnconstrained(qpData_t* const qpData,
+interval_t* const interval, const z_vector_t* const qStep);
 
-/** ... */
-return_t directQpSolver_solveUnconstrained( qpData_t* const qpData,
-									 	 	 	 interval_t* const interval,
-									 	 	 	 const z_vector_t* const qStep );
+return_t directQpSolver_getMinStepsize(const interval_t* const interval,
+real_t* alphaMin);
 
+return_t directQpSolver_doStep(qpData_t* const qpData,
+interval_t* const interval, const z_vector_t* const stepDir, real_t alpha,
+z_vector_t* const zUnconstrained, z_vector_t* const z, d2_vector_t* const mu,
+z_vector_t* const q, real_t* const p);
 
-/** ... */
-return_t directQpSolver_getMinStepsize( const qpData_t* const qpData,
-										const interval_t* const interval,
-										real_t* alphaMin );
+return_t directQpSolver_saturateVector(qpData_t* const qpData,
+d_vector_t* const vec, d2_vector_t* const mu, const d_vector_t* const lb,
+const d_vector_t* const ub, size_t nD);
 
+return_t clippingQpSolver_ratioTest(qpData_t* const qpData,
+real_t* minStepSizeASChange,	/* minimum step size that leads to active set change */
+d_vector_t* const zStepDir,
+d2_vector_t* const mu,			/* pseudo multipliers, resembling the gaps to the bounds; + active, - inactive */
+const d_vector_t* const lb, const d_vector_t* const ub, size_t nV);
 
-/** ... */
-return_t directQpSolver_doStep( qpData_t* const qpData,
-								interval_t* const interval,
-								const z_vector_t* const stepDir,
-								real_t alpha,
-								z_vector_t* const zUnconstrained,
-								z_vector_t* const z,
-								d2_vector_t* const mu,
-								z_vector_t* const q,
-								real_t* const p				);
-
-
-
-/** ... */
-return_t directQpSolver_saturateVector(	qpData_t* const qpData,
-												d_vector_t* const vec,
-												d2_vector_t* const mu,
-												const d_vector_t* const lb,
-												const d_vector_t* const ub,
-												int_t nD
-												);
-
-
-/** ... */
-return_t clippingQpSolver_ratioTest(	qpData_t* const qpData,
-									real_t* minStepSizeASChange,	/* minimum step size that leads to active set change */
-									d_vector_t* const zStepDir,
-									d2_vector_t* const mu,			/* pseudo multipliers, resembling the gaps to the bounds; + active, - inactive */
-									const d_vector_t* const lb,
-									const d_vector_t* const ub,
-									int_t nV
-									);
-
-
-/** ... */
-real_t directQpSolver_getObjectiveValue(	qpData_t* const qpData,
-												interval_t* const interval
-												);
+real_t directQpSolver_getObjectiveValue(qpData_t* const qpData,
+interval_t* const interval);
 
 
 #endif	/* QP42_STAGE_QP_SOLVER_CLIPPING_H */
-
-
-/*
- *	end of file
- */

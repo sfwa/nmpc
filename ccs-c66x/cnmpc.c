@@ -30,12 +30,13 @@ SOFTWARE.
     #include "config.h"
     #include "../c/cnmpc.h"
 #else
-    #define UKF_USE_DSP_INTRINSICS
+    #define USE_DSP_INTRINSICS
 
     #include "config.h"
     #include "cnmpc.h"
 #endif
 
+#include "c66math.h"
 #include "qpDUNES/qpDUNES.h"
 
 /*
@@ -137,11 +138,6 @@ struct static_qpdata_t {
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
-/* Non-TI compatibility */
-#ifndef __TI_COMPILER_VERSION__
-#define _nassert(x)
-#endif
-
 #ifndef M_PI
 #define M_PI ((real_t)3.14159265358979323846)
 #define M_PI_2 (M_PI * 0.5)
@@ -159,10 +155,6 @@ struct static_qpdata_t {
 #define G_ACCEL ((real_t)9.80665)
 #define RHO ((real_t)1.225)
 
-#define sqrt_inv(x) (real_t)(1.0 / sqrt((x)))
-#define divide(a, b) ((a) / (b))
-#define recip(a) (real_t)(1.0 / (a))
-#define fsqrt(a) (real_t)sqrt((a))
 
 /* Math routines -- assume float */
 static inline void quaternion_multiply(real_t *restrict res,
@@ -436,10 +428,10 @@ const real_t *restrict state, const real_t *restrict control) {
 
     horizontal_v2 = airflow_x2 + airflow_y2;
     qbar = (RHO * 0.5f) * horizontal_v2;
-    v_inv = sqrt_inv(max(1.0f, horizontal_v2 + airflow_z2));
+    v_inv = recip_sqrt_f(max(1.0f, horizontal_v2 + airflow_z2));
 
-    vertical_v = fsqrt(airflow_x2 + airflow_z2);
-    vertical_v_inv = recip(max(1.0f, vertical_v));
+    vertical_v = sqrt_f(airflow_x2 + airflow_z2);
+    vertical_v_inv = recip_f(max(1.0f, vertical_v));
 
     /* Work out sin/cos of alpha and beta */
     real_t sin_alpha, cos_alpha, sin_beta, cos_beta, sin_cos_alpha;
@@ -478,9 +470,9 @@ const real_t *restrict state, const real_t *restrict control) {
            roll_rate = state[10 + X],
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
-    pitch_moment = 0.0f - 0.001f * sin_cos_alpha - 0.003f * pitch_rate -
-                   0.04f * (left_aileron + right_aileron) * vertical_v * 0.1f;
-    roll_moment = 0.03f * sin_beta - 0.05f * roll_rate +
+    pitch_moment = 0.0f + 0.015f * sin_cos_alpha - 0.003f * pitch_rate -
+                   0.05f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+    roll_moment = 0.02f * sin_beta - 0.08f * roll_rate +
                   0.1f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron)) *
@@ -539,7 +531,7 @@ const real_t *restrict s2) {
         err_q[W] = -err_q[W];
     }
 
-    real_t d = NMPC_MRP_F / (NMPC_MRP_A + err_q[W]);
+    real_t d = NMPC_MRP_F * recip_f(NMPC_MRP_A + err_q[W]);
     delta[6] = err_q[X] * d;
     delta[7] = err_q[Y] * d;
     delta[8] = err_q[Z] * d;
@@ -660,8 +652,8 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
 
     return_t status_flag;
     status_flag = qpDUNES_updateIntervalData(
-        &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[0], 0, 0, 0, 0,
-        z_low, z_upp, 0, 0, 0, 0);
+        &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[0], 0, 0, 0,
+        z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
     qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
@@ -690,7 +682,9 @@ static real_t _solve_qp(void) {
         }
 
         for (i = 0; i <= OCP_HORIZON_LENGTH; i++) {
-            qpDUNES_setupStageQP(&ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i], QPDUNES_FALSE);
+            qpDUNES_setupStageQP(
+                &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i],
+                QPDUNES_FALSE);
             ocp_qp_data.qpdata.intervals[i]->p = 0;
         }
         return objective_value;
@@ -847,7 +841,7 @@ const qpOptions_t *opts) {
     qpDUNES_indicateDataChange(&qp->qpdata);
 }
 
-void nmpc_init(bool state_position_delta) {
+void nmpc_init(bool use_relative_positions) {
     real_t C[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
            z_low[NMPC_GRADIENT_DIM],
            z_upp[NMPC_GRADIENT_DIM],
@@ -859,7 +853,7 @@ void nmpc_init(bool state_position_delta) {
     qpOptions_t qp_options;
     size_t i;
 
-    ocp_state_position_is_delta = state_position_delta;
+    ocp_state_position_is_delta = use_relative_positions;
 
     /* Initialise state inequality constraints to +/-infinity. */
     for (i = 0; i < NMPC_DELTA_DIM; i++) {
@@ -869,9 +863,9 @@ void nmpc_init(bool state_position_delta) {
 
     /* qpDUNES configuration */
     qp_options = qpDUNES_setupDefaultOptions();
-    qp_options.maxIter = 5;
+    qp_options.maxIter = 10;
     qp_options.printLevel = 0;
-    qp_options.stationarityTolerance = 1e-3f;
+    qp_options.stationarityTolerance = 1e-1f;
 
     /* Set up problem dimensions. */
     _init_static_qp(&ocp_qp_data, &qp_options);
@@ -908,7 +902,7 @@ void nmpc_init(bool state_position_delta) {
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_setupRegularInterval(
             &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i],
-            0, Q, R, 0, g, C, 0, 0, c, z_low, z_upp, 0, 0, 0, 0, 0, 0, 0);
+            Q, R, g, C, c, z_low, z_upp, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
     }
 
@@ -922,7 +916,7 @@ void nmpc_init(bool state_position_delta) {
         Q, g, z_low, z_upp, 0, 0, 0);
     assert(status_flag == QPDUNES_OK);
 
-    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata, QPDUNES_FALSE);
+    qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata);
 
     qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
@@ -1054,7 +1048,7 @@ uint32_t i) {
         /* Copy the relevant data into the qpDUNES arrays. */
         status_flag = qpDUNES_updateIntervalData(
             &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i - 1u],
-            0, gradient, jacobian, residuals, z_low, z_upp, 0, 0, 0, 0);
+            gradient, jacobian, residuals, z_low, z_upp, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
     }
 }

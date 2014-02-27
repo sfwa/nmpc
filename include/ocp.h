@@ -44,6 +44,8 @@ class OptimalControlProblem {
     IntegratorEuler integrator;
 #endif
 
+    bool relative_positions;
+
     DynamicsModel *dynamics;
 
     ControlVector control_reference[OCP_HORIZON_LENGTH];
@@ -94,7 +96,7 @@ class OptimalControlProblem {
     void solve_qp();
 
 public:
-    OptimalControlProblem(DynamicsModel *d);
+    OptimalControlProblem(DynamicsModel *d, bool use_relative_positions);
     void initialise();
     void set_state_weights(const DeltaVector &in) {
         state_weights.diagonal() = in;

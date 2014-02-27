@@ -53,12 +53,6 @@
 /*#define __MEASURE_TIMINGS__*/				/* measure computation times */
 /*#undef __MEASURE_TIMINGS__*/
 
-#define __ANALYZE_FACTORIZATION__			/* log inverse Newton Hessian for analysis */
-#undef __ANALYZE_FACTORIZATION__
-
-#define __QPDUNES_PARALLEL__				/* use openMP parallelization */
-#undef __QPDUNES_PARALLEL__
-
 #define PRINTING_PRECISION 14
 
 #ifdef __MATLAB__
@@ -112,9 +106,9 @@
 
 /** MATRIX ACCESS */
 /*                                                block offset   row offset   column offset (0=diag,-1=supDiag)   column */
-#define accHessian( K, L, I, J )	hessian->data[ (K)*2*_NX_*_NX_  + (I)*2*_NX_   + (1+L)*_NX_                         + (J) ]
+#define accHessian( K, L, I, J )	hessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (1u+L)*_NX_                         + (J) ]
 /*                                                        block offset   row offset   column offset (0=diag,-1=supDiag)   column */
-#define accCholHessian( K, L, I, J )	cholHessian->data[ (K)*2*_NX_*_NX_  + (I)*2*_NX_   + (1+L)*_NX_                         + (J) ]
+#define accCholHessian( K, L, I, J )	cholHessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (1u+L)*_NX_                         + (J) ]
 
 #define accH( I, J )	H->data[ (I)*nV + (J) ]
 
@@ -570,10 +564,6 @@ typedef struct
 	d2n1_vector_t y;
 
 	xn_vector_t regDirections; 		/* log the regularized directions delta, for Newton system (H+diag(delta))*lambda = -g */
-
-	#ifdef __ANALYZE_FACTORIZATION__
-	xnxn_matrix_t invHessian;
-	#endif
 
 	int_t** ieqStatus;
 	int_t** prevIeqStatus;

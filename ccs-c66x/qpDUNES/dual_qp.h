@@ -122,10 +122,6 @@ return_t qpDUNES_multiplyNewtonHessianVector(	qpData_t* const qpData,
 											const xn_vector_t* const vec	);
 
 
-return_t qpDUNES_diffWorkingSet(	qpData_t* const qpData
-								);
-
-
 return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 									xn_vector_t* const lambda,
 									xn_vector_t* const deltaLambdaFS,
