@@ -328,7 +328,7 @@ interval_t* const interval, boolean_t refactorHessian) {
     interval->qpSolverSpecification = QPDUNES_STAGE_QP_SOLVER_CLIPPING;
 
     /* (b) prepare clipping QP solver */
-    if (refactorHessian == QPDUNES_TRUE)  {
+    if (refactorHessian == QPDUNES_TRUE) {
         /*
         only first Hessian needs to be factorized in LTI case, others can
         be copied; last one might still be different, due to terminal

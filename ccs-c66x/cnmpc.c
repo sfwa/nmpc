@@ -864,7 +864,7 @@ void nmpc_init(bool use_relative_positions) {
 
     /* qpDUNES configuration */
     qp_options = qpDUNES_setupDefaultOptions();
-    qp_options.maxIter = 10;
+    qp_options.maxIter = 7;
     qp_options.printLevel = 0;
     qp_options.stationarityTolerance = 1e-1f;
 

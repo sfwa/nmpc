@@ -102,9 +102,6 @@ const vector_t* const x, size_t dim0, size_t dim1);
 real_t multiplyVectorMatrixVector(const matrix_t* const M,
 const vector_t* const x, size_t dim0);
 
-return_t multiplyMatrixTVector(vector_t* const res, const matrix_t* const M,
-const vector_t* const x, size_t dim0, size_t dim1);
-
 return_t multiplyInvMatrixVector(qpData_t* const qpData, vector_t* const res,
 const matrix_t* const cholH, const vector_t* const x,
 size_t dim0); /* dimension of symmetric matrix */
@@ -124,21 +121,9 @@ const real_t* const M, const real_t* const x, size_t dim0);
 real_t multiplyVectorMatrixVectorDiagonal(const real_t* const M,
 const real_t* const x, size_t dim0	);
 
-/** Dense generic transposed matrix-vector product res = M.T*x */
-return_t multiplyMatrixTVectorDense(real_t* const res,
-const real_t* const M,	/* untransposed matrix */
-const real_t* const x, size_t dim0, size_t dim1);
-
-/** Sparse generic transposed matrix-vector product res = M.T*x */
-return_t multiplyMatrixTVectorSparse(real_t* const res,
-const real_t* const M, const real_t* const x, size_t dim0, size_t dim1);
-
 /** Low-level scalar product */
 real_t scalarProd(const vector_t* const x, const vector_t* const y,
 size_t len);
-
-return_t addVectors(vector_t* const res, const vector_t* const x,
-const vector_t* const y, size_t len);
 
 return_t addToVector(vector_t* const res, const vector_t* const update,
 size_t len);

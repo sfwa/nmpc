@@ -28,8 +28,6 @@
 #include "types.h"
 
 
-const real_t* offsetArray(const real_t* const data, size_t offset);
-
 sparsityType_t qpDUNES_detectMatrixSparsity(const real_t* const M,
 size_t nRows, size_t nCols);
 

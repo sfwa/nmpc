@@ -11,7 +11,6 @@ ADD_LIBRARY(c66nmpc SHARED
     qpDUNES/matrix_vector.c
     qpDUNES/setup_qp.c
     qpDUNES/stage_qp_solver_clipping.c
-    qpDUNES/stage_qp_solver_qpoases.cpp
     qpDUNES/utils.c)
 ADD_LIBRARY(fcsnmpc STATIC
     cnmpc.c
@@ -19,5 +18,4 @@ ADD_LIBRARY(fcsnmpc STATIC
     qpDUNES/matrix_vector.c
     qpDUNES/setup_qp.c
     qpDUNES/stage_qp_solver_clipping.c
-    qpDUNES/stage_qp_solver_qpoases.cpp
     qpDUNES/utils.c)

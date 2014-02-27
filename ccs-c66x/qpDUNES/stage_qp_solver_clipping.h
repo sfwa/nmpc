@@ -50,14 +50,5 @@ return_t directQpSolver_saturateVector(qpData_t* const qpData,
 d_vector_t* const vec, d2_vector_t* const mu, const d_vector_t* const lb,
 const d_vector_t* const ub, size_t nD);
 
-return_t clippingQpSolver_ratioTest(qpData_t* const qpData,
-real_t* minStepSizeASChange,	/* minimum step size that leads to active set change */
-d_vector_t* const zStepDir,
-d2_vector_t* const mu,			/* pseudo multipliers, resembling the gaps to the bounds; + active, - inactive */
-const d_vector_t* const lb, const d_vector_t* const ub, size_t nV);
-
-real_t directQpSolver_getObjectiveValue(qpData_t* const qpData,
-interval_t* const interval);
-
 
 #endif	/* QP42_STAGE_QP_SOLVER_CLIPPING_H */

@@ -40,13 +40,6 @@
 return_t qpDUNES_solve(qpData_t* const qpData) {
 	uint_t ii, kk;
 
-
-	#ifdef __MEASURE_TIMINGS__
-    real_t 	tItStart, tItEnd, tQpStart, tQpEnd, tNwtnSetupStart, tNwtnSetupEnd,
-			tNwtnFactorStart, tNwtnFactorEnd, tNwtnSolveStart, tNwtnSolveEnd,
-			tLineSearchStart, tLineSearchEnd, tDiff;
-	#endif
-
 	return_t statusFlag = QPDUNES_OK; /* generic status flag */
 	int_t lastActSetChangeIdx = _NI_;
 	real_t objValIncumbent = qpData->options.QPDUNES_INFTY;
@@ -60,9 +53,6 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 	/** (1) todo: initialize local active sets (at least when using qpOASES) with initial guess from previous iteration */
 
 	/** (2) solve local QP problems for initial guess of lambda */
-	#ifdef __MEASURE_TIMINGS__
-	tQpStart = getTime();
-	#endif
 
 	/* resolve initial QPs for possibly changed bounds (initial value embedding) */
 	for (ii = 0; ii < _NI_ + 1; ++ii) {
@@ -125,9 +115,6 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 			}
 
 			/** (1Bb) factorize Newton system */
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnFactorStart = getTime();
-			#endif
 			statusFlag = qpDUNES_factorNewtonSystem(qpData, &(itLogPtr->isHessianRegularized), lastActSetChangeIdx);		/* TODO! can we get a problem with on-the-fly regularization in partial refactorization? might only be partially reg.*/
 			switch (statusFlag) {
 				case QPDUNES_OK:
@@ -135,14 +122,8 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 				default:
 					return statusFlag;
 			}
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnFactorEnd = getTime();
-			#endif
 
 			/** (1Bc) compute step direction */
-			#ifdef __MEASURE_TIMINGS__
-			tNwtnSolveStart = getTime();
-			#endif
 			switch (qpData->options.nwtnHssnFacAlg) {
 			case QPDUNES_NH_FAC_BAND_FORWARD:
 				statusFlag = qpDUNES_solveNewtonEquation(qpData, &(qpData->deltaLambda), &(qpData->cholHessian), &(qpData->gradient));
@@ -234,44 +215,6 @@ void qpDUNES_logIteration(	qpData_t* qpData,
 	itLogPtr->lambdaNorm = vectorNorm(&(qpData->lambda), _NI_ * _NX_);
 	itLogPtr->objVal = objValIncumbent;
 	itLogPtr->lastActSetChangeIdx = lastActSetChangeIdx;
-
-	/* full logging */
-	if (qpData->options.logLevel == QPDUNES_LOG_ALL_DATA) {
-		/* - dual variables */
-		qpDUNES_copyVector(&(itLogPtr->lambda), &(qpData->lambda), _NI_ * _NX_);
-		qpDUNES_copyVector(&(itLogPtr->deltaLambda), &(qpData->deltaLambda),
-				_NI_ * _NX_);
-		/* - Newton system */
-		for (ii = 0; ii < _NI_ * _NX_ * 2 * _NX_; ++ii) {
-			itLogPtr->hessian.data[ii] = qpData->hessian.data[ii];
-			itLogPtr->cholHessian.data[ii] = qpData->cholHessian.data[ii];
-		}
-		for (ii = 0; ii < _NI_ * _NX_; ++ii) {
-			itLogPtr->gradient.data[ii] = qpData->gradient.data[ii];
-		}
-		/* - local primal and variables */
-		for (kk = 0; kk < _NI_ + 1; ++kk) {
-			interval_t* interval = qpData->intervals[kk];
-			/* dz */
-			for (ii = 0; ii < interval->nV; ++ii) {
-				itLogPtr->dz.data[kk * _NZ_ + ii] =
-						interval->qpSolverClipping.dz.data[ii];
-			}
-			/* zUnconstrained */
-			for (ii = 0; ii < interval->nV; ++ii) {
-				itLogPtr->zUnconstrained.data[kk * _NZ_ + ii] =
-						interval->qpSolverClipping.zUnconstrained.data[ii];
-			}
-			/* z */
-			for (ii = 0; ii < interval->nV; ++ii) {
-				itLogPtr->z.data[kk * _NZ_ + ii] = interval->z.data[ii];
-			}
-			/*TODO: fix logging of multipliers! */
-			/* y */
-		}
-	}
-
-	return;
 }
 /*<<< END OF qpDUNES_logIteration */
 
@@ -337,13 +280,13 @@ return_t qpDUNES_solveAllLocalQPs(	qpData_t* const qpData,
 	/* 2) solve local QPs */
 	/* TODO: check what happens in case of errors (return)*/
 	/* Note: const variables are predetermined shared (at least on apple)*/
-		for (kk = 0; kk < _NI_ + 1; ++kk) {
-			statusFlag = qpDUNES_solveLocalQP(qpData, qpData->intervals[kk]);
-			if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
-				errCntr++;
-			}
+	for (kk = 0; kk < _NI_ + 1; ++kk) {
+		statusFlag = qpDUNES_solveLocalQP(qpData, qpData->intervals[kk]);
+		if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
+			errCntr++;
 		}
-/*	}*/ /* END of omp parallel */
+	}
+
 	if (errCntr > 0) {
 		return QPDUNES_ERR_STAGE_QP_INFEASIBLE;
 	}
@@ -499,10 +442,11 @@ return_t qpDUNES_computeNewtonGradient(qpData_t* const qpData, xn_vector_t* grad
 		multiplyCz(qpData, gradPiece, &(intervals[kk]->C), &(intervals[kk]->z));
 		addToVector(gradPiece, &(intervals[kk]->c), _NX_);
 
-		/* subtractFromVector( xVecTmp, &(intervals[kk+1]->x), _NX_ ); */
-		for (ii = 0; ii < _NX_; ++ii) {
+		subtractFromVector(gradPiece, &(intervals[kk+1]->z), _NX_);
+
+		/* for (ii = 0; ii < _NX_; ++ii) {
 			gradPiece->data[ii] -= intervals[kk + 1]->z.data[ii];
-		}
+		} */
 
 		/* write gradient part */
 		for (ii = 0; ii < _NX_; ++ii) {
@@ -546,8 +490,6 @@ return_t qpDUNES_factorNewtonSystem( qpData_t* const qpData,
 	if (statusFlag == QPDUNES_OK) {
 		for (kk = 0; kk < _NI_; ++kk) {
 			for (ii = 0; ii < _NX_; ++ii) {
-/*				if (minDiagElem > fabs(accCholHessian(kk, 0, ii, ii)) ) {
-					minDiagElem = fabs( accCholHessian(kk, 0, ii, ii) );*/
 				if (minDiagElem > accCholHessian(kk, 0, ii, ii) ) {
 					minDiagElem = accCholHessian(kk, 0, ii, ii);
 				}
@@ -855,17 +797,10 @@ return_t qpDUNES_solveNewtonEquation(	qpData_t* const qpData,
 				sum -= accCholHessian(kk,0,ii,jj)* res->data[kk*_NX_+jj];
 			}
 
-			/* divide by diagonal element */
-			#if defined(__USE_ASSERTS__)
-			if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-				return QPDUNES_ERR_DIVISION_BY_ZERO;
-			}
-			#endif
 			/* temporarily to try Wright1999 */
-			if (accCholHessian(kk,0,ii,ii)> qpData->options.QPDUNES_INFTY) {
+			if (accCholHessian(kk,0,ii,ii) > qpData->options.QPDUNES_INFTY) {
 				res->data[kk*_NX_+ii] = 0.;
-			}
-			else {
+			} else {
 				res->data[kk*_NX_+ii] = divide_f(sum, accCholHessian(kk,0,ii,ii));
 			}
 		}
@@ -887,12 +822,6 @@ return_t qpDUNES_solveNewtonEquation(	qpData_t* const qpData,
 				}
 			}
 
-			/* divide by diagonal element */
-			#if defined(__USE_ASSERTS__)
-				if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-					return QPDUNES_ERR_DIVISION_BY_ZERO;
-				}
-			#endif
 			res->data[kk * _NX_ + ii] = divide_f(sum, accCholHessian(kk,0,ii,ii));
 		}
 	}
@@ -932,11 +861,6 @@ return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 			}
 
 			/* divide by diagonal element */
-			#if defined(__USE_ASSERTS__)
-				if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-					return QPDUNES_ERR_DIVISION_BY_ZERO;
-				}
-			#endif
 			res->data[kk * _NX_ + ii] = divide_f(sum, accCholHessian(kk,0,ii,ii));
 		}
 	}
@@ -958,11 +882,6 @@ return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 			}
 
 			/* divide by diagonal element */
-			#if defined(__USE_ASSERTS__)
-				if ( fabs( accCholHessian(kk,0,ii,ii) ) < qpData->options.QPDUNES_ZERO * fabs( sum ) ) {
-					return QPDUNES_ERR_DIVISION_BY_ZERO;
-				}
-			#endif
 			res->data[kk * _NX_ + ii] = divide_f(sum, accCholHessian(kk,0,ii,ii));
 		}
 	}
@@ -970,62 +889,6 @@ return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 	return QPDUNES_OK;
 }
 /*<<< END OF qpDUNES_solveNewtonEquationBottomUp */
-
-
-/* ----------------------------------------------
- * special multiplication routine for Newton Hessian with a vector
- *
- >>>>>>                                           */
-return_t qpDUNES_multiplyNewtonHessianVector(	qpData_t* const qpData,
-												xn_vector_t* const res,
-												const xn2x_matrix_t* const hessian, /**< Newton Hessian */
-												const xn_vector_t* const vec	)
-{
-	int_t ii, jj, kk;
-
-
-	for (kk = 0; kk < _NI_; ++kk) 			/* go by block rows top down */
-	{
-		/* empty full result vector chunk beforehand, needed for cache-efficient transposed multiplication */
-		for (ii = 0; ii < _NX_; ++ii)
-		{
-			res->data[kk * _NX_ + ii] = 0.0;
-		}
-
-		/* write result */
-		for (ii = 0; ii < _NX_; ++ii) 		/* go by in-block rows top down */
-		{
-			if (kk > 0)
-			{
-				/* go through subdiagonal block by columns */
-				for (jj = 0; jj < _NX_; ++jj)
-				{
-					res->data[kk*_NX_ + ii] += accHessian(kk,-1,ii,jj) * vec->data[(kk-1)*_NX_ + jj];
-				}
-			}
-
-			/* go through diagonal block by columns */
-			for (jj = 0; jj < _NX_; ++jj)
-			{
-				res->data[kk*_NX_ + ii] += accHessian(kk,0,ii,jj) * vec->data[kk*_NX_ + jj];
-			}
-
-			if (kk < _NI_-1)
-			{
-				/* go through superdiagonal block by columns; transposed access though */
-				for (jj = 0; jj < _NX_; ++jj)
-				{
-					/* by-column multiplication for higher cache efficiency in Newton Hessian (transposed access of Newton Hessian) */
-					res->data[kk*_NX_ + jj] += accHessian(kk+1,-1,ii,jj) * vec->data[(kk+1)*_NX_ + ii];
-				}
-			}
-		} 	/* end of in-block rows */
-	}		/* end of block rows */
-
-	return QPDUNES_OK;
-}
-/*<<< END OF qpDUNES_multiplyNewtonHessianVector */
-
 
 
 /* ----------------------------------------------
@@ -1293,10 +1156,11 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 			multiplyCz( qpData, &(qpData->xVecTmp), &(qpData->intervals[kk]->C), &(qpData->intervals[kk]->zVecTmp) );
 			addToVector(&(qpData->xVecTmp), &(qpData->intervals[kk]->c), _NX_); /* TODO: avoid using global memory!!! */
 
-			/* subtractFromVector( xVecTmp, &(intervals[kk+1]->x), _NX_ ); */
-			for (ii = 0; ii < _NX_; ++ii) {
+			subtractFromVector(
+				&qpData->xVecTmp, &(qpData->intervals[kk+1]->zVecTmp), _NX_);
+			/* for (ii = 0; ii < _NX_; ++ii) {
 				qpData->xVecTmp.data[ii] -=	qpData->intervals[kk + 1]->zVecTmp.data[ii];
-			}
+			} */
 
 			/* write gradient part */
 			for (ii = 0; ii < _NX_; ++ii) {
@@ -1348,10 +1212,11 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 			multiplyCz( qpData, &(qpData->xVecTmp), &(qpData->intervals[kk]->C), &(qpData->intervals[kk]->zVecTmp) );
 			addToVector( &(qpData->xVecTmp), &(qpData->intervals[kk]->c), _NX_ );
 
-			/* subtractFromVector( xVecTmp, &(intervals[kk+1]->x), _NX_ ); */
-			for (ii = 0; ii < _NX_; ++ii) {
+			subtractFromVector(
+				&qpData->xVecTmp, &(qpData->intervals[kk+1]->zVecTmp), _NX_);
+			/* for (ii = 0; ii < _NX_; ++ii) {
 				qpData->xVecTmp.data[ii] -= qpData->intervals[kk + 1]->zVecTmp.data[ii];
-			}
+			} */
 
 			/* write gradient part */
 			for (ii = 0; ii < _NX_; ++ii) {
@@ -1433,18 +1298,6 @@ void qpDUNES_getPrimalSol(const qpData_t* const qpData, real_t* const z) {
 	return;
 }
 /*<<< END OF qpDUNES_getPrimalSol */
-
-
-/* ----------------------------------------------
- * ...
- *
- >>>>>>                                           */
-void qpDUNES_getDualSol(const qpData_t* const qpData, real_t* const lambda,
-		real_t* const y) {
-
-	return;
-}
-/*<<< END OF qpDUNES_getDualSol */
 
 
 /* ----------------------------------------------

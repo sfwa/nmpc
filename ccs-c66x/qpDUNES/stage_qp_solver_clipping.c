@@ -22,6 +22,7 @@
  */
 
 #include <assert.h>
+#include <float.h>
 
 #include "stage_qp_solver_clipping.h"
 #include "../c66math.h"
@@ -51,15 +52,15 @@ const z_vector_t* const lambdaK1) {
         /* qStep = C.T*lambdaK1 */
         multiplyCTy(qpData, &(interval->qpSolverClipping.qStep),
                     &(interval->C), lambdaK1);
-        /* pStep = c*lambdaK1 */
+        /* pStep = c*lambdaK1 -- constant objective term */
         interval->qpSolverClipping.pStep =
-            scalarProd(lambdaK1, &(interval->c), _NX_); /* constant objective term */
-    }
-    else {
+            scalarProd(lambdaK1, &(interval->c), _NX_);
+    } else {
         /* qStep = 0 */
-        qpDUNES_setupZeroVector( &(interval->qpSolverClipping.qStep), interval->nV );
-        /* pStep = 0 */
-        interval->qpSolverClipping.pStep = 0.;  /* constant objective term */
+        qpDUNES_setupZeroVector(&(interval->qpSolverClipping.qStep),
+                                interval->nV);
+        /* pStep = 0 --  constant objective term */
+        interval->qpSolverClipping.pStep = 0.0f;
     }
 
     if (lambdaK->isDefined == QPDUNES_TRUE) {
@@ -101,21 +102,32 @@ real_t* alphaMin) {
     assert(interval && alphaMin);
 
     size_t i;
-    real_t alphaASChange;
+    real_t alphaASChange, tmp1, tmp2;
 
     for (i = 0; i < interval->nV; i++) {
         /*
-        WARNING: compiler support for 1./0. == inf, and (2. < inf) == TRUE
-        are assumed
+        The original qpDUNES implementation assumes compiler/chip support for
+        1./0. == inf, and (2. < inf) == TRUE
 
-        FIXME?
+        We can't really make that guarantee on CCS/C66x so encode it
+        explicitly instead.
         */
-        alphaASChange = recip_f(qpDUNES_fmax(
-            divide_f(interval->qpSolverClipping.dz.data[i], interval->y.data[2u * i]),
-            divide_f(interval->qpSolverClipping.dz.data[i], -interval->y.data[2 * i + 1u])
-        ));
+        if (abs_f(interval->y.data[2u * i]) > 1e-15) {
+            tmp1 = divide_f(interval->qpSolverClipping.dz.data[i],
+                            interval->y.data[2u * i]);
+        } else {
+            tmp1 = FLT_MAX;
+        }
+        if (abs_f(interval->y.data[2 * i + 1u]) > 1e-15) {
+            tmp2 = divide_f(interval->qpSolverClipping.dz.data[i],
+                            -interval->y.data[2 * i + 1u]);
+        } else {
+            tmp2 = FLT_MAX;
+        }
 
-        if (alphaASChange > 0.0 && alphaASChange < *alphaMin) {
+        alphaASChange = recip_f(qpDUNES_fmax(tmp1, tmp2));
+
+        if (alphaASChange > 1e-15 && alphaASChange < *alphaMin) {
             *alphaMin = alphaASChange;
         }
     }
@@ -187,60 +199,4 @@ const d_vector_t* const lb, const d_vector_t* const ub, size_t nV) {
     }
 
     return QPDUNES_OK;
-}
-
-
-return_t clippingQpSolver_ratioTest(qpData_t* const qpData,
-real_t* minStepSizeASChange,    /* minimum step size that leads to active set change */
-d_vector_t* const zStepDir,
-d2_vector_t* const mu,          /* pseudo multipliers, resembling the gaps to the bounds; + active, - inactive */
-const d_vector_t* const lb, const d_vector_t* const ub, size_t nV) {
-    size_t i;
-    real_t stepRatio;
-
-    /* minimum step size that leads to active set change */
-    *minStepSizeASChange = qpData->options.QPDUNES_INFTY;
-
-    for (i = 0; i < nV; i++) {
-        /* check ratio distance to lower bound and step direction */
-        stepRatio = divide_f(mu->data[2u * i], zStepDir->data[i]);
-        if (stepRatio >= 0.0 && stepRatio < *minStepSizeASChange) {
-            /* treat lb inactive and -infty separately */
-            if (mu->data[2u * i] < qpData->options.equalityTolerance &&
-                    lb->data[i] < qpData->options.QPDUNES_INFTY *
-                                   (-1 + qpData->options.equalityTolerance)) {
-                *minStepSizeASChange = stepRatio;
-            }
-        }
-
-        /* check ratio distance to upper bound and step direction */
-        stepRatio = -divide_f(mu->data[2u * i + 1u], zStepDir->data[i]);
-        if (stepRatio >= 0.0 && stepRatio < *minStepSizeASChange) {
-            /* treat ub inactive and +infty separately */
-            if (mu->data[2u * i + 1u] < qpData->options.equalityTolerance &&
-                    ub->data[i] < qpData->options.QPDUNES_INFTY *
-                                   (1 - qpData->options.equalityTolerance)) {
-                *minStepSizeASChange = stepRatio;
-            }
-        }
-    }
-
-    return QPDUNES_OK;
-}
-
-
-real_t directQpSolver_getObjectiveValue(qpData_t* const qpData,
-interval_t* const interval) {
-    assert(qpData && interval);
-
-    real_t objVal;
-
-    /* quadratic part */
-    objVal = 0.5f * multiplyzHz(&(interval->H), &(interval->z), interval->nV);
-    /* linear part */
-    objVal += scalarProd(&(interval->q), &(interval->z), interval->nV);
-    /* constant part */
-    objVal += interval->p;
-
-    return objVal;
 }

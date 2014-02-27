@@ -30,12 +30,6 @@
 #include "../c66math.h"
 
 
-/* safe array offset routine, avoids NULL pointer offsetting */
-const real_t* offsetArray(const real_t* const data, size_t offset) {
-    return (data != 0) ? &(data[offset]) : 0;
-}
-
-
 sparsityType_t qpDUNES_detectMatrixSparsity(const real_t* const M,
 size_t nRows, size_t nCols) {
     sparsityType_t sparsityM;
@@ -323,24 +317,24 @@ size_t dim1) {
             matrix diagonal is saved in first line; go through matrix back to
             front
             */
-            for (i = dim0 - 1u; i != SIZE_MAX; i--) {
+            for (i = dim0 - 1u; i != ((size_t)(0 - 1u)); i--) {
                 for (j = dim1 - 1u; j > i; j--) {
                     accM(i, j, dim1) = 0.0;
                 }
                 accM(i, i, dim1) = accM(0, i, dim1);
-                for (j = i - 1u; j != SIZE_MAX; j--) {
+                for (j = i - 1u; i && j != ((size_t)(0 - 1u)); j--) {
                     accM(i, j, dim1) = 0.0;
                 }
             }
             M_ptr->sparsityType = QPDUNES_DENSE;
             break;
         case QPDUNES_IDENTITY:
-            for (i = dim0 - 1u; i != SIZE_MAX; i--) {
+            for (i = dim0 - 1u; i != ((size_t)(0 - 1u)); i--) {
                 for (j = dim1 - 1u; j > i; j--) {
                     accM(i, j, dim1) = 0.0;
                 }
                 accM(i, i, dim1) = 1.0;
-                for (j = i - 1u; j != SIZE_MAX; j--) {
+                for (j = i - 1u; i && j != ((size_t)(0 - 1u)); j--) {
                     accM(i, j, dim1) = 0.0;
                 }
             }

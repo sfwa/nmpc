@@ -36,7 +36,6 @@
 
 #include <assert.h>
 #include "stage_qp_solver_clipping.h"
-#include "stage_qp_solver_qpoases.hpp"
 #include "types.h"
 #include "matrix_vector.h"
 #include "setup_qp.h"
@@ -116,12 +115,6 @@ return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 											const xn_vector_t* const gradient
 											);
 
-return_t qpDUNES_multiplyNewtonHessianVector(	qpData_t* const qpData,
-											xn_vector_t* const res,
-											const xn2x_matrix_t* const hessian, /**< Newton Hessian */
-											const xn_vector_t* const vec	);
-
-
 return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 									xn_vector_t* const lambda,
 									xn_vector_t* const deltaLambdaFS,
@@ -179,11 +172,6 @@ return_t qpDUNES_infeasibilityCheck(	qpData_t* qpData
 
 void qpDUNES_getPrimalSol(	const qpData_t* const qpData,
 							real_t* const z
-							);
-
-void qpDUNES_getDualSol(	const qpData_t* const qpData,
-							real_t* const lambda,
-							real_t* const y
 							);
 
 

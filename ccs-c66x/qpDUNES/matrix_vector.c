@@ -93,8 +93,9 @@ const xz_matrix_t* const C, const x_vector_t* const y) {
 
 
 /* Matrix times inverse matrix product res = A * Q^-1 */
-return_t multiplyAInvQ(qpData_t* const qpData, xx_matrix_t* const res,
-const xx_matrix_t* const C, const xx_matrix_t* const cholH) {
+return_t multiplyAInvQ(qpData_t* const qpData,
+xx_matrix_t* restrict const res, const xx_matrix_t* const C,
+const xx_matrix_t* const cholH) {
     assert(qpData && res && C && cholH && res->data && C->data &&
            cholH->data);
     _nassert((size_t)res->data % 4 == 0);
@@ -212,23 +213,6 @@ size_t len) {
 
     for (i = 0; i < len; i++) {
         res->data[i] = x->data[i] + scalingFactor * y->data[i];
-    }
-
-    return QPDUNES_OK;
-}
-
-
-return_t addVectors(vector_t* restrict const res, const vector_t* const x,
-const vector_t* const y, size_t len) {
-    assert(res && x && y && res->data && x->data && y->data);
-    _nassert((size_t)res->data % 4 == 0);
-    _nassert((size_t)x->data % 4 == 0);
-    _nassert((size_t)y->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < len; i++) {
-        res->data[i] = x->data[i] + y->data[i];
     }
 
     return QPDUNES_OK;
@@ -383,7 +367,7 @@ size_t n) {
         }
     } else {
         /* solve L^Ta = b */
-        for (i = n - 1u; i != SIZE_MAX; i--) {
+        for (i = n - 1u; i != ((size_t)(0 - 1u)); i--) {
             sum = b[i];
             for (j = i + 1u; j < n; j++) {
                 sum -= accL(j, i, n) * res[j];
@@ -483,7 +467,7 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
         }
     } else {
         /* solve L^T*A = B^T */
-        for (i = dim1 - 1u; i != SIZE_MAX; i--) { /* go by rows, bottom-up */
+        for (i = dim1 - 1u; i != ((size_t)(0 - 1u)); i--) { /* go by rows, bottom-up */
             for (k = 0; k < dim0; k++) {
                 sums[k] = accM(k, i, dim0);
             }
@@ -537,33 +521,6 @@ size_t dim0, size_t dim1) { /* dimensions of M2 */
 }
 
 
-/* Generic matrix-vector product b = M*x */
-return_t multiplyMatrixVector(vector_t* const res, const matrix_t* const M,
-const vector_t* const x, size_t dim0, size_t dim1) {
-    assert(res && M && x && res->data && M->data && x->data);
-
-    /* choose appropriate multiplication routine */
-    switch (M->sparsityType) {
-        case QPDUNES_DENSE:
-            return multiplyMatrixVectorDense(res->data, M->data, x->data,
-                                             dim0, dim1);
-        case QPDUNES_SPARSE:
-            return multiplyMatrixVectorSparse(res->data, M->data, x->data,
-                                              dim0, dim1);
-        case QPDUNES_DIAGONAL:
-            return multiplyMatrixVectorDiagonal(res->data, M->data, x->data,
-                                                dim0);
-        case QPDUNES_IDENTITY:
-            /* just copy vector */
-            return qpDUNES_copyVector(res, x, dim0);
-        case QPDUNES_MATRIX_UNDEFINED:
-        case QPDUNES_ALLZEROS:
-            assert(0 && "Invalid M sparsity type");
-            return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
-    }
-}
-
-
 /*
 Generic vector-matrix-vector product b = x'*M*x - M has to be square matrix
 */
@@ -585,33 +542,6 @@ const vector_t* const x, size_t dim0) {
         case QPDUNES_ALLZEROS:
             assert(0 && "Invalid M sparsity type");
             return -1.0;
-    }
-}
-
-
-/* Generic transposed matrix-vector product res = A.T*x */
-return_t multiplyMatrixTVector(vector_t* const res, const matrix_t* const M,
-const vector_t* const x, size_t dim0, size_t dim1) {
-    assert(res && M && x && res->data && x->data);
-
-    /* choose appropriate multiplication routine */
-    switch (M->sparsityType) {
-        case QPDUNES_DENSE:
-            return multiplyMatrixTVectorDense(res->data, M->data, x->data,
-                                              dim0, dim1);
-        case QPDUNES_SPARSE:
-            return multiplyMatrixTVectorSparse(res->data, M->data, x->data,
-                                               dim0, dim1);
-        case QPDUNES_DIAGONAL:
-            return multiplyMatrixVectorDiagonal(res->data, M->data, x->data,
-                                                dim0);
-        case QPDUNES_IDENTITY:
-            /* just copy vector */
-            return qpDUNES_copyVector(res, x, dim0);
-        case QPDUNES_MATRIX_UNDEFINED:
-        case QPDUNES_ALLZEROS:
-            assert(0 && "Invalid M sparsity type");
-            return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
     }
 }
 
@@ -668,27 +598,6 @@ const matrix_t* const cholH, const vector_t* const x, size_t dim0) {
 }
 
 
-/* Dense generic matrix-vector product b = A*x */
-return_t multiplyMatrixVectorDense(real_t* const res, const real_t* const M,
-const real_t* const x, size_t dim0, size_t dim1) {
-    assert(res && M && x);
-    _nassert((size_t)res % 4 == 0);
-    _nassert((size_t)M % 4 == 0);
-    _nassert((size_t)x % 4 == 0);
-
-    size_t i, j;
-
-    for (i = 0; i < dim0; i++) {
-        res[i] = 0.0;
-        for (j = 0; j < dim1; j++) {
-            res[i] += accM(i, j, dim1) * x[j];
-        }
-    }
-
-    return QPDUNES_OK;
-}
-
-
 /* Dense generic vector-matrix-vector product a = x'*M*x */
 real_t multiplyVectorMatrixVectorDense(const real_t* const M,
 const real_t* const x, size_t dim0) {
@@ -709,36 +618,6 @@ const real_t* const x, size_t dim0) {
 }
 
 
-/*
-Sparse generic matrix-vector product b = A*x
-
-WARNING: sparse matrix-vector multiplication not yet implemented
-*/
-return_t multiplyMatrixVectorSparse(real_t* res, const real_t* const M,
-const real_t* const x, size_t dim0, size_t dim1) {
-    return multiplyMatrixVectorDense(res, M, x, dim0, dim1);
-}
-
-
-/* Generic diagonal matrix-vector product b = A*x */
-return_t multiplyMatrixVectorDiagonal(real_t* const res,
-const real_t* const M, const real_t* const x, size_t dim0) {
-    assert(res && M && x);
-    _nassert((size_t)res % 4 == 0);
-    _nassert((size_t)M % 4 == 0);
-    _nassert((size_t)x % 4 == 0);
-
-    size_t i;
-
-    /* multiply vector with diagonal matrix saved in first line */
-    for (i = 0; i < dim0; i++) {
-        res[i] = accM(0, i, dim0) * x[i];
-    }
-
-    return QPDUNES_OK;
-}
-
-
 /* Generic diagonal vector-matrix-vector product a = x'*M*x */
 real_t multiplyVectorMatrixVectorDiagonal(const real_t* const M,
 const real_t* const x, size_t dim0) {
@@ -755,41 +634,6 @@ const real_t* const x, size_t dim0) {
     }
 
     return result;
-}
-
-
-/* Dense generic transposed matrix-vector product res = M.T*x */
-return_t multiplyMatrixTVectorDense(real_t* const res, const real_t* const M,
-const real_t* const x, size_t dim0, size_t dim1) {
-    assert(res && M && x);
-    _nassert((size_t)res % 4 == 0);
-    _nassert((size_t)M % 4 == 0);
-    _nassert((size_t)x % 4 == 0);
-
-    size_t i, j;
-
-    /* change multiplication order for more efficient memory access */
-    for (j = 0; j < dim1; j++) {
-        res[j] = 0.0;
-    }
-    for (i = 0; i < dim0; i++) {
-        for (j = 0; j < dim1; j++) {
-            res[j] += accM(i, j, dim1) * x[i];
-        }
-    }
-
-    return QPDUNES_OK;
-}
-
-
-/*
-Sparse generic transposed matrix-vector product b = A*x
-
-WARNING: sparse matrix-vector multiplication not yet implemented
-*/
-return_t multiplyMatrixTVectorSparse(real_t* res, const real_t* const M,
-const real_t* const x, size_t dim0, size_t dim1) {
-    return multiplyMatrixTVectorDense(res, M, x, dim0, dim1);
 }
 
 
