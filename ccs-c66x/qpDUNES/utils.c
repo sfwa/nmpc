@@ -21,7 +21,8 @@
  *
  */
 
-#include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
 #include <math.h>
 #include <assert.h>
 
@@ -53,12 +54,12 @@ size_t nRows, size_t nCols) {
 
     for (i = 0; i < nRows && sparsityM != QPDUNES_DENSE; i++) { /* check if dense */
         for (j = 0; i && sparsityM != QPDUNES_DENSE && j < i - 1u; j++) {   /* lower triangle */
-            if (fabs(M[i * nCols + j]) > 1e-15) { /* TODO: make threshold adjustable! */
+            if (abs_f(M[i * nCols + j]) > 1e-15f) { /* TODO: make threshold adjustable! */
                 sparsityM = QPDUNES_DENSE;
             }
         }
         for (j = i + 1u; sparsityM != QPDUNES_DENSE && j < nCols; j++) {    /* upper triangle */
-            if (fabs(M[i * nCols + j]) > 1e-15) {
+            if (abs_f(M[i * nCols + j]) > 1e-15f) {
                 sparsityM = QPDUNES_DENSE;
             }
         }
@@ -69,7 +70,7 @@ size_t nRows, size_t nCols) {
         sparsityM = QPDUNES_IDENTITY;
 
         for (i = 0; i < nRows; i++) {
-            if (fabs(M[i * nCols + i] - 1.0) > 1e-15) {
+            if (abs_f(M[i * nCols + i] - 1.0f) > 1e-15f) {
                 sparsityM = QPDUNES_DIAGONAL;
                 break;
             }

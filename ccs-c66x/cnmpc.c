@@ -841,6 +841,7 @@ const qpOptions_t *opts) {
     qpDUNES_indicateDataChange(&qp->qpdata);
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_init);
 void nmpc_init(bool use_relative_positions) {
     real_t C[NMPC_DELTA_DIM * NMPC_GRADIENT_DIM], /* 720B */
            z_low[NMPC_GRADIENT_DIM],
@@ -921,14 +922,17 @@ void nmpc_init(bool use_relative_positions) {
     qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_preparation_step);
 void nmpc_preparation_step(void) {
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_feedback_step);
 void nmpc_feedback_step(real_t measurement[NMPC_STATE_DIM]) {
     _initial_constraint(measurement);
     ocp_last_result = _solve_qp();
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_get_controls);
 enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     assert(controls);
 
@@ -942,6 +946,7 @@ enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     }
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_update_horizon);
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
     /*
     Shift reference state and control -- we need to track all these values
@@ -959,6 +964,7 @@ void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
     nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH);
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_state_weights);
 void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]) {
     assert(coeffs);
 
@@ -969,30 +975,35 @@ void nmpc_set_state_weights(real_t coeffs[NMPC_DELTA_DIM]) {
     memcpy(ocp_state_weights, coeffs, sizeof(ocp_state_weights));
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_control_weights);
 void nmpc_set_control_weights(real_t coeffs[NMPC_CONTROL_DIM]) {
     assert(coeffs);
 
     memcpy(ocp_control_weights, coeffs, sizeof(ocp_control_weights));
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_terminal_weights);
 void nmpc_set_terminal_weights(real_t coeffs[NMPC_DELTA_DIM]) {
     assert(coeffs);
 
     memcpy(ocp_terminal_weights, coeffs, sizeof(ocp_terminal_weights));
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_lower_control_bound);
 void nmpc_set_lower_control_bound(real_t coeffs[NMPC_CONTROL_DIM]) {
     assert(coeffs);
 
     memcpy(ocp_lower_control_bound, coeffs, sizeof(ocp_lower_control_bound));
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_upper_control_bound);
 void nmpc_set_upper_control_bound(real_t coeffs[NMPC_CONTROL_DIM]) {
     assert(coeffs);
 
     memcpy(ocp_upper_control_bound, coeffs, sizeof(ocp_upper_control_bound));
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_reference_point);
 void nmpc_set_reference_point(real_t coeffs[NMPC_REFERENCE_DIM],
 uint32_t i) {
     assert(coeffs);
@@ -1053,28 +1064,34 @@ uint32_t i) {
     }
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_set_wind_velocity);
 void nmpc_set_wind_velocity(real_t x, real_t y, real_t z) {
     wind_velocity[0] = x;
     wind_velocity[1] = y;
     wind_velocity[2] = z;
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_config_get_state_dim);
 uint32_t nmpc_config_get_state_dim(void) {
     return NMPC_STATE_DIM;
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_config_get_control_dim);
 uint32_t nmpc_config_get_control_dim(void) {
     return NMPC_CONTROL_DIM;
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_config_get_horizon_length);
 uint32_t nmpc_config_get_horizon_length(void) {
     return OCP_HORIZON_LENGTH;
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_config_get_step_length);
 real_t nmpc_config_get_step_length(void) {
     return OCP_STEP_LENGTH;
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_config_get_precision);
 enum nmpc_precision_t nmpc_config_get_precision(void) {
 #ifdef NMPC_SINGLE_PRECISION
     return NMPC_PRECISION_FLOAT;

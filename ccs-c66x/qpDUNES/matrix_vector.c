@@ -374,8 +374,8 @@ size_t n) {
                 sum -= accL(i, j, n) * res[j];
             }
 
-            if (fabs(accL(i, i, n)) >=
-                    qpData->options.QPDUNES_ZERO * fabs(sum)) {
+            if (abs_f(accL(i, i, n)) >=
+                    qpData->options.QPDUNES_ZERO * abs_f(sum)) {
                 res[i] = divide_f(sum, accL(i, i, n));
             } else {
                 return QPDUNES_ERR_DIVISION_BY_ZERO;
@@ -389,8 +389,8 @@ size_t n) {
                 sum -= accL(j, i, n) * res[j];
             }
 
-            if (fabs(accL(i, i, n)) >=
-                    qpData->options.QPDUNES_ZERO * fabs(sum)) {
+            if (abs_f(accL(i, i, n)) >=
+                    qpData->options.QPDUNES_ZERO * abs_f(sum)) {
                 res[i] = divide_f(sum, accL(i, i, n));
             } else {
                 return QPDUNES_ERR_DIVISION_BY_ZERO;
@@ -433,7 +433,7 @@ real_t* const res, const real_t* const M1, size_t dim0) {
 
     /* backsolve on diagonal matrix: res for M1*res = I */
     for (i = 0; i < dim0; i++) {
-        if (fabs(M1[i]) >= qpData->options.QPDUNES_ZERO) {
+        if (abs_f(M1[i]) >= qpData->options.QPDUNES_ZERO) {
             /* M1 is the actual matrix in diagonal case */
             res[i] = recip_f(M1[i]);
         } else {
@@ -473,8 +473,8 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
                 }
             }
             for (k = 0; k < dim0; k++) {
-                if (fabs(accL(i, i, dim1)) >=
-                        qpData->options.QPDUNES_ZERO * fabs(sums[k])) {
+                if (abs_f(accL(i, i, dim1)) >=
+                        qpData->options.QPDUNES_ZERO * abs_f(sums[k])) {
                     res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
                 } else {
                     return QPDUNES_ERR_DIVISION_BY_ZERO;
@@ -493,8 +493,8 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
                 }
             }
             for(k = 0; k < dim0; k++) {
-                if (fabs(accL(i, i, dim1)) >=
-                        qpData->options.QPDUNES_ZERO * fabs(sums[k])) {
+                if (abs_f(accL(i, i, dim1)) >=
+                        qpData->options.QPDUNES_ZERO * abs_f(sums[k])) {
                     res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
                 } else {
                     return QPDUNES_ERR_DIVISION_BY_ZERO;
@@ -521,8 +521,8 @@ size_t dim0, size_t dim1) { /* dimensions of M2 */
 
     for (i = 0; i < dim1; i++) {
         for (j = 0; j < dim0; j++) {
-            if (fabs(M1[i]) >=
-                    qpData->options.QPDUNES_ZERO * fabs(M2[j * dim1 + i])) {
+            if (abs_f(M1[i]) >=
+                    qpData->options.QPDUNES_ZERO * abs_f(M2[j * dim1 + i])) {
                 /*
                 M1 is the actual matrix in diagonal case; M2 is untransposed
                 */

@@ -61,12 +61,12 @@ static inline float recip_sqrt_f(float a) {
 static inline float sqrt_f(float a) {
     const float half = 0.5;
     const float onep5 = 1.5;
-    const float maxe = ;
+    const float maxe = 3.402823466E+38f;
     float x0, x1, x2, x3;
 
     if (a <= 0.0) {
         x2 = 0.0;
-    } else if (a > 3.402823466E+38) {
+    } else if (a > maxe) {
         x2 = maxe;
     } else {
         x0 = _rsqrsp(a);
@@ -82,14 +82,14 @@ static inline float sqrt_f(float a) {
 }
 
 static inline float divide_f(float a, float b) {
-    const float two = 2.0;
-    const float maxe = 3.402823466E+38;
+    const float two = 2.0f;
+    const float maxe = 3.402823466E+38f;
     float x;
 
-    if (a == 0.0) {
-        x = 0.0;
-    } else if (_fabsf(b) > maxe && _fabs(a) <= maxe) {
-        x = 0.0;
+    if (a == 0.0f) {
+        x = 0.0f;
+    } else if (_fabsf(b) > maxe && _fabsf(a) <= maxe) {
+        x = 0.0f;
     } else {
         x = _rcpsp(b);
         x = x * (two - b * x);
@@ -101,11 +101,11 @@ static inline float divide_f(float a, float b) {
 }
 
 static inline float recip_f(float b) {
-    const float two = 2.0;
+    const float two = 2.0f;
     float x;
 
-    if (_fabsf(a) > 3.402823466E+38) {
-        x = 0.0;
+    if (_fabsf(b) > 3.402823466E+38f) {
+        x = 0.0f;
     } else {
         x = _rcpsp(b);
         x = x * (two - b * x);
@@ -115,12 +115,17 @@ static inline float recip_f(float b) {
     return x;
 }
 
+static inline float abs_f(float x) {
+	return _fabsf(x);
+}
+
 #else
 
 #define recip_sqrt_f(x) ((float)(1.0 / sqrt((x))))
 #define divide_f(a, b) ((float)((a) / (b)))
 #define recip_f(a) ((float)(1.0 / (a)))
 #define sqrt_f(a) ((float)sqrt((a)))
+#define abs_f(x) ((float)fabs(x))
 
 #endif
 

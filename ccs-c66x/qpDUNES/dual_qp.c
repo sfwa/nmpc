@@ -692,8 +692,8 @@ return_t qpDUNES_factorizeNewtonHessian( qpData_t* const qpData,
 				}
 
 				/* TEMPORARY */
-				if (colMax<fabs(sum)) colMax =fabs(sum);
-				colSum += fabs(accHessian(kk,0,ii,jj));
+				if (colMax < abs_f(sum)) colMax = abs_f(sum);
+				colSum += abs_f(accHessian(kk,0,ii,jj));
 				/* END TEMPORARY */
 
 				accCholHessian(kk,0,ii,jj) = divide_f(sum, accCholHessian(kk,0,jj,jj));
@@ -710,8 +710,8 @@ return_t qpDUNES_factorizeNewtonHessian( qpData_t* const qpData,
 					}
 
 					/* TEMPORARY */
-					if (colMax<fabs(sum)) colMax =fabs(sum);
-					colSum += fabs(accHessian(kk+1,-1,ii,jj));
+					if (colMax < abs_f(sum)) colMax = abs_f(sum);
+					colSum += abs_f(accHessian(kk+1,-1,ii,jj));
 					/* END TEMPORARY */
 
 					accCholHessian(kk+1,-1,ii,jj) = divide_f(sum, accCholHessian(kk,0,jj,jj));
@@ -772,7 +772,7 @@ return_t qpDUNES_factorizeNewtonHessianBottomUp( qpData_t* const qpData,
 				*isHessianRegularized = QPDUNES_TRUE;
 			}
 			else {
-				if ( sum < 1.e2*qpData->options.equalityTolerance ) {	/* matrix not positive definite */
+				if ( sum < 1.e2f*qpData->options.equalityTolerance ) {	/* matrix not positive definite */
 					return QPDUNES_ERR_DIVISION_BY_ZERO;
 				}
 			}
@@ -1077,9 +1077,9 @@ return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 
 
 	/* take full step and leave */
-	if ( (alphaMin > 1. - qpData->options.equalityTolerance) && (newtonHessianRegularized == QPDUNES_FALSE) )
+	if ( (alphaMin > 1.0f - qpData->options.equalityTolerance) && (newtonHessianRegularized == QPDUNES_FALSE) )
 	{
-		*alpha = 1.;
+		*alpha = 1.0f;
 
 		addVectorScaledVector(lambda, lambda, *alpha, deltaLambdaFS, nV); /* temporary; TODO: move out to mother function */
 		for (kk = 0; kk < _NI_ + 1; ++kk) {
@@ -1123,7 +1123,7 @@ return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 			return statusFlag;
 		}
 		/* check for active set change: we need at least one AS change to get new Hessian information in next step */
-		if ((alphaMin < 1. - qpData->options.equalityTolerance)
+		if ((alphaMin < 1.0f - qpData->options.equalityTolerance)
 				&& (*alpha < alphaMin)) {
 			*alpha = alphaMin;
 		}
@@ -1216,7 +1216,7 @@ return_t qpDUNES_backTrackingLineSearch(	qpData_t* const qpData,
 {
 	real_t objVal;
 
-	real_t minimumProgress = qpData->options.lineSearchMinRelProgress * fabs(objValIncumbent) + qpData->options.lineSearchMinAbsProgress;
+	real_t minimumProgress = qpData->options.lineSearchMinRelProgress * abs_f(objValIncumbent) + qpData->options.lineSearchMinAbsProgress;
 	real_t normDeltaLambda = vectorNorm( deltaLambdaFS, nV );
 
 	*alpha = alphaMax;
@@ -1306,7 +1306,7 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 		alphaSlope = scalarProd(gradientTry, deltaLambdaFS, nV);
 
 		/* take full step if stationary */
-		if (fabs(divide_f(alphaSlope, slopeNormalization)) <= qpData->options.lineSearchStationarityTolerance)
+		if (abs_f(divide_f(alphaSlope, slopeNormalization)) <= qpData->options.lineSearchStationarityTolerance)
 		{
 			*alpha = alphaMax;
 			return QPDUNES_OK;
@@ -1361,7 +1361,7 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 		alphaSlope = scalarProd(gradientTry, deltaLambdaFS, nV);
 
 		/* check for stationarity in search direction */
-		if ( fabs(divide_f(alphaSlope, slopeNormalization)) <= qpData->options.lineSearchStationarityTolerance ) {
+		if ( abs_f(divide_f(alphaSlope, slopeNormalization)) <= qpData->options.lineSearchStationarityTolerance ) {
 			*alpha = alphaC;
 			return QPDUNES_OK;
 		}
