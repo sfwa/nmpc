@@ -191,7 +191,6 @@ zx_matrix_t* const restrict zxMatTmp) { /* temporary matrix of shape dim1 x dim0
     vector_t* const restrict vecTmp = &(qpData->xVecTmp);
     real_t* restrict yd = y->data;
 
-
     size_t i, j, l;
 
     /* compute M1^-1/2 * M2.T */
@@ -270,7 +269,7 @@ zx_matrix_t* const restrict zxMatTmp) { /* temporary matrix of shape dim1 x dim0
 
 
 return_t addScaledVector(vector_t* restrict const res, real_t scalingFactor,
-const vector_t* const update, size_t len) {
+const vector_t* restrict const update, size_t len) {
     assert(res && update && res->data && update->data);
     _nassert((size_t)res->data % 4 == 0);
     _nassert((size_t)update->data % 4 == 0);
@@ -287,8 +286,8 @@ const vector_t* const update, size_t len) {
 
 /* res = x + a*y  */
 return_t addVectorScaledVector(vector_t* restrict const res,
-const vector_t* const x, real_t scalingFactor, const vector_t* const y,
-size_t len) {
+const vector_t* restrict const x, real_t scalingFactor,
+const vector_t* restrict const y, size_t len) {
     assert(res && x && y && res->data && x->data && y->data);
     _nassert((size_t)res->data % 4 == 0);
     _nassert((size_t)x->data % 4 == 0);
@@ -305,7 +304,7 @@ size_t len) {
 
 
 return_t addToVector(vector_t* restrict const res,
-const vector_t* const update, size_t len) {
+const vector_t* restrict const update, size_t len) {
     assert(res && update && res->data && update->data);
     _nassert((size_t)res->data % 4 == 0);
     _nassert((size_t)update->data % 4 == 0);
@@ -537,14 +536,11 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
         for (i = 0; i < dim1; i++) { /* go by rows */
             for (k = 0; k < dim0; k++) {
                 sums[k] = accM(k, i, dim0);
-            }
-            for (j = 0; j < i; j++) {
-                for (k = 0; k < dim0; k++) {
+
+                for (j = 0; j < i; j++) {
                     sums[k] -= accL(i, j, dim1) * res[j * dim0 + k];
                 }
-            }
 
-            for (k = 0; k < dim0; k++) {
                 res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
 
                 threshold = qpData->options.QPDUNES_ZERO * abs_f(sums[k]);
@@ -558,14 +554,11 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
         for (i = dim1 - 1u; i != ((size_t)(0 - 1u)); i--) { /* go by rows, bottom-up */
             for (k = 0; k < dim0; k++) {
                 sums[k] = accM(k, i, dim0);
-            }
-            for (j= i + 1u; j < dim1; j++) {
-                for (k = 0; k < dim0; k++) {
+
+                for (j = i + 1u; j < dim1; j++) {
                     sums[k] -= accL(j, i, dim1) * res[j * dim0 + k];
                 }
-            }
 
-            for (k = 0; k < dim0; k++) {
                 res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
 
                 threshold = qpData->options.QPDUNES_ZERO * abs_f(sums[k]);

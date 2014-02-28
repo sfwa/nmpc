@@ -946,6 +946,11 @@ enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     }
 }
 
+#pragma FUNC_EXT_CALLED(nmpc_get_objective_value);
+real_t nmpc_get_objective_value(void) {
+    return ocp_last_result;
+}
+
 #pragma FUNC_EXT_CALLED(nmpc_update_horizon);
 void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
     /*

@@ -64,10 +64,11 @@ return_t factorizeH(qpData_t* const qpData, vv_matrix_t* const cholH,
 const vv_matrix_t* const H, size_t nV);
 
 return_t addScaledVector(xn_vector_t* const res, real_t scalingFactor,
-const xn_vector_t* const update, size_t len);
+const xn_vector_t* restrict const update, size_t len);
 
-return_t addVectorScaledVector(vector_t* const res, const vector_t* const x,
-real_t scalingFactor, const vector_t* const y, size_t len);
+return_t addVectorScaledVector(vector_t* restrict const res,
+const vector_t* restrict const x, real_t scalingFactor,
+const vector_t* restrict const y, size_t len);
 
 return_t backsolveDenseL(qpData_t* const qpData, real_t* const res,
 const real_t* const L, const real_t* const b, boolean_t transposed, size_t n);
@@ -126,8 +127,8 @@ const real_t* const x, size_t dim0	);
 real_t scalarProd(const vector_t* const x, const vector_t* const y,
 size_t len);
 
-return_t addToVector(vector_t* const res, const vector_t* const update,
-size_t len);
+return_t addToVector(vector_t* restrict const res,
+const vector_t* restrict const update, size_t len);
 
 return_t subtractFromVector(vector_t* const res, const vector_t* const update,
 size_t len);

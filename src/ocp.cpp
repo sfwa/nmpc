@@ -404,3 +404,7 @@ uint32_t i) {
         qpDUNES_indicateDataChange(&qp_data);
     }
 }
+
+real_t OptimalControlProblem::get_objective_value() {
+    return qpDUNES_computeObjectiveValue(&qp_data);
+}

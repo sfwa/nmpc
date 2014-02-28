@@ -119,6 +119,7 @@ public:
     const ControlVector& get_controls() const { return control_horizon[0]; }
     void update_horizon(ReferenceVector new_reference);
     void set_dynamics_model(DynamicsModel *in) { dynamics = in; }
+    real_t get_objective_value();
 };
 
 #endif

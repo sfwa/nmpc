@@ -304,11 +304,11 @@ return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData
 {
     int_t ii, jj, kk;
 
-    x_vector_t* xVecTmp = &(qpData->xVecTmp);
-    xx_matrix_t* xxMatTmp = &(qpData->xxMatTmp);
-    zx_matrix_t* zxMatTmp = &(qpData->zxMatTmp);
-    interval_t** intervals = qpData->intervals;
-    xn2x_matrix_t* hessian = &(qpData->hessian);
+    x_vector_t* restrict xVecTmp = &(qpData->xVecTmp);
+    xx_matrix_t* restrict xxMatTmp = &(qpData->xxMatTmp);
+    zx_matrix_t* restrict zxMatTmp = &(qpData->zxMatTmp);
+    interval_t** restrict intervals = qpData->intervals;
+    xn2x_matrix_t* restrict hessian = &(qpData->hessian);
 
     /** calculate gradient and check gradient norm for convergence */
     qpDUNES_computeNewtonGradient(qpData, &(qpData->gradient), xVecTmp);
@@ -330,11 +330,12 @@ return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData
 
             /* Annihilate columns in invQ; WARNING: this can really only be applied for diagonal matrices */
             qpDUNES_makeMatrixDense(xxMatTmp, _NX_, _NX_);
+            #pragma MUST_ITERATE(_NX_, _NX_)
             for (ii = 0; ii < _NX_; ++ii) {
                 if ((intervals[kk + 1]->y.data[2 * ii] >= qpData->options.equalityTolerance) ||     /* check if local constraint lb_x is active*/
                     (intervals[kk + 1]->y.data[2 * ii + 1] >= qpData->options.equalityTolerance))   /* check if local constraint ub_x is active*/   /* WARNING: weakly active constraints are excluded here!*/
                 {
-                    xxMatTmp->data[ii * _NX_ + ii] = 0.;
+                    xxMatTmp->data[ii * _NX_ + ii] = 0.0f;
                 }
             }
 
@@ -342,11 +343,13 @@ return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData
             addCInvHCT(qpData, xxMatTmp, &(intervals[kk]->cholH), &(intervals[kk]->C), &(intervals[kk]->y), zxMatTmp);
 
             /* write Hessian part */
+            #pragma MUST_ITERATE(_NX_, _NX_)
             for (ii = 0; ii < _NX_; ++ii) {
+                #pragma MUST_ITERATE(_NX_, _NX_)
                 for (jj = 0; jj < _NX_; ++jj) {
                     accHessian( kk, 0, ii, jj ) = xxMatTmp->data[ii * _NX_ + jj];
                     /* clean xxMatTmp */
-                    xxMatTmp->data[ii * _NX_ + jj] = 0.; /* TODO: this cleaning part is probably not needed, but we need to be very careful if we decide to leave it out! */
+                    xxMatTmp->data[ii * _NX_ + jj] = 0.0f; /* TODO: this cleaning part is probably not needed, but we need to be very careful if we decide to leave it out! */
                 }
             }
         }
@@ -358,15 +361,16 @@ return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData
             multiplyAInvQ( qpData, &(qpData->xxMatTmp), &(intervals[kk]->C), &(intervals[kk]->cholH) );
 
             /* write Hessian part */
+            #pragma MUST_ITERATE(_NX_, _NX_)
             for (ii=0; ii<_NX_; ++ii) {
+                #pragma MUST_ITERATE(_NX_, _NX_)
                 for (jj=0; jj<_NX_; ++jj) {
                     /* cheap way of annihilating columns; TODO: make already in multiplication routine! */
                     if ( ( intervals[kk]->y.data[2*jj] <= qpData->options.equalityTolerance ) &&        /* check if local constraint lb_x is inactive*/
                          ( intervals[kk]->y.data[2*jj+1] <= qpData->options.equalityTolerance ) )       /* check if local constraint ub_x is inactive*/
                     {
                         accHessian( kk, -1, ii, jj ) = - xxMatTmp->data[ii * _NX_ + jj];
-                    }
-                    else {
+                    } else {
                         /* eliminate column if variable bound is active */
                         accHessian( kk, -1, ii, jj ) = 0.;
                     }
@@ -506,16 +510,8 @@ return_t qpDUNES_factorizeNewtonHessianBottomUp( qpData_t* const qpData,
 
 
             /* 2) check for too small diagonal elements */
-            if ( (qpData->options.regType == QPDUNES_REG_SINGULAR_DIRECTIONS) &&    /* Add regularization on too small values already in factorization */
-                 (sum < qpData->options.newtonHessDiagRegTolerance) )       /* TODO: take branching in options.regType out of the loop if too slow */
-            {
-                sum += qpData->options.regParam;
-                *isHessianRegularized = QPDUNES_TRUE;
-            }
-            else {
-                if ( sum < 1.e2f*qpData->options.equalityTolerance ) {  /* matrix not positive definite */
-                    return QPDUNES_ERR_DIVISION_BY_ZERO;
-                }
+            if ( sum < 1.e2f*qpData->options.equalityTolerance ) {  /* matrix not positive definite */
+                return QPDUNES_ERR_DIVISION_BY_ZERO;
             }
 
             accCholHessian(kk,0,jj,jj) = sqrt_f( sum );

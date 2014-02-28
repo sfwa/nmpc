@@ -117,6 +117,10 @@ void nmpc_set_wind_velocity(real_t x, real_t y, real_t z) {
     dynamics_model.set_wind_velocity(Vector3r(x, y, z));
 }
 
+real_t nmpc_get_objective_value(void) {
+    return ocp.get_objective_value();
+}
+
 void nmpc_fixedwingdynamics_set_position(
 real_t lat, real_t lon, real_t alt) {
     current.position() << lat, lon, alt;
