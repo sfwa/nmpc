@@ -431,6 +431,7 @@ size_t n) {
     _nassert((size_t)b % 4 == 0);
 
     size_t i, j;
+    ptrdiff_t ii, jj;
     real_t sum;
 
     /* Solve La = b, where L might be transposed. */
@@ -451,15 +452,15 @@ size_t n) {
         }
     } else {
         /* solve L^Ta = b */
-        for (i = n - 1u; i != ((size_t)(0 - 1u)); i--) {
-            sum = b[i];
-            for (j = i + 1u; j < n; j++) {
-                sum -= accL(j, i, n) * res[j];
+        for (ii = (ptrdiff_t)n - 1; ii >= 0; ii--) {
+            sum = b[ii];
+            for (jj = ii + 1; jj < (ptrdiff_t)n; jj++) {
+                sum -= accL((size_t)jj, (size_t)ii, n) * res[jj];
             }
 
-            if (abs_f(accL(i, i, n)) >=
+            if (abs_f(accL((size_t)ii, (size_t)ii, n)) >=
                     qpData->options.QPDUNES_ZERO * abs_f(sum)) {
-                res[i] = divide_f(sum, accL(i, i, n));
+                res[ii] = divide_f(sum, accL((size_t)ii, (size_t)ii, n));
             } else {
                 return QPDUNES_ERR_DIVISION_BY_ZERO;
             }

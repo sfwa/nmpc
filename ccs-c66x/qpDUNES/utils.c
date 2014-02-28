@@ -257,7 +257,7 @@ size_t dim1) {
     assert(dim0);
     assert(dim1);
 
-    size_t i, j;
+    ptrdiff_t i, j;
     /* enable matrix access by preprocessor macro */
     real_t* restrict M = M_ptr->data;
 
@@ -272,25 +272,25 @@ size_t dim1) {
             matrix diagonal is saved in first line; go through matrix back to
             front
             */
-            for (i = dim0 - 1u; i != ((size_t)(0 - 1u)); i--) {
-                for (j = dim1 - 1u; j > i; j--) {
-                    accM(i, j, dim1) = 0.0;
+            for (i = (ptrdiff_t)dim0 - 1; i >= 0; i--) {
+                for (j = (ptrdiff_t)dim1 - 1; j > i; j--) {
+                    accM((size_t)i, (size_t)j, dim1) = 0.0;
                 }
-                accM(i, i, dim1) = accM(0, i, dim1);
-                for (j = i - 1u; i && j != ((size_t)(0 - 1u)); j--) {
-                    accM(i, j, dim1) = 0.0;
+                accM((size_t)i, (size_t)i, dim1) = accM(0, (size_t)i, dim1);
+                for (j = i - 1; j >= 0; j--) {
+                    accM((size_t)i, (size_t)j, dim1) = 0.0;
                 }
             }
             M_ptr->sparsityType = QPDUNES_DENSE;
             break;
         case QPDUNES_IDENTITY:
-            for (i = dim0 - 1u; i != ((size_t)(0 - 1u)); i--) {
-                for (j = dim1 - 1u; j > i; j--) {
-                    accM(i, j, dim1) = 0.0;
+            for (i = (ptrdiff_t)dim0 - 1; i >= 0; i--) {
+                for (j = (ptrdiff_t)dim1 - 1; j > i; j--) {
+                    accM((size_t)i, (size_t)j, dim1) = 0.0;
                 }
-                accM(i, i, dim1) = 1.0;
-                for (j = i - 1u; i && j != ((size_t)(0 - 1u)); j--) {
-                    accM(i, j, dim1) = 0.0;
+                accM((size_t)i, (size_t)i, dim1) = 1.0;
+                for (j = i - 1; j >= 0; j--) {
+                    accM((size_t)i, (size_t)j, dim1) = 0.0;
                 }
             }
             M_ptr->sparsityType = QPDUNES_DENSE;
