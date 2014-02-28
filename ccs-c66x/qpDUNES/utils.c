@@ -213,51 +213,6 @@ const real_t* const uBnd) {
 }
 
 
-return_t qpDUNES_setupZeroVector(vector_t* const to, size_t n) {
-    assert(to && to->data);
-    _nassert((size_t)to->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < n; i++) {
-        to->data[i] = 0.0;
-    }
-
-    return QPDUNES_OK;
-}
-
-
-return_t qpDUNES_setupUniformVector(vector_t* const to, real_t value,
-size_t n) {
-    assert(to && to->data);
-    _nassert((size_t)to->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < n; i++) {
-        to->data[i] = value;
-    }
-
-    return QPDUNES_OK;
-}
-
-
-return_t qpDUNES_copyVector(vector_t* const to, const vector_t* const from,
-size_t n) {
-    assert(to && from && to->data && from->data);
-    _nassert((size_t)to->data % 4 == 0);
-    _nassert((size_t)from->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < n; i++) {
-        to->data[i] = from->data[i];
-    }
-
-    return QPDUNES_OK;
-}
-
-
 /** deep matrix copy */
 return_t qpDUNES_copyMatrix(matrix_t* const to, const matrix_t* const from,
 size_t dim0, size_t dim1) {
@@ -390,20 +345,3 @@ const matrix_t* const from, size_t dim0, size_t dim1) {
 
     return QPDUNES_OK;
 }
-
-
-return_t qpDUNES_copyArray(real_t* restrict const to,
-const real_t* const from, size_t n) {
-    assert(to && from);
-    _nassert((size_t)to % 4 == 0);
-    _nassert((size_t)from % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < n; i++) {
-        to[i] = from[i];
-    }
-
-    return QPDUNES_OK;
-}
-

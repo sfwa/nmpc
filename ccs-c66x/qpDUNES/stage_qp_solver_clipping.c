@@ -65,6 +65,7 @@ const z_vector_t* const lambdaK1) {
 
     if (lambdaK->isDefined == QPDUNES_TRUE) {
         /* qStep -= [lambdaK.T 0] */
+        #pragma MUST_ITERATE(_NX_, _NX_)
         for (i = 0; i < _NX_; i++) {
             interval->qpSolverClipping.qStep.data[i] -= lambdaK->data[i];
         }
@@ -104,6 +105,8 @@ real_t* alphaMin) {
     size_t i;
     real_t alphaASChange, tmp1, tmp2;
 
+    #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM + NMPC_CONTROL_DIM, \
+                         NMPC_CONTROL_DIM)
     for (i = 0; i < interval->nV; i++) {
         /*
         The original qpDUNES implementation assumes compiler/chip support for
@@ -161,6 +164,8 @@ z_vector_t* const q, real_t* const p) {
                                   &(interval->zUpp), interval->nV);
 
     /* update q */
+    #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM + NMPC_CONTROL_DIM, \
+                         NMPC_CONTROL_DIM)
     for (i = 0; i < interval->nV; i++) {
         q->data[i] = interval->q.data[i] +
                      alpha * interval->qpSolverClipping.qStep.data[i];
@@ -181,6 +186,8 @@ const d_vector_t* const lb, const d_vector_t* const ub, size_t nV) {
 
     size_t i;
 
+    #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM + NMPC_CONTROL_DIM, \
+                         NMPC_CONTROL_DIM)
     for (i = 0; i < nV; i++) {
         /* feasibility gap to lower bound; negative value means inactive */
         mu->data[2u * i] = lb->data[i] - vec->data[i];

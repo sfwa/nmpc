@@ -36,6 +36,8 @@
 #define QPDUNES_TYPES_H
 
 
+#include <stdbool.h>
+
 #ifdef __MATLAB__
 #include "matrix.h"	/* for mwSize types */
 #endif
@@ -75,32 +77,41 @@
 
 
 /** simple types */
-#ifndef __MATLAB__
-	#ifndef _INT_T
-		typedef int int_t;
-	#endif
-	#ifndef _UINT_T
-		typedef unsigned int uint_t;
-	#endif
-	#ifndef _REAL_T
-		typedef float real_t;
-	#endif
-#else	/* __MATLAB__ */
+#ifndef _INT_T
 	typedef int int_t;
+#endif
+#ifndef _UINT_T
 	typedef unsigned int uint_t;
-	typedef double real_t;
-#endif	/* __MATLAB__ */
+#endif
 
 
-#if !defined(__STATIC_MEMORY__)
+/* Hard-code values to give CCS an easier time optimizing loops */
+#ifndef __TI_COMPILER_VERSION__
+    #include "config.h"
+    #include "../c/cnmpc.h"
+#else
+    #define USE_DSP_INTRINSICS
+
+    #include "config.h"
+    #include "cnmpc.h"
+#endif
+
+#define _NX_ NMPC_DELTA_DIM
+#define _NU_ NMPC_CONTROL_DIM
+#define _NZ_ (NMPC_DELTA_DIM + NMPC_CONTROL_DIM)
+#define _NI_ OCP_HORIZON_LENGTH
+#define _NDTTL_ 0
+
+#ifndef _NX_
 	#define _NX_ (qpData->nX)
 	#define _NU_ (qpData->nU)
 	#define _NZ_ (qpData->nZ)
-	#define _NV( I ) (qpData->intervals[ I ]->nV)
 	#define _NI_ (qpData->nI)
-	#define _ND( I ) (qpData->intervals[ I ]->nD)
 	#define _NDTTL_ (qpData->nDttl)
 #endif
+
+#define _NV( I ) (qpData->intervals[ I ]->nV)
+#define _ND( I ) (qpData->intervals[ I ]->nD)
 
 
 
@@ -111,9 +122,7 @@
 #define accCholHessian( K, L, I, J )	cholHessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (1u+L)*_NX_                         + (J) ]
 
 #define accH( I, J )	H->data[ (I)*nV + (J) ]
-
 #define accC( I, J )	C->data[ (I)*_NZ_ + (J) ]
-
 #define accM( I, J, DIM )	M[ (I)*(DIM) + (J) ]		/**< generic low level matrix access */
 #define accMT( I, J, DIM )	M[ (J)*(DIM) + (I) ]		/**< generic low level transposed matrix access */
 #define accL( I, J, DIM )	L[ (I)*(DIM) + (J) ]		/**< generic low level lower triangular matrix access */

@@ -53,8 +53,9 @@ return_t multiplyCTy(qpData_t* const qpData, z_vector_t* const res,
 const xz_matrix_t* const C, const x_vector_t* const y);
 
 /** Inverse matrix times matrix product res = Q^-1 * A */
-return_t multiplyAInvQ(qpData_t* const qpData, xx_matrix_t* const res,
-const xx_matrix_t* const C, const vv_matrix_t* const cholH);
+return_t multiplyAInvQ(qpData_t* const qpData,
+xx_matrix_t* restrict const res, const xx_matrix_t* const C,
+const vv_matrix_t* const cholH);
 
 return_t getInvQ(qpData_t* const qpData, xx_matrix_t* const res,
 const xx_matrix_t* const cholM1, size_t nV);
@@ -135,15 +136,9 @@ return_t negateVector(vector_t* const res, size_t len);
 
 real_t vectorNorm(const vector_t* const vec, size_t len);
 
-return_t addCInvHCT(qpData_t* const qpData, xx_matrix_t* const res,
-const vv_matrix_t* const cholH, const xz_matrix_t* const C,
-const d2_vector_t* const y, zx_matrix_t* const zxMatTmp);
-
-return_t addMultiplyMatrixInvMatrixMatrixT(qpData_t* const qpData,
-matrix_t* const res, const matrix_t* const cholM1, const matrix_t* const M2,
-const real_t* const y, /* vector containing non-zeros for columns of M2 to be eliminated */
-matrix_t* const Ztmp, /* temporary matrix of shape dim1 x dim0 */
-vector_t* const vecTmp,
-size_t dim0, size_t dim1); /* dimensions of M2 */
+return_t addCInvHCT(qpData_t* const qpData, xx_matrix_t* const restrict res,
+const vv_matrix_t* const restrict cholH, const xz_matrix_t* const restrict C,
+const d2_vector_t* const y, /* vector containing non-zeros for columns of C to be eliminated */
+zx_matrix_t* const restrict zxMatTmp);
 
 #endif	/* QP42_MATRIX_VECTOR_H */

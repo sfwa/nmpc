@@ -87,27 +87,12 @@ return_t qpDUNES_computeNewtonGradient(	qpData_t* const qpData,
 								x_vector_t* gradPiece
 								);
 
-
-return_t qpDUNES_factorizeNewtonHessian(	qpData_t* const qpData,
-										xn2x_matrix_t* const cholHessian,
-										xn2x_matrix_t* const hessian,
-										boolean_t* isHessianRegularized
-										);
-
-
 return_t qpDUNES_factorizeNewtonHessianBottomUp(	qpData_t* const qpData,
 												xn2x_matrix_t* const cholHessian,
 												xn2x_matrix_t* const hessian,
 												int_t lastActSetChangeIdx,
 												boolean_t* isHessianRegularized
 												);
-
-
-return_t qpDUNES_solveNewtonEquation(	qpData_t* const qpData,
-									xn_vector_t* const res,
-									const xn2x_matrix_t* const cholHessian,	/**< lower triangular Newton Hessian factor */
-									const xn_vector_t* const gradient
-									);
 
 return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
 											xn_vector_t* const res,
@@ -124,13 +109,12 @@ return_t qpDUNES_determineStepLength(	qpData_t* const qpData,
 									boolean_t newtonHessianRegularized
 									);
 
-return_t qpDUNES_backTrackingLineSearch(	qpData_t* const qpData,
+return_t qpDUNES_backTrackingLineSearch(qpData_t* const qpData,
 										real_t* const alpha,
 										uint_t* const itCntr,
-/*										xn_vector_t* const lambda,*/
 										const xn_vector_t* const deltaLambdaFS,
 										xn_vector_t* const lambdaTry,
-										int_t nV,
+										size_t nV,
 										real_t alphaMin,
 										real_t alphaMax,
 										real_t const objValIncumbent
@@ -139,32 +123,12 @@ return_t qpDUNES_backTrackingLineSearch(	qpData_t* const qpData,
 return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 										real_t* const alpha,
 										uint_t* const itCntr,
-/*										xn_vector_t* const lambda,*/
 										const xn_vector_t* const deltaLambdaFS,
 										xn_vector_t* const lambdaTry,
-										int_t nV,
+										size_t nV,
 										real_t alphaMin,
 										real_t alphaMax
 										);
-
-return_t qpDUNES_qpadApproxIntervalSearch(	qpData_t* const qpData,
-										real_t* const alpha,
-										uint_t* const itCntr,
-										const xn_vector_t* const deltaLambdaFS,
-										xn_vector_t* const lambdaTry,
-										int_t nV,
-										real_t alphaL,
-										real_t alphaR
-										);
-
-return_t qpDUNES_gridSearch(	qpData_t* const qpData,
-							real_t* const alpha,
-							uint_t* const itCntr,
-							real_t* const objValIncumbent,
-							real_t alphaMin,
-							real_t alphaMax
-							);
-
 
 return_t qpDUNES_infeasibilityCheck(	qpData_t* qpData
 										);
@@ -179,9 +143,8 @@ real_t qpDUNES_computeObjectiveValue(	qpData_t* const qpData
 									);
 
 
-real_t qpDUNES_computeParametricObjectiveValue(	qpData_t* const qpData,
-												const real_t alpha
-												);
+real_t qpDUNES_computeParametricObjectiveValue(qpData_t* const qpData,
+const real_t alpha);
 
 
 uint_t qpDUNES_getActSet(	const qpData_t* const qpData,

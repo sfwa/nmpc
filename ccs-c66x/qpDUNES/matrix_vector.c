@@ -55,8 +55,10 @@ const xz_matrix_t* const C, const z_vector_t* const z) {
     /* only dense multiplication */
     size_t i, j;
 
+    #pragma MUST_ITERATE(_NX_, _NX_)
     for (i = 0; i < _NX_; i++) {
         res->data[i] = 0.0;
+        #pragma MUST_ITERATE(_NZ_, _NZ_)
         for (j = 0; j < _NZ_; j++) {
             res->data[i] += accC(i, j) * z->data[j];
         }
@@ -78,11 +80,14 @@ const xz_matrix_t* const C, const x_vector_t* const y) {
     size_t i, j;
 
     /* change multiplication order for more efficient memory access */
+    #pragma MUST_ITERATE(_NZ_, _NZ_)
     for (j = 0; j < _NZ_; j++) {
         res->data[j] = 0.0;
     }
 
+    #pragma MUST_ITERATE(_NX_, _NX_)
     for (i = 0; i < _NX_; i++) {
+        #pragma MUST_ITERATE(_NZ_, _NZ_)
         for (j = 0; j < _NZ_; j++) {
             res->data[j] += accC(i, j) * y->data[i];
         }
@@ -95,7 +100,7 @@ const xz_matrix_t* const C, const x_vector_t* const y) {
 /* Matrix times inverse matrix product res = A * Q^-1 */
 return_t multiplyAInvQ(qpData_t* const qpData,
 xx_matrix_t* restrict const res, const xx_matrix_t* const C,
-const xx_matrix_t* const cholH) {
+const vv_matrix_t* const cholH) {
     assert(qpData && res && C && cholH && res->data && C->data &&
            cholH->data);
     _nassert((size_t)res->data % 4 == 0);
@@ -118,7 +123,9 @@ const xx_matrix_t* const cholH) {
         /* cholH diagonal */
         case QPDUNES_DIAGONAL:
             /* scale A part of C column-wise */
+            #pragma MUST_ITERATE(_NX_, _NX_)
             for (i = 0; i < _NX_; i++) {
+                #pragma MUST_ITERATE(_NX_, _NX_)
                 for (j = 0; j < _NX_; j++) {
                     /* cholH is the actual matrix in diagonal case */
                     res->data[i * _NX_ + j] =
@@ -129,7 +136,9 @@ const xx_matrix_t* const cholH) {
         /* cholH identity */
         case QPDUNES_IDENTITY:
             /* copy A block */
+            #pragma MUST_ITERATE(_NX_, _NX_)
             for (i = 0; i < _NX_; i++) {
+                #pragma MUST_ITERATE(_NX_, _NX_)
                 for (j = 0; j < _NX_; j++) {
                     res->data[i * _NX_ + j] = accC(i, j);
                 }
@@ -174,13 +183,89 @@ const vv_matrix_t* const H, size_t nV) {
     return factorizePosDefMatrix(qpData, (matrix_t*)cholH, (matrix_t*)H, nV);
 }
 
+/* M2 * M1^-1 * M2.T -- result gets added to res, not overwritten */
+return_t addCInvHCT(qpData_t* const qpData, xx_matrix_t* const restrict res,
+const vv_matrix_t* const restrict cholM1, const xz_matrix_t* const restrict M2,
+const d2_vector_t* const y, /* vector containing non-zeros for columns of M2 to be eliminated */
+zx_matrix_t* const restrict zxMatTmp) { /* temporary matrix of shape dim1 x dim0 */
+    vector_t* const restrict vecTmp = &(qpData->xVecTmp);
+    real_t* restrict yd = y->data;
 
-return_t addCInvHCT(qpData_t* const qpData, xx_matrix_t* const res,
-const vv_matrix_t* const cholH, const xz_matrix_t* const C,
-const d2_vector_t* const y, zx_matrix_t* const zxMatTmp) {
-    /* TODO: summarize to one function */
-    return addMultiplyMatrixInvMatrixMatrixT(qpData, res, cholH, C, y->data,
-            zxMatTmp, &(qpData->xVecTmp), _NX_, _NZ_);
+
+    size_t i, j, l;
+
+    /* compute M1^-1/2 * M2.T */
+    switch (cholM1->sparsityType) {
+        case QPDUNES_DENSE:
+        case QPDUNES_SPARSE:
+            backsolveMatrixTDenseDenseL(qpData, zxMatTmp->data, cholM1->data,
+                                        M2->data, vecTmp->data, QPDUNES_FALSE,
+                                        _NX_, _NZ_);
+            break;
+        case QPDUNES_DIAGONAL:
+            /* computes full inverse times M2! */
+            backsolveMatrixTDiagonalDense(qpData, zxMatTmp->data,
+                                          cholM1->data, M2->data, _NX_, _NZ_);
+            break;
+        case QPDUNES_IDENTITY:
+            qpDUNES_transposeMatrix(zxMatTmp, M2, _NX_, _NZ_);
+            break;
+        case QPDUNES_MATRIX_UNDEFINED:
+        case QPDUNES_ALLZEROS:
+            assert(0 && "Invalid cholM1 sparsity type");
+            return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
+    }
+
+    qpDUNES_makeMatrixDense(res, _NX_, _NX_);
+
+    if (cholM1->sparsityType != QPDUNES_DIAGONAL) {
+        /* compute Z.T * Z as dyadic products */
+        for (l = 0; l < _NZ_; l++) {
+            /*
+            only add columns of variables with inactive lower and upper bounds
+            */
+            if ((yd[2u * l] <= qpData->options.equalityTolerance) &&
+                    (yd[2u * l + 1u] <= qpData->options.equalityTolerance)) {
+                #pragma MUST_ITERATE(_NX_, _NX_)
+                for (i = 0; i < _NX_; i++) {
+                    #pragma MUST_ITERATE(_NX_, _NX_)
+                    for (j = 0; j < _NX_; j++) {
+                        /* since M2 is dense, so is Z */
+                        res->data[i * _NX_ + j] +=
+                            zxMatTmp->data[l * _NX_ + i] *
+                            zxMatTmp->data[l * _NX_ + j];
+                    }
+                }
+            }
+        }
+    } else { /* diagonal H */
+        /*
+        Z already contains H^-1 * M2^T, therefore only multiplication with M2
+        from left is needed
+
+        compute M2 * Z as dyadic products
+        */
+        for (l = 0; l < _NZ_; l++) {
+            /*
+            only add columns of variables with inactive upper and lower bounds
+            */
+            if ((yd[2u * l] <= qpData->options.equalityTolerance) &&
+                    (yd[2u * l + 1u] <= qpData->options.equalityTolerance)) {
+                #pragma MUST_ITERATE(_NX_, _NX_)
+                for (i = 0; i < _NX_; i++) {
+                    #pragma MUST_ITERATE(_NX_, _NX_)
+                    for (j = 0; j < _NX_; j++) {
+                        /* since M2 is dense, so is Z */
+                        res->data[i * _NX_ + j] +=
+                            M2->data[i * _NZ_ + l] *
+                            zxMatTmp->data[l * _NX_ + j];
+                    }
+                }
+            } /* end of dyadic addend */
+        }
+    }
+
+    return QPDUNES_OK;
 }
 
 
@@ -443,6 +528,8 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
     _nassert((size_t)sums % 4 == 0);
 
     size_t i, j, k;
+    return_t result = QPDUNES_OK;
+    real_t threshold;
 
     /* Solve L*A = B^T, where L might be transposed. */
     if (transposedL == QPDUNES_FALSE) {
@@ -456,12 +543,13 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
                     sums[k] -= accL(i, j, dim1) * res[j * dim0 + k];
                 }
             }
+
             for (k = 0; k < dim0; k++) {
-                if (abs_f(accL(i, i, dim1)) >=
-                        qpData->options.QPDUNES_ZERO * abs_f(sums[k])) {
-                    res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
-                } else {
-                    return QPDUNES_ERR_DIVISION_BY_ZERO;
+                res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
+
+                threshold = qpData->options.QPDUNES_ZERO * abs_f(sums[k]);
+                if (abs_f(accL(i, i, dim1)) < threshold) {
+                    result = QPDUNES_ERR_DIVISION_BY_ZERO;
                 }
             }
         }
@@ -476,18 +564,19 @@ boolean_t transposedL, size_t dim0, size_t dim1 /* dimensions of M */) {
                     sums[k] -= accL(j, i, dim1) * res[j * dim0 + k];
                 }
             }
-            for(k = 0; k < dim0; k++) {
-                if (abs_f(accL(i, i, dim1)) >=
-                        qpData->options.QPDUNES_ZERO * abs_f(sums[k])) {
-                    res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
-                } else {
-                    return QPDUNES_ERR_DIVISION_BY_ZERO;
+
+            for (k = 0; k < dim0; k++) {
+                res[i * dim0 + k] = divide_f(sums[k], accL(i, i, dim1));
+
+                threshold = qpData->options.QPDUNES_ZERO * abs_f(sums[k]);
+                if (abs_f(accL(i, i, dim1)) < threshold) {
+                    result = QPDUNES_ERR_DIVISION_BY_ZERO;
                 }
             }
         }
     }
 
-    return QPDUNES_OK;
+    return result;
 }
 
 
@@ -589,7 +678,8 @@ const matrix_t* const cholH, const vector_t* const x, size_t dim0) {
                                      dim0);
         case QPDUNES_IDENTITY:
             /* just copy vector */
-            return qpDUNES_copyVector(res, x, dim0);
+            qpDUNES_copyVector(res, x, dim0);
+            return QPDUNES_OK;
         case QPDUNES_MATRIX_UNDEFINED:
         case QPDUNES_ALLZEROS:
             assert(0 && "Invalid cholH sparsity type");
@@ -634,84 +724,6 @@ const real_t* const x, size_t dim0) {
     }
 
     return result;
-}
-
-
-/* M2 * M1^-1 * M2.T -- result gets added to res, not overwritten */
-return_t addMultiplyMatrixInvMatrixMatrixT(qpData_t* const qpData,
-matrix_t* const res, const matrix_t* const cholM1, const matrix_t* const M2,
-const real_t* const y, /* vector containing non-zeros for columns of M2 to be eliminated */
-matrix_t* const Ztmp, /* temporary matrix of shape dim1 x dim0 */
-vector_t* const vecTmp,
-size_t dim0, size_t dim1) {/* dimensions of M2 */
-    size_t i, j, l;
-
-    /* compute M1^-1/2 * M2.T */
-    switch (cholM1->sparsityType) {
-        case QPDUNES_DENSE:
-        case QPDUNES_SPARSE:
-            backsolveMatrixTDenseDenseL(qpData, Ztmp->data, cholM1->data,
-                                        M2->data, vecTmp->data, QPDUNES_FALSE,
-                                        dim0, dim1);
-            break;
-        case QPDUNES_DIAGONAL:
-            /* computes full inverse times M2! */
-            backsolveMatrixTDiagonalDense(qpData, Ztmp->data, cholM1->data,
-                                          M2->data, dim0, dim1);
-            break;
-        case QPDUNES_IDENTITY:
-            qpDUNES_transposeMatrix(Ztmp, M2, dim0, dim1);
-            break;
-        case QPDUNES_MATRIX_UNDEFINED:
-        case QPDUNES_ALLZEROS:
-            assert(0 && "Invalid cholM1 sparsity type");
-            return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
-    }
-
-    qpDUNES_makeMatrixDense(res, dim0, dim0);
-
-    if (cholM1->sparsityType != QPDUNES_DIAGONAL) {
-        /* compute Z.T * Z as dyadic products */
-        for (l = 0; l < dim1; l++) {
-            /*
-            only add columns of variables with inactive lower and upper bounds
-            */
-            if ((y[2u * l] <= qpData->options.equalityTolerance) &&
-                    (y[2u * l + 1u] <= qpData->options.equalityTolerance)) {
-                for (i = 0; i < dim0; i++) {
-                    for (j = 0; j < dim0; j++) {
-                        /* since M2 is dense, so is Z */
-                        res->data[i * dim0 + j] += Ztmp->data[l * dim0 + i] *
-                                                   Ztmp->data[l * dim0 + j];
-                    }
-                }
-            }
-        }
-    } else { /* diagonal H */
-        /*
-        Z already contains H^-1 * M2^T, therefore only multiplication with M2
-        from left is needed
-
-        compute M2 * Z as dyadic products
-        */
-        for (l = 0; l < dim1; l++) {
-            /*
-            only add columns of variables with inactive upper and lower bounds
-            */
-            if ((y[2u * l] <= qpData->options.equalityTolerance) &&
-                    (y[2u * l + 1u] <= qpData->options.equalityTolerance)) {
-                for (i = 0; i < dim0; i++) {
-                    for (j = 0; j < dim0; j++) {
-                        /* since M2 is dense, so is Z */
-                        res->data[i * dim0 + j] += M2->data[i * dim1 + l] *
-                                                   Ztmp->data[l * dim0 + j];
-                    }
-                }
-            } /* end of dyadic addend */
-        }
-    }
-
-    return QPDUNES_OK;
 }
 
 
