@@ -406,19 +406,21 @@ const real_t *restrict state, const real_t *restrict control) {
     /*
     Calculate axial airflow
     */
-    real_t airflow_x2, airflow_y2, airflow_z2;
+    real_t airflow_x2, airflow_y2, airflow_z2, airflow_v2;
     airflow_x2 = airflow[X]*airflow[X];
     airflow_y2 = airflow[Y]*airflow[Y];
     airflow_z2 = airflow[Z]*airflow[Z];
+    airflow_v2 = airflow_x2 + airflow_y2 + airflow_z2;
 
     /*
     Determine airflow magnitude, and the magnitudes of the components in
     the vertical and horizontal planes
     */
-    real_t rpm = control[0] * 12000.0f, thrust,
+    real_t rpm = control[0] * 30000.0f, thrust,
            ve2 = (0.0025f * 0.0025f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
-    thrust = (ve2 - airflow_x2) * (0.26315789473684f * 0.5f * RHO * 0.02f);
+    thrust = (ve2 - airflow_v2) *
+             (0.26315789473684f * 0.5f * RHO * 0.02f);
 
     /*
     Calculate airflow in the horizontal and vertical planes, as well as
@@ -428,7 +430,7 @@ const real_t *restrict state, const real_t *restrict control) {
 
     horizontal_v2 = airflow_x2 + airflow_y2;
     qbar = (RHO * 0.5f) * horizontal_v2;
-    v_inv = recip_sqrt_f(max(1.0f, horizontal_v2 + airflow_z2));
+    v_inv = recip_sqrt_f(max(1.0f, airflow_v2));
 
     vertical_v = sqrt_f(airflow_x2 + airflow_z2);
     vertical_v_inv = recip_f(max(1.0f, vertical_v));
@@ -470,10 +472,10 @@ const real_t *restrict state, const real_t *restrict control) {
            roll_rate = state[10 + X],
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
-    pitch_moment = 0.0f + 0.015f * sin_cos_alpha - 0.003f * pitch_rate -
-                   0.05f * (left_aileron + right_aileron) * vertical_v * 0.1f;
-    roll_moment = 0.02f * sin_beta - 0.08f * roll_rate +
-                  0.1f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+    pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
+                   0.08f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+    roll_moment = -0.03f * sin_beta - 0.05f * roll_rate +
+                  0.13f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron)) *
                  vertical_v * 0.1f;
@@ -492,9 +494,9 @@ const real_t *restrict state, const real_t *restrict control) {
         0 5.88235 0
         0.277444 0 2.49202
     */
-    out[3 + Y] = 5.8823528f * pitch_moment;
-    out[3 + X] = (3.364222f * roll_moment + 0.27744448f * yaw_moment);
-    out[3 + Z] = (0.27744448f * roll_moment + 2.4920163f * yaw_moment);
+    out[3 + Y] = 25.8823528f * pitch_moment;
+    out[3 + X] = (1.364222f * roll_moment + 0.27744448f * yaw_moment);
+    out[3 + Z] = (0.27744448f * roll_moment + 0.4920163f * yaw_moment);
 }
 
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
@@ -667,30 +669,22 @@ static real_t _solve_qp(void) {
     status_flag = qpDUNES_solve(&ocp_qp_data.qpdata);
     if (status_flag == QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND) {
         size_t i;
-        real_t solution[NMPC_GRADIENT_DIM * (OCP_HORIZON_LENGTH + 1u)];
-
-        /* Get the solution. */
-        qpDUNES_getPrimalSol(&ocp_qp_data.qpdata, solution);
 
         /* Check the objective value. */
-        objective_value = qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata);
+        objective_value =
+            abs_f(qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata));
 
         /* Get the first set of control values */
         for (i = 0; i < NMPC_CONTROL_DIM; i++) {
             ocp_control_value[i] = ocp_control_reference[i] +
-                                   solution[NMPC_DELTA_DIM + i];
+                ocp_qp_data.qpdata.intervals[0]->z.data[NMPC_DELTA_DIM + i];
         }
 
-        for (i = 0; i <= OCP_HORIZON_LENGTH; i++) {
-            qpDUNES_setupStageQP(
-                &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i],
-                QPDUNES_FALSE);
-            ocp_qp_data.qpdata.intervals[i]->p = 0;
-        }
         return objective_value;
     } else {
         /* Check the objective value. */
-        objective_value = qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata);
+        objective_value =
+            abs_f(qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata));
 
         /* Flag an error in some appropriate way */
         return -1.0;
@@ -939,7 +933,7 @@ enum nmpc_result_t nmpc_get_controls(real_t controls[NMPC_CONTROL_DIM]) {
     /* Return the next control state */
     memcpy(controls, ocp_control_value, sizeof(real_t) * NMPC_CONTROL_DIM);
 
-    if (ocp_last_result >= 0.0) {
+    if (ocp_last_result >= 0.0f) {
         return NMPC_OK;
     } else {
         return NMPC_INFEASIBLE;
@@ -1066,6 +1060,10 @@ uint32_t i) {
             &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i - 1u],
             gradient, jacobian, residuals, z_low, z_upp, 0, 0, 0);
         assert(status_flag == QPDUNES_OK);
+
+        qpDUNES_setupStageQP(
+                &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i - 1u],
+                QPDUNES_FALSE);
     }
 }
 

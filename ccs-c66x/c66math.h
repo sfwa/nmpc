@@ -38,14 +38,15 @@ Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
 #ifndef C66MATH_H
 #define C66MATH_H
 
+
 #ifdef USE_C66_INTRINSICS
 
 static inline float recip_sqrt_f(float a) {
-    const float half = 0.5;
-    const float onep5 = 1.5;
+    const float half = 0.5f;
+    const float onep5 = 1.5f;
     float x0, x1, x2, x3;
 
-    if (a < 1.17549435e-38) {
+    if (a < 1.17549435e-38f) {
         x2 = _itof(0x7F800000);
     } else {
         x0 = _rsqrsp(a);
@@ -59,13 +60,13 @@ static inline float recip_sqrt_f(float a) {
 }
 
 static inline float sqrt_f(float a) {
-    const float half = 0.5;
-    const float onep5 = 1.5;
+    const float half = 0.5f;
+    const float onep5 = 1.5f;
     const float maxe = 3.402823466E+38f;
     float x0, x1, x2, x3;
 
-    if (a <= 0.0) {
-        x2 = 0.0;
+    if (a <= 0.0f) {
+        x2 = 0.0f;
     } else if (a > maxe) {
         x2 = maxe;
     } else {

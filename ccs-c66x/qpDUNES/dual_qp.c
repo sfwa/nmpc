@@ -32,8 +32,6 @@
 #include "dual_qp.h"
 #include "../c66math.h"
 
-#include <stdio.h>
-
 /* ----------------------------------------------
  * main solve function
  *
@@ -100,27 +98,17 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
             /** (1Ab) do gradient step */
             qpDUNES_copyVector(&(qpData->deltaLambda), &(qpData->gradient),
                     _NI_ * _NX_);
-            statusFlag = QPDUNES_OK;
         } else {
             /** (1Ba) set up Newton system */
             statusFlag = qpDUNES_setupNewtonSystem(qpData);
-            switch (statusFlag) {
-                case QPDUNES_OK:
-                    break;
-                case QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND: /* zero gradient norm detected */
-                    /* ...and leave */
-                    return QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND;
-                default:
-                    return statusFlag;
+            if (statusFlag != QPDUNES_OK) {
+                return statusFlag;
             }
 
             /** (1Bb) factorize Newton system */
             statusFlag = qpDUNES_factorNewtonSystem(qpData, &(itLogPtr->isHessianRegularized), lastActSetChangeIdx);        /* TODO! can we get a problem with on-the-fly regularization in partial refactorization? might only be partially reg.*/
-            switch (statusFlag) {
-                case QPDUNES_OK:
-                    break;
-                default:
-                    return statusFlag;
+            if (statusFlag != QPDUNES_OK) {
+                return statusFlag;
             }
 
             /** (1Bc) compute step direction */
@@ -142,15 +130,13 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
                 &(qpData->deltaLambda), &(itLogPtr->numLineSearchIter),
                 &(qpData->alpha), &objValIncumbent,
                 itLogPtr->isHessianRegularized);
-        switch (statusFlag) {
-            case QPDUNES_OK:
-            case QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED:
-            case QPDUNES_ERR_EXCEEDED_MAX_LINESEARCH_STEPSIZE:
-                break;
-            case QPDUNES_ERR_DECEEDED_MIN_LINESEARCH_STEPSIZE: /* deltaLambda is no ascent direction */
-                return QPDUNES_ERR_NEWTON_SYSTEM_NO_ASCENT_DIRECTION;
-            default:
-                return statusFlag;
+        if (statusFlag != QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED &&
+                statusFlag != QPDUNES_ERR_EXCEEDED_MAX_LINESEARCH_STEPSIZE &&
+                statusFlag != QPDUNES_OK &&
+                statusFlag != QPDUNES_ERR_DECEEDED_MIN_LINESEARCH_STEPSIZE) {
+            return statusFlag;
+        } else if (statusFlag == QPDUNES_ERR_DECEEDED_MIN_LINESEARCH_STEPSIZE) {
+            return QPDUNES_ERR_NEWTON_SYSTEM_NO_ASCENT_DIRECTION;
         }
 
 
@@ -174,7 +160,7 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
                                                      (const int_t * const * const ) itLogPtr->ieqStatus, /* explicit casting necessary due to gcc bug */
                                                      (const int_t * const * const ) itLogPtr->prevIeqStatus,
                                                      &lastActSetChangeIdx);
-        qpDUNES_logIteration(qpData, itLogPtr, objValIncumbent, lastActSetChangeIdx);
+        itLogPtr->lastActSetChangeIdx = lastActSetChangeIdx;
     }
 
 
@@ -183,27 +169,6 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
 
     return QPDUNES_ERR_ITERATION_LIMIT_REACHED;
 }
-/*<<< END OF qpDUNES_solve */
-
-
-/* ----------------------------------------------
- * log all data of this iteration
- *
- >>>>>>                                           */
-void qpDUNES_logIteration(  qpData_t* qpData,
-                        itLog_t* itLogPtr,
-                        real_t objValIncumbent,
-                        int_t lastActSetChangeIdx
-                        )
-{
-    itLogPtr->gradNorm = vectorNorm(&(qpData->gradient), _NI_ * _NX_);
-    itLogPtr->stepNorm = vectorNorm(&(qpData->deltaLambda), _NI_ * _NX_);
-    itLogPtr->stepSize = qpData->alpha;
-    itLogPtr->lambdaNorm = vectorNorm(&(qpData->lambda), _NI_ * _NX_);
-    itLogPtr->objVal = objValIncumbent;
-    itLogPtr->lastActSetChangeIdx = lastActSetChangeIdx;
-}
-/*<<< END OF qpDUNES_logIteration */
 
 
 /* ----------------------------------------------
@@ -482,9 +447,7 @@ return_t qpDUNES_factorizeNewtonHessianBottomUp( qpData_t* const qpData,
     int_t jj, ii, kk, ll;
     real_t sum;
 
-    int_t blockIdxStart = (lastActSetChangeIdx >= 0)  ?
-        (lastActSetChangeIdx < _NI_ - 1 ? lastActSetChangeIdx : _NI_ - 1)  :
-        -1;
+    int_t blockIdxStart = _NI_ - 1;
 
     /* go by block columns */
     for (kk = blockIdxStart; kk >= 0; --kk) {

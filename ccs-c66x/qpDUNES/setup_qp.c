@@ -353,6 +353,8 @@ interval_t* const interval, boolean_t refactorHessian) {
             _NX_);
     }
 
+    interval->p = 0.0f;
+
     /*     - update first order term */
     /* reset q; qStep is added in qpDUNES_solve, when bounds are known */
     qpDUNES_setupZeroVector(&(interval->q), interval->nV);

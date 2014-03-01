@@ -115,13 +115,13 @@ real_t* alphaMin) {
         We can't really make that guarantee on CCS/C66x so encode it
         explicitly instead.
         */
-        if (abs_f(interval->y.data[2u * i]) > 1e-15) {
+        if (abs_f(interval->y.data[2u * i]) > 1e-15f) {
             tmp1 = divide_f(interval->qpSolverClipping.dz.data[i],
                             interval->y.data[2u * i]);
         } else {
             tmp1 = FLT_MAX;
         }
-        if (abs_f(interval->y.data[2 * i + 1u]) > 1e-15) {
+        if (abs_f(interval->y.data[2 * i + 1u]) > 1e-15f) {
             tmp2 = divide_f(interval->qpSolverClipping.dz.data[i],
                             -interval->y.data[2 * i + 1u]);
         } else {
@@ -130,7 +130,7 @@ real_t* alphaMin) {
 
         alphaASChange = recip_f(qpDUNES_fmax(tmp1, tmp2));
 
-        if (alphaASChange > 1e-15 && alphaASChange < *alphaMin) {
+        if (alphaASChange > 1e-15f && alphaASChange < *alphaMin) {
             *alphaMin = alphaASChange;
         }
     }
@@ -140,7 +140,6 @@ real_t* alphaMin) {
 
 
 /* do a step of length alpha */
-#include <stdio.h>
 return_t directQpSolver_doStep(qpData_t* const qpData,
 interval_t* const interval, const z_vector_t* const stepDir, real_t alpha,
 z_vector_t* const zUnconstrained, z_vector_t* const z, d2_vector_t* const mu,
@@ -174,8 +173,6 @@ z_vector_t* const q, real_t* const p) {
 
     /* update p */
     *p = interval->p + alpha * interval->qpSolverClipping.pStep;
-
-    //printf("interval ID %d, p = %f, alpha = %f\n", interval->id, *p, alpha);
 
     return QPDUNES_OK;
 }
