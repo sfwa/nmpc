@@ -46,14 +46,6 @@ return_t qpDUNES_solve(	qpData_t* const qpData
 						);
 
 
-void qpDUNES_logIteration( qpData_t* qpData,
-						itLog_t* itLogPtr,
-						real_t objValIncumbent,
-						int_t lastActSetChangeIdx
-						);
-
-
-
 return_t qpDUNES_solveAllLocalQPs(	qpData_t* const qpData,
 								const xn_vector_t* const lambda
 								);
@@ -73,12 +65,10 @@ return_t qpDUNES_solveLocalQP(	qpData_t* const qpData,
 							);
 
 
-return_t qpDUNES_setupNewtonSystem(	qpData_t* const qpData
-									);
+return_t qpDUNES_setupNewtonSystem(qpData_t* const qpData, boolean_t actSetHasChanged);
 
 return_t qpDUNES_factorNewtonSystem(	qpData_t* const qpData,
-									boolean_t* const isHessianRegularized,
-									int_t lastActSetChangeIdx
+									boolean_t* const isHessianRegularized
 									);
 
 
@@ -90,7 +80,6 @@ return_t qpDUNES_computeNewtonGradient(	qpData_t* const qpData,
 return_t qpDUNES_factorizeNewtonHessianBottomUp(	qpData_t* const qpData,
 												xn2x_matrix_t* const cholHessian,
 												xn2x_matrix_t* const hessian,
-												int_t lastActSetChangeIdx,
 												boolean_t* isHessianRegularized
 												);
 
@@ -145,17 +134,6 @@ real_t qpDUNES_computeObjectiveValue(	qpData_t* const qpData
 
 real_t qpDUNES_computeParametricObjectiveValue(qpData_t* const qpData,
 const real_t alpha);
-
-
-uint_t qpDUNES_getActSet(	const qpData_t* const qpData,
-						int_t *const *const actSetStatus
-						);
-
-uint_t qpDUNES_compareActSets(	const qpData_t* const qpData,
-							const int_t *const *const newActSetStatus,
-							const int_t *const *const oldActSetStatus,
-							int_t *const lastActSetChangeIdx
-							);
 
 #endif	/* QP42_DUAL_QP_H */
 
