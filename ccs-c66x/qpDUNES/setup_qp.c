@@ -47,11 +47,9 @@ void qpDUNES_indicateDataChange(qpData_t* const qpData) {
 
 return_t qpDUNES_setupRegularInterval(qpData_t* const qpData,
 interval_t* interval, const real_t* const Q_, const real_t* const R_,
-const real_t* const g_, const real_t* const C_, const real_t* const c_,
-const real_t* const zLow_, const real_t* const zUpp_, const real_t* const D_,
-const real_t* const dLow_, const real_t* const dUpp_) {
-    size_t i, j;
-    size_t nD = interval->nD;
+const real_t* const C_, const real_t* const c_, const real_t* const zLow_,
+const real_t* const zUpp_) {
+    size_t i;
     size_t nV = interval->nV;
 
     vv_matrix_t* H = &(interval->H);
@@ -69,90 +67,22 @@ const real_t* const dLow_, const real_t* const dUpp_) {
     sparsityR = (R_ != 0) ?
         qpDUNES_detectMatrixSparsity(R_, _NU_, _NU_) : QPDUNES_IDENTITY;
 
+    assert(sparsityQ == QPDUNES_DIAGONAL);
+    assert(sparsityR == QPDUNES_DIAGONAL);
+
     /* write Hessian blocks */
-    if (sparsityQ == QPDUNES_DENSE || sparsityR == QPDUNES_DENSE) {
-        H->sparsityType = QPDUNES_DENSE;
-        for (i = 0; i < _NX_; i++) {
-            /* Q part */
-            if (Q_) {
-                for (j = 0; j < _NX_; j++) {
-                    accH(i, j) = Q_[i * _NX_ + j];
-                }
-            } else {
-                for (j = 0; j < i; j++) {
-                    accH(i, j) = 0.0;
-                }
-                accH(i, i) = qpData->options.regParam;
-                for (j = i + 1u; j < _NX_; j++) {
-                    accH(i, j) = 0.0;
-                }
-            }
-            /* S part */
-            for (j = _NX_; j < _NZ_; j++) {
-                accH(i, j) = 0.0;
-            }
-        }
-        for (i = 0; i < _NU_; i++) {
-            /* S^T part */
-            for (j = 0; j < _NX_; j++) {
-                accH(_NX_ + i, j) = 0.0;
-            }
-            /* R part */
-            if (R_) {
-                for (j = 0; j < _NU_; j++) {
-                    accH(_NX_ + i, _NX_ + j) = R_[i * _NU_ + j];
-                }
-            } else {
-                for (j = 0; j < i; j++) {
-                    accH(_NX_ + i, _NX_ + j) = 0.0;
-                }
-                accH(_NX_ + i, _NX_ + i) = qpData->options.regParam;
-                for (j = i + 1u; j < _NX_; j++) {
-                    accH(_NX_ + i, _NX_ + j) = 0.0;
-                }
-            }
-        }
-    } else {  /* Q and R block are diagonal or identity */
-        if (sparsityQ == QPDUNES_IDENTITY && sparsityR == QPDUNES_IDENTITY) {
-            H->sparsityType = QPDUNES_IDENTITY;
-            /* no data needs to be written */
-        } else {
-            H->sparsityType = QPDUNES_DIAGONAL;
-            /* write diagonal in first line for cache efficiency */
-            /* Q part */
-            if (sparsityQ == QPDUNES_IDENTITY) {
-                for (i = 0; i < _NX_; i++) {
-                    accH(0, i) = 1.0;
-                }
-            } else {
-                for (i = 0; i < _NX_; i++) {
-                    accH(0, i) = Q_[i * _NX_ + i];
-                }
-            }
-            /* R part */
-            if (sparsityR == QPDUNES_IDENTITY) {
-                for (i = 0; i < _NU_; i++) {
-                    accH(0, _NX_ + i) = 1.0;
-                }
-            } else {
-                for (i = 0; i < _NU_; i++) {
-                    accH(0, _NX_ + i) = R_[i * _NU_ + i];
-                }
-            }
-        }
+    H->sparsityType = QPDUNES_DIAGONAL;
+    /* write diagonal in first line for cache efficiency */
+    /* Q part */
+    for (i = 0; i < _NX_; i++) {
+        accH(0, i) = Q_[i * _NX_ + i];
+    }
+    /* R part */
+    for (i = 0; i < _NU_; i++) {
+        accH(0, _NX_ + i) = R_[i * _NU_ + i];
     }
 
-    if (H->sparsityType  < QPDUNES_DIAGONAL) {
-        return QPDUNES_ERR_INVALID_ARGUMENT;
-    }
-
-    /** (2) linear term of cost function */
-    if (g_) {
-        qpDUNES_setupVector((vector_t*)&(interval->g), g_, nV);
-    } else {
-        qpDUNES_setupZeroVector((vector_t*)&(interval->g), nV);
-    }
-
+    /** (2) linear term of cost function -- always 0 */
 
     /** (3) dynamic system */
     if (C->sparsityType == QPDUNES_MATRIX_UNDEFINED) {
@@ -182,32 +112,14 @@ const real_t* const dLow_, const real_t* const dUpp_) {
     qpDUNES_updateSimpleBoundVector(
         qpData, (vector_t*)&(interval->zUpp), zUpp_, NULL, NULL);
 
-    /** (5) constraints */
-    /*  - Matrix */
-    if (D_) {    /* generically bounded QP */
-        if (interval->D.sparsityType == QPDUNES_MATRIX_UNDEFINED) {
-            interval->D.sparsityType =
-                qpDUNES_detectMatrixSparsity(D_, nD, _NZ_);
-        }
-        qpDUNES_updateMatrixData((matrix_t*)&(interval->D), D_, nD, _NZ_);
-    } else {  /* simply bounded QP */
-        qpDUNES_setMatrixNull((matrix_t*)&(interval->D));
-    }
-
-    /*  - Vectors */
-    qpDUNES_updateVector((vector_t*)&(interval->dLow), dLow_, nD);
-    qpDUNES_updateVector((vector_t*)&(interval->dUpp), dUpp_, nD);
-
     return QPDUNES_OK;
 }
 
 
 return_t qpDUNES_setupFinalInterval(qpData_t* const qpData,
-interval_t* interval, const real_t* const H_, const real_t* const g_,
-const real_t* const zLow_, const real_t* const zUpp_, const real_t* const D_,
-const real_t* const dLow_, const real_t* const dUpp_) {
+interval_t* interval, const real_t* const H_, const real_t* const zLow_,
+const real_t* const zUpp_) {
     size_t nV = interval->nV;
-    size_t nD = interval->nD;
 
     vv_matrix_t* H = &(interval->H);
 
@@ -220,12 +132,7 @@ const real_t* const dLow_, const real_t* const dUpp_) {
                                           (matrix_t*)H);
     }
 
-    /** (2) linear term of cost function */
-    if (g_ != 0) {
-        qpDUNES_setupVector((vector_t*)&(interval->g), g_, nV);
-    } else {
-        qpDUNES_setupZeroVector((vector_t*)&(interval->g), nV);
-    }
+    /** (2) linear term of cost function -- unused */
 
     /** (3) local bounds */
     qpDUNES_setupUniformVector(
@@ -235,51 +142,23 @@ const real_t* const dLow_, const real_t* const dUpp_) {
         (vector_t*)&(interval->zUpp), qpData->options.QPDUNES_INFTY, nV);
     qpDUNES_updateVector((vector_t*)&(interval->zUpp), zUpp_, nV);
 
-    /** (4) local constraints */
-    if (D_) {    /* generically bounded QP */
-        if (interval->D.sparsityType == QPDUNES_MATRIX_UNDEFINED) {
-            interval->D.sparsityType =
-                qpDUNES_detectMatrixSparsity(D_, nD, nV);
-        }
-        qpDUNES_updateMatrixData((matrix_t*)&(interval->D), D_, nD, nV);
-    } else {  /* simply bounded QP */
-        qpDUNES_setMatrixNull((matrix_t*)&(interval->D));
-    }
-
-    qpDUNES_updateVector((vector_t*)&(interval->dLow), dLow_, nD);
-    qpDUNES_updateVector((vector_t*)&(interval->dUpp), dUpp_, nD);
-
     return QPDUNES_OK;
 }
 
 
 return_t qpDUNES_updateIntervalData(qpData_t* const qpData,
-interval_t* interval, const real_t* const g_, const real_t* const C_,
-const real_t* const c_, const real_t* const zLow_, const real_t* const zUpp_,
-const real_t* const D_, const real_t* const dLow_,
-const real_t* const dUpp_) {
-    size_t nD = interval->nD;
+interval_t* interval, const real_t* const C_, const real_t* const c_,
+const real_t* const zLow_, const real_t* const zUpp_) {
     size_t nV = interval->nV;
-
-    /** copy data */
-    qpDUNES_updateVector((vector_t*)&(interval->g), g_, nV);
-
-    qpDUNES_updateMatrixData((matrix_t*)&(interval->C), C_, _NX_, _NZ_);
-    qpDUNES_updateVector((vector_t*)&(interval->c), c_, _NX_);
 
     qpDUNES_updateVector((vector_t*)&(interval->zLow), zLow_, nV);
     qpDUNES_updateVector((vector_t*)&(interval->zUpp), zUpp_, nV);
 
-    /* generically bounded QP */
-    if (D_) {
-        qpDUNES_updateMatrixData((matrix_t*)&(interval->D), D_, nD, nV);
-    }
-    qpDUNES_updateVector((vector_t*)&(interval->dLow), dLow_, nD);
-    qpDUNES_updateVector((vector_t*)&(interval->dUpp), dUpp_, nD);
-
     /** re-factorize Hessian for direct QP solver if needed */
-    /** re-run stage QP setup if objective and/or matrices changed */
-    if (g_ || D_) {  /* matrices and/or QP objective were changed */
+    if (C_ || c_) {
+        /** copy data */
+        qpDUNES_updateMatrixData((matrix_t*)&(interval->C), C_, _NX_, _NZ_);
+        qpDUNES_updateVector((vector_t*)&(interval->c), c_, _NX_);
         qpDUNES_setupStageQP(qpData, interval, QPDUNES_TRUE);
     }
 
@@ -307,9 +186,6 @@ return_t qpDUNES_setupAllLocalQPs(qpData_t* const qpData) {
     for (k = 0; k < _NI_ + 1u; k++) {
         interval = qpData->intervals[k];
 
-        /* (a) decide which stage QP solver to use */
-        interval->qpSolverSpecification = QPDUNES_STAGE_QP_SOLVER_CLIPPING;
-
         /* (c) prepare stage QP solvers */
         qpDUNES_setupStageQP(qpData, interval, QPDUNES_TRUE);
     }
@@ -323,9 +199,6 @@ interval_t* const interval, boolean_t refactorHessian) {
     assert(qpData && interval);
 
     return_t statusFlag;
-
-    /* (a) use clipping stage QP solver */
-    interval->qpSolverSpecification = QPDUNES_STAGE_QP_SOLVER_CLIPPING;
 
     /* (b) prepare clipping QP solver */
     if (refactorHessian == QPDUNES_TRUE) {
@@ -362,8 +235,6 @@ interval_t* const interval, boolean_t refactorHessian) {
                                      &(interval->lambdaK),
                                      &(interval->lambdaK1));
     /* Note: qStep is rewritten in line before */
-    addToVector(&(interval->qpSolverClipping.qStep), &(interval->g),
-                interval->nV);
     /*     - solve */
     statusFlag = directQpSolver_solveUnconstrained(
         qpData, interval, &(interval->qpSolverClipping.qStep));
@@ -425,8 +296,8 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
 
     /* iteration limits */
     options.maxIter                     = 100;
-    options.maxNumLineSearchIterations  = 19;               /* 0.3^19 = 1e-10 */
-    options.maxNumLineSearchRefinementIterations    = 40;   /* 0.62^49 = 1e-10 */
+    options.maxNumLineSearchIterations  = 5;               /* 0.3^19 = 1e-10 */
+    options.maxNumLineSearchRefinementIterations    = 10;   /* 0.62^49 = 1e-10 */
 
     /* printing */
     options.printLevel                  = 2;
@@ -467,7 +338,7 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
     options.lineSearchReductionFactor       = 0.1f;  /**< needs to be between 0 and 1 */
     options.lineSearchIncreaseFactor        = 1.5f;  /**< needs to be greater than 1 */
     options.lineSearchMinAbsProgress        = options.equalityTolerance;
-    options.lineSearchMinRelProgress        = 1e-14f;
+    options.lineSearchMinRelProgress        = 1e-10f;
     options.lineSearchStationarityTolerance = 1e-3f;
     options.lineSearchMaxStepSize           = 1.0f;
     options.lineSearchNbrGridPoints         = 5;

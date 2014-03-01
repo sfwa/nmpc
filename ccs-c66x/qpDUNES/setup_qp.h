@@ -43,19 +43,16 @@ void qpDUNES_indicateDataChange(qpData_t* const qpData);
 
 return_t qpDUNES_setupRegularInterval(qpData_t* const qpData,
 interval_t* interval, const real_t* const Q_, const real_t* const R_,
-const real_t* const g_, const real_t* const C_, const real_t* const c_,
-const real_t* const zLow_, const real_t* const zUpp_, const real_t* const D_,
-const real_t* const dLow_, const real_t* const dUpp_);
+const real_t* const C_, const real_t* const c_, const real_t* const zLow_,
+const real_t* const zUpp_);
 
 return_t qpDUNES_setupFinalInterval(qpData_t* const qpData,
-interval_t* interval, const real_t* const H_, const real_t* const g_,
-const real_t* const zLow_, const real_t* const zUpp_, const real_t* const D_,
-const real_t* const dLow_, const real_t* const dUpp_);
+interval_t* interval, const real_t* const H_, const real_t* const zLow_,
+const real_t* const zUpp_);
 
 return_t qpDUNES_updateIntervalData(qpData_t* const qpData,
-interval_t* interval, const real_t* const g_, const real_t* const C_,
-const real_t* const c_, const real_t* const zLow_, const real_t* const zUpp_,
-const real_t* const D_, const real_t* const dLow_, const real_t* const dUpp_);
+interval_t* interval, const real_t* const C_, const real_t* const c_,
+const real_t* const zLow_, const real_t* const zUpp_);
 
 return_t qpDUNES_setupAllLocalQPs(qpData_t* const qpData);
 

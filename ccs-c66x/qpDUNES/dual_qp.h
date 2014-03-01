@@ -130,14 +130,6 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 										real_t alphaMax
 										);
 
-return_t qpDUNES_infeasibilityCheck(	qpData_t* qpData
-										);
-
-
-void qpDUNES_getPrimalSol(	const qpData_t* const qpData,
-							real_t* const z
-							);
-
 
 real_t qpDUNES_computeObjectiveValue(	qpData_t* const qpData
 									);

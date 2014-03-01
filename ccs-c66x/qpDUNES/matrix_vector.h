@@ -70,9 +70,6 @@ return_t addVectorScaledVector(vector_t* restrict const res,
 const vector_t* restrict const x, real_t scalingFactor,
 const vector_t* restrict const y, size_t len);
 
-return_t backsolveDenseL(qpData_t* const qpData, real_t* const res,
-const real_t* const L, const real_t* const b, boolean_t transposed, size_t n);
-
 return_t backsolveDiagonal(qpData_t* const qpData, real_t* const res,
 const real_t* const M, const real_t* const b, size_t n);
 
@@ -84,14 +81,6 @@ const matrix_t* const M, size_t dim0);
 
 return_t denseCholeskyFactorization(qpData_t* const qpData,
 matrix_t* const cholM, const matrix_t* const M, size_t dim0);
-
-/* Matrix backsolve for L, M both dense compute res for L*res = M^T */
-return_t backsolveMatrixTDenseDenseL(qpData_t* const qpData,
-real_t* const res, const real_t* const L,
-const real_t* const M, /* untransposed M */
-real_t* const sums, /* memory for saving intermediate results (for speedup) */
-boolean_t transposedL,
-size_t dim0, size_t dim1); /* dimensions of M */
 
 return_t backsolveMatrixTDiagonalDense(qpData_t* const qpData,
 real_t* const res, const real_t* const M1,
@@ -110,9 +99,6 @@ size_t dim0); /* dimension of symmetric matrix */
 
 return_t multiplyMatrixVectorDense(real_t* const res, const real_t* const M,
 const real_t* const x, size_t dim0, size_t dim1);
-
-real_t multiplyVectorMatrixVectorDense(const real_t* const M,
-const real_t* const x, size_t dim0);
 
 return_t multiplyMatrixVectorSparse(real_t* const res, const real_t* const M,
 const real_t* const x, size_t dim0, size_t dim1);

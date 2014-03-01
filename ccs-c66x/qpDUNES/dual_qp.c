@@ -143,15 +143,9 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
         /** (5) regular log and display iteration */
         /* get active set of local constraints */
         /* - save old active set */
-        if (qpData->options.logLevel >= QPDUNES_LOG_ITERATIONS) {
-            itLogPtr->prevIeqStatus = qpData->log.itLog[(*itCntr) - 1].ieqStatus;
-        } else {
-            /* itLogPtr stays constant */
-            /* copy prevIeqStatus */
-            for (kk = 0; kk < _NI_ + 1; ++kk) {
-                for (ii = 0; ii < _ND(kk)+_NV(kk); ++ii ) {
-                    itLogPtr->prevIeqStatus[kk][ii] = itLogPtr->ieqStatus[kk][ii];
-                }
+        for (kk = 0; kk < _NI_ + 1; ++kk) {
+            for (ii = 0; ii < _ND(kk)+_NV(kk); ++ii ) {
+                itLogPtr->prevIeqStatus[kk][ii] = itLogPtr->ieqStatus[kk][ii];
             }
         }
         /* - get new active set */
@@ -170,50 +164,6 @@ return_t qpDUNES_solve(qpData_t* const qpData) {
     return QPDUNES_ERR_ITERATION_LIMIT_REACHED;
 }
 
-
-/* ----------------------------------------------
- * update all qSteps and pSteps (linear and constant objective function contribution) of the local QPs
- *
- >>>>>>                                           */
-return_t qpDUNES_updateAllLocalQPs( qpData_t* const qpData,
-                                    const xn_vector_t* const lambda
-                                    )
-{
-    int_t kk;
-    interval_t* interval;
-
-    /* first interval: */
-    interval = qpData->intervals[0];
-    qpDUNES_updateVector( &(interval->lambdaK1), &(lambda->data[0]), _NX_ );
-    /* intermediate intervals: */
-    for (kk = 1; kk < _NI_; ++kk) {
-        interval = qpData->intervals[kk];
-        qpDUNES_updateVector( &(interval->lambdaK), &(lambda->data[(kk - 1) * _NX_]), _NX_ );
-        qpDUNES_updateVector( &(interval->lambdaK1), &(lambda->data[kk * _NX_]), _NX_ );
-    }
-    /* last interval: */
-    interval = qpData->intervals[_NI_];
-    qpDUNES_updateVector( &(interval->lambdaK), &(lambda->data[(_NI_ - 1) * _NX_]), _NX_ );
-
-    for (kk = 0; kk < _NI_ + 1; ++kk) {
-        interval = qpData->intervals[kk];
-        switch (interval->qpSolverSpecification) {
-        case QPDUNES_STAGE_QP_SOLVER_CLIPPING:
-            clippingQpSolver_updateStageData( qpData, interval, &(interval->lambdaK), &(interval->lambdaK1) );
-            break;
-        case QPDUNES_STAGE_QP_SOLVER_QPOASES:
-            assert(0);
-            break;
-        default:
-            return QPDUNES_ERR_UNKNOWN_ERROR;
-        }
-    }
-
-    return QPDUNES_OK;
-}
-/*<<< END OF qpDUNES_updateAllLocalQPs */
-
-
 /* ----------------------------------------------
  * solve local QPs for a multiplier guess lambda
  *
@@ -227,16 +177,34 @@ return_t qpDUNES_solveAllLocalQPs(  qpData_t* const qpData,
     return_t statusFlag;
 
     /* 1) update local QP data */
-    qpDUNES_updateAllLocalQPs(qpData, lambda);
+    interval_t* interval;
 
-    /* 2) solve local QPs */
-    /* TODO: check what happens in case of errors (return)*/
-    /* Note: const variables are predetermined shared (at least on apple)*/
     for (kk = 0; kk < _NI_ + 1; ++kk) {
-        statusFlag = qpDUNES_solveLocalQP(qpData, qpData->intervals[kk]);
-        if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
-            errCntr++;
+        interval = qpData->intervals[kk];
+        if (kk < _NI_) {
+            qpDUNES_updateVector( &(interval->lambdaK1), &(lambda->data[kk * _NX_]), _NX_ );
         }
+        if (kk > 0) {
+            qpDUNES_updateVector( &(interval->lambdaK), &(lambda->data[(kk - 1) * _NX_]), _NX_ );
+
+            /* Solve local QPs for the previous interval */
+            interval = qpData->intervals[kk - 1];
+            clippingQpSolver_updateStageData(
+                qpData, interval, &(interval->lambdaK), &(interval->lambdaK1));
+            statusFlag = qpDUNES_solveLocalQP(qpData, interval);
+            if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
+                errCntr++;
+            }
+        }
+    }
+
+    /* Solve local QPs for the last interval */
+    interval = qpData->intervals[_NI_];
+    clippingQpSolver_updateStageData(
+        qpData, interval, &(interval->lambdaK), &(interval->lambdaK1));
+    statusFlag = qpDUNES_solveLocalQP(qpData, interval);
+    if (statusFlag != QPDUNES_OK) { /* note that QPDUNES_OK == 0 */
+        errCntr++;
     }
 
     if (errCntr > 0) {
@@ -265,8 +233,7 @@ return_t qpDUNES_solveLocalQP(  qpData_t* const qpData,
  * ...
  *
  >>>>>>                                           */
-return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData
-                                    )
+return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData)
 {
     int_t ii, jj, kk;
 
@@ -335,10 +302,10 @@ return_t qpDUNES_setupNewtonSystem( qpData_t* const qpData
                     if ( ( intervals[kk]->y.data[2*jj] <= qpData->options.equalityTolerance ) &&        /* check if local constraint lb_x is inactive*/
                          ( intervals[kk]->y.data[2*jj+1] <= qpData->options.equalityTolerance ) )       /* check if local constraint ub_x is inactive*/
                     {
-                        accHessian( kk, -1, ii, jj ) = - xxMatTmp->data[ii * _NX_ + jj];
+                        accHessian( kk, -1, ii, jj ) = -xxMatTmp->data[ii * _NX_ + jj];
                     } else {
                         /* eliminate column if variable bound is active */
-                        accHessian( kk, -1, ii, jj ) = 0.;
+                        accHessian( kk, -1, ii, jj ) = 0.0;
                     }
                 }
             }
@@ -598,6 +565,7 @@ return_t qpDUNES_solveNewtonEquationBottomUp(   qpData_t* const qpData,
  * ...
  *
  >>>>>>                                           */
+ #include <stdio.h>
 return_t qpDUNES_determineStepLength(   qpData_t* const qpData,
                                     xn_vector_t* const lambda,
                                     xn_vector_t* const deltaLambdaFS,
@@ -625,9 +593,7 @@ return_t qpDUNES_determineStepLength(   qpData_t* const qpData,
 
     /* compute minimum step size for active set change */
     /* WARNING: THIS ONLY WORKS IF ALL INTERVALS ARE OF THE SAME TYPE */
-    if (qpData->intervals[0]->qpSolverSpecification == QPDUNES_STAGE_QP_SOLVER_CLIPPING) {
-        alphaMin = qpData->options.QPDUNES_INFTY;
-    }
+    alphaMin = qpData->options.QPDUNES_INFTY;
     for (kk = 0; kk < _NI_ + 1; kk++) {
         directQpSolver_getMinStepsize(qpData->intervals[kk], &alphaASChange);
         if (alphaASChange < alphaMin) {
@@ -872,16 +838,6 @@ size_t nV, real_t alphaMin, real_t alphaMax) {
     *alpha = alphaC;
 
     return QPDUNES_ERR_NUMBER_OF_MAX_LINESEARCH_ITERATIONS_REACHED;
-}
-
-
-void qpDUNES_getPrimalSol(const qpData_t* const qpData, real_t* const z) {
-    size_t k;
-
-    for (k = 0; k <= _NI_; k++) {
-        qpDUNES_copyArray(&(z[k * _NZ_]), qpData->intervals[k]->z.data,
-                          qpData->intervals[k]->nV);
-    }
 }
 
 

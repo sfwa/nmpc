@@ -342,39 +342,6 @@ typedef struct
 typedef intVector_t zn_intVector_t;
 
 
-
-/**
- *	\brief pointer to qpOASES object for C++ method access
- *
- *	...
- *
- *	\author Janick Frasch
- *	\version 1.0beta
- *	\date 2013
- */
-typedef void qpoasesObject_t;
-
-
-/**
- *	\brief struct with auxiliary data for QPOASES QP solver
- *
- *	...
- *
- *	\author Janick Frasch
- *	\version 1.0beta
- *	\date 2013
- */
-typedef struct
-{
-	qpoasesObject_t* qpoasesObject;
-
-	/* workspace */
-	z_vector_t qFullStep;			/**< linear term corresponding to full-step in lambda */
-	real_t pFullStep;				/**< constant term corresponding to full-step in lambda */
-} qpSolverQpoases_t;
-
-
-
 /**
  *	\brief struct with auxiliary data for clipping QP solver
  *
@@ -426,8 +393,6 @@ typedef struct
 	vv_matrix_t cholH;			/**< inverse of Hessian */
 	real_t HQNorm;				/**< norm of Q-part of Hessian */     /*FIXME: choose which norm to compute exactly, etc.*/
 
-	z_vector_t g;				/**< primal gradient block */
-
 
 	/* dualized objective function */
 	z_vector_t q;				/**< linear objective function term after dualization */
@@ -442,9 +407,6 @@ typedef struct
 	/* constraints */
 	z_vector_t  zLow;			/**< lower variable bound */
 	z_vector_t  zUpp;			/**< upper variable bound */
-	dz_matrix_t D;				/**< full constraint matrix */
-	d_vector_t  dLow;			/**< constraint lower bound */
-	d_vector_t  dUpp;			/**< constraint upper bound */
 
 
 	/* primal QP solution */
@@ -457,10 +419,7 @@ typedef struct
 
 
 	/* QP solver */
-	qp_solver_t qpSolverSpecification;		/**< dedicated QP solver */
-
 	qpSolverClipping_t qpSolverClipping;	/**< workspace for clipping QP solver */
-	qpSolverQpoases_t qpSolverQpoases;		/**< pointer to qpOASES object */
 
 	boolean_t actSetHasChanged;				/**< indicator flag whether an active set change occurred on this
 										     	 interval during the current iteration */
