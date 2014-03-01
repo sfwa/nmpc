@@ -127,9 +127,12 @@ const vv_matrix_t* const cholH) {
             for (i = 0; i < _NX_; i++) {
                 #pragma MUST_ITERATE(_NX_, _NX_)
                 for (j = 0; j < _NX_; j++) {
-                    /* cholH is the actual matrix in diagonal case */
+                    /*
+                    cholH is the actual matrix in diagonal case -- elements
+                    are stored as reciprocal
+                    */
                     res->data[i * _NX_ + j] =
-                        divide_f(accC(i, j), cholH->data[j]);
+                        accC(i, j) * cholH->data[j];
                 }
             }
             break;
@@ -315,14 +318,23 @@ return_t negateVector(vector_t* const res, size_t len) {
 /* Compute a Cholesky factorization of M */
 return_t factorizePosDefMatrix(qpData_t* const qpData, matrix_t* const cholM,
 const matrix_t* const M, size_t dim0) {
+    size_t i;
     /* choose appropriate factorization routine */
     switch (M->sparsityType) {
         case QPDUNES_DIAGONAL:
             /*
             cholM in this case is defined to contain full diagonal matrix
             (not a factor)
+
+            matrix diagonal is saved in first line -- take the reciprocal of
+            each element because the cholH elements are always used to divide
+            elsewhere.
             */
-            return qpDUNES_copyMatrix(cholM, M, dim0, dim0);
+            for (i = 0; i < dim0; i++) {
+                cholM->data[i] = recip_f(M->data[i]);
+            }
+            cholM->sparsityType = QPDUNES_DIAGONAL;
+            return QPDUNES_OK;
         case QPDUNES_IDENTITY:
             cholM->sparsityType = QPDUNES_IDENTITY;
             return QPDUNES_OK;
@@ -347,9 +359,9 @@ const real_t* const M, const real_t* const b, size_t n) {
 
     size_t i;
 
-    /* Solve M*res = b */
+    /* Solve M*res = b -- M elements are always reciprocal */
     for (i = 0; i < n; i++) {
-        res[i] = divide_f(b[i], accM(0, i, n));
+        res[i] = b[i] * accM(0, i, n);
     }
 
     return QPDUNES_OK;
@@ -368,8 +380,11 @@ real_t* const res, const real_t* const M1, size_t dim0) {
     /* backsolve on diagonal matrix: res for M1*res = I */
     for (i = 0; i < dim0; i++) {
         if (abs_f(M1[i]) >= qpData->options.QPDUNES_ZERO) {
-            /* M1 is the actual matrix in diagonal case */
-            res[i] = recip_f(M1[i]);
+            /*
+            M1 is the actual matrix in diagonal case -- all elements are
+            reciprocal
+            */
+            res[i] = M1[i];
         } else {
             return QPDUNES_ERR_DIVISION_BY_ZERO;
         }
@@ -397,8 +412,9 @@ size_t dim0, size_t dim1) { /* dimensions of M2 */
                     qpData->options.QPDUNES_ZERO * abs_f(M2[j * dim1 + i])) {
                 /*
                 M1 is the actual matrix in diagonal case; M2 is untransposed
+                All elements of M1 are reciprocal
                 */
-                res[i * dim0 + j] = divide_f(M2[j * dim1 + i], M1[i]);
+                res[i * dim0 + j] = M2[j * dim1 + i] * M1[i];
             } else {
                 return QPDUNES_ERR_DIVISION_BY_ZERO;
             }

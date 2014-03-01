@@ -51,9 +51,6 @@ size_t n);
 return_t qpDUNES_updateSimpleBoundVector(qpData_t* qpData, vector_t* const to,
 const real_t* const dBnd, const real_t* const xBnd, const real_t* const uBnd);
 
-return_t qpDUNES_copyMatrix(matrix_t* const to, const matrix_t* const from,
-size_t dim0, size_t dim1);
-
 return_t qpDUNES_makeMatrixDense(matrix_t* const M, size_t dim0, size_t dim1);
 
 return_t qpDUNES_transposeMatrix(matrix_t* const to,

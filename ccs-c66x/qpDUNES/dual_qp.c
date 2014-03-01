@@ -321,15 +321,16 @@ return_t qpDUNES_computeNewtonGradient(qpData_t* const qpData,
 xn_vector_t* restrict gradient, x_vector_t* restrict gradPiece) {
     size_t k, i;
 
-    interval_t** intervals = qpData->intervals;
+    const interval_t* restrict interval;
 
     /* d/(d lambda_ii) for kk=0.._NI_-1 */
     for (k = 0; k < _NI_; k++) {
+        interval = qpData->intervals[k];
         /* ( C_kk*z_kk^opt + c_kk ) - x_(kk+1)^opt */
-        multiplyCz(qpData, gradPiece, &(intervals[k]->C),
-                   &(intervals[k]->z));
-        addToVector(gradPiece, &(intervals[k]->c), _NX_);
-        subtractFromVector(gradPiece, &(intervals[k + 1u]->z), _NX_);
+        multiplyCz(qpData, gradPiece, &(interval->C),
+                   &(interval->z));
+        addToVector(gradPiece, &(interval->c), _NX_);
+        subtractFromVector(gradPiece, &(qpData->intervals[k + 1u]->z), _NX_);
 
         /* write gradient part */
         #pragma MUST_ITERATE(_NX_, _NX_)

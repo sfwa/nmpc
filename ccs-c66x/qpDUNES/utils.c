@@ -213,44 +213,6 @@ const real_t* const uBnd) {
 }
 
 
-/** deep matrix copy */
-return_t qpDUNES_copyMatrix(matrix_t* const to, const matrix_t* const from,
-size_t dim0, size_t dim1) {
-    assert(to && from && to->data && from->data);
-    _nassert((size_t)to->data % 4 == 0);
-    _nassert((size_t)from->data % 4 == 0);
-
-    size_t i;
-
-    /* choose appropriate copy routine */
-    switch (from->sparsityType) {
-        case QPDUNES_DENSE:
-        case QPDUNES_SPARSE:
-            for (i = 0; i < dim0 * dim1; i++) {
-                to->data[i] = from->data[i];
-            }
-            to->sparsityType = QPDUNES_DENSE;
-            break;
-        case QPDUNES_DIAGONAL:
-            /* matrix diagonal is saved in first line */
-            for (i = 0; i < dim1; i++) {
-                to->data[i] = from->data[i];
-            }
-            to->sparsityType = QPDUNES_DIAGONAL;
-            break;
-        case QPDUNES_IDENTITY:
-            to->sparsityType = QPDUNES_IDENTITY;
-            break;
-        case QPDUNES_MATRIX_UNDEFINED:
-        case QPDUNES_ALLZEROS:
-            assert(0 && "Invalid sparsity type");
-            return QPDUNES_ERR_UNKNOWN_MATRIX_SPARSITY_TYPE;
-    }
-
-    return QPDUNES_OK;
-}
-
-
 return_t qpDUNES_makeMatrixDense(matrix_t* const M_ptr, size_t dim0,
 size_t dim1) {
     assert(M_ptr && M_ptr->data);
