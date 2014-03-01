@@ -140,6 +140,7 @@ real_t* alphaMin) {
 
 
 /* do a step of length alpha */
+#include <stdio.h>
 return_t directQpSolver_doStep(qpData_t* const qpData,
 interval_t* const interval, const z_vector_t* const stepDir, real_t alpha,
 z_vector_t* const zUnconstrained, z_vector_t* const z, d2_vector_t* const mu,
@@ -173,6 +174,8 @@ z_vector_t* const q, real_t* const p) {
 
     /* update p */
     *p = interval->p + alpha * interval->qpSolverClipping.pStep;
+
+    //printf("interval ID %d, p = %f, alpha = %f\n", interval->id, *p, alpha);
 
     return QPDUNES_OK;
 }

@@ -32,6 +32,7 @@
 #include "dual_qp.h"
 #include "../c66math.h"
 
+#include <stdio.h>
 
 /* ----------------------------------------------
  * main solve function
@@ -661,48 +662,31 @@ return_t qpDUNES_determineStepLength(   qpData_t* const qpData,
 
     /* compute minimum step size for active set change */
     /* WARNING: THIS ONLY WORKS IF ALL INTERVALS ARE OF THE SAME TYPE */
-    if ( qpData->intervals[0]->qpSolverSpecification    == QPDUNES_STAGE_QP_SOLVER_CLIPPING )
-    {
+    if (qpData->intervals[0]->qpSolverSpecification == QPDUNES_STAGE_QP_SOLVER_CLIPPING) {
         alphaMin = qpData->options.QPDUNES_INFTY;
     }
-    for ( kk = 0; kk < _NI_ + 1; ++kk )
-    {
-        if (qpData->intervals[kk]->qpSolverSpecification == QPDUNES_STAGE_QP_SOLVER_CLIPPING)
-        {
-            directQpSolver_getMinStepsize(qpData->intervals[kk], &alphaASChange);
-            if (alphaASChange < alphaMin) {
-                alphaMin = alphaASChange;
-            }
+    for (kk = 0; kk < _NI_ + 1; kk++) {
+        directQpSolver_getMinStepsize(qpData->intervals[kk], &alphaASChange);
+        if (alphaASChange < alphaMin) {
+            alphaMin = alphaASChange;
         }
-        /* TODO: compute minimum stepsize for qpOASES */
     }
 
 
     /* take full step and leave */
-    if ( (alphaMin > 1.0f - qpData->options.equalityTolerance) && (newtonHessianRegularized == QPDUNES_FALSE) )
-    {
+    if ((alphaMin > 1.0f - qpData->options.equalityTolerance) &&
+            (newtonHessianRegularized == QPDUNES_FALSE)) {
         *alpha = 1.0f;
 
         addVectorScaledVector(lambda, lambda, *alpha, deltaLambdaFS, nV); /* temporary; TODO: move out to mother function */
         for (kk = 0; kk < _NI_ + 1; ++kk) {
             interval = qpData->intervals[kk];
             /* update primal, dual, and internal QP solver variables */
-            switch (interval->qpSolverSpecification) {
-            case QPDUNES_STAGE_QP_SOLVER_CLIPPING:
-                directQpSolver_doStep(qpData, interval,
+            directQpSolver_doStep(qpData, interval,
                         &(interval->qpSolverClipping.dz), *alpha,
                         &(interval->qpSolverClipping.zUnconstrained),
                         &(interval->z), &(interval->y), &(interval->q),
                         &(interval->p));
-                break;
-
-            case QPDUNES_STAGE_QP_SOLVER_QPOASES:
-                assert(0);
-                break;
-
-            default:
-                return QPDUNES_ERR_UNKNOWN_ERROR;
-            }
         }
         *objValIncumbent = qpDUNES_computeObjectiveValue(qpData);
         return QPDUNES_OK;
@@ -726,22 +710,11 @@ return_t qpDUNES_determineStepLength(   qpData_t* const qpData,
         interval = qpData->intervals[kk];
         /* TODO: this might have already been done in line search; do not redo */
         /* update primal, dual, and internal QP solver variables */
-        switch (interval->qpSolverSpecification) {
-        case QPDUNES_STAGE_QP_SOLVER_CLIPPING:
-            directQpSolver_doStep(qpData, interval,
+        directQpSolver_doStep(qpData, interval,
                     &(interval->qpSolverClipping.dz), *alpha,
                     &(interval->qpSolverClipping.zUnconstrained),
                     &(interval->z), &(interval->y), &(interval->q),
                     &(interval->p));
-            break;
-
-        case QPDUNES_STAGE_QP_SOLVER_QPOASES:
-            assert(0);
-            break;
-
-        default:
-            return QPDUNES_ERR_UNKNOWN_ERROR;
-        }
     }
     *objValIncumbent = qpDUNES_computeObjectiveValue(qpData);
 
@@ -952,22 +925,23 @@ void qpDUNES_getPrimalSol(const qpData_t* const qpData, real_t* const z) {
 real_t qpDUNES_computeObjectiveValue(qpData_t* const qpData) {
     size_t k;
     interval_t* restrict interval;
-    real_t objVal = 0.0f;
+    real_t objVal = 0.0f, qVal, lVal, cVal;
 
     for (k = 0; k <= _NI_; k++) {
         interval = qpData->intervals[k];
 
         /* quadratic objective part */
-        interval->optObjVal =
+        qVal =
             0.5f * multiplyzHz(&(interval->H), &(interval->z), interval->nV);
         /* linear objective part */
-        interval->optObjVal += scalarProd(&(interval->q), &(interval->z),
-                                          interval->nV);
+        lVal = scalarProd(&(interval->q), &(interval->z), interval->nV);
         /* constant objective part */
-        interval->optObjVal += interval->p;
+        cVal = interval->p;
+
+        //printf("qVal %f, lVal %f, cVal %f\n", qVal, lVal, cVal);
 
         /* sum up */
-        objVal += interval->optObjVal;
+        objVal += qVal + lVal + cVal;
     }
 
     return objVal;
