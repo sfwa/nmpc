@@ -473,8 +473,8 @@ const real_t *restrict state, const real_t *restrict control) {
            right_aileron = control[2] - 0.5f;
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
                    0.08f * (left_aileron + right_aileron) * vertical_v * 0.1f;
-    roll_moment = -0.03f * sin_beta - 0.05f * roll_rate +
-                  0.13f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+    roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
+                  0.15f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron)) *
                  vertical_v * 0.1f;
@@ -494,7 +494,7 @@ const real_t *restrict state, const real_t *restrict control) {
         0.277444 0 2.49202
     */
     out[3 + Y] = 25.8823528f * pitch_moment;
-    out[3 + X] = (1.364222f * roll_moment + 0.27744448f * yaw_moment);
+    out[3 + X] = (1.864222f * roll_moment + 0.27744448f * yaw_moment);
     out[3 + Z] = (0.27744448f * roll_moment + 0.4920163f * yaw_moment);
 }
 
@@ -664,11 +664,11 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
 static real_t _solve_qp(void) {
     return_t status_flag;
     real_t objective_value;
+    size_t i;
 
     status_flag = qpDUNES_solve(&ocp_qp_data.qpdata);
-    if (status_flag == QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND) {
-        size_t i;
 
+    if (status_flag == QPDUNES_SUCC_OPTIMAL_SOLUTION_FOUND) {
         /* Check the objective value. */
         objective_value =
             abs_f(qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata));
@@ -684,6 +684,15 @@ static real_t _solve_qp(void) {
         /* Check the objective value. */
         objective_value =
             abs_f(qpDUNES_computeObjectiveValue(&ocp_qp_data.qpdata));
+
+        /*
+        Get the first set of control values, but scale closer to the reference
+        because they're probably all over the place.
+        */
+        for (i = 0; i < NMPC_CONTROL_DIM; i++) {
+            ocp_control_value[i] = ocp_control_reference[i] +
+                ocp_qp_data.qpdata.intervals[0]->z.data[NMPC_DELTA_DIM + i] * 0.2f;
+        }
 
         /* Flag an error in some appropriate way */
         return -1.0;
@@ -833,6 +842,8 @@ void nmpc_init(bool use_relative_positions) {
     return_t status_flag;
     qpOptions_t qp_options;
     size_t i;
+
+    memset(&ocp_qp_data, 0, sizeof(ocp_qp_data));
 
     ocp_state_position_is_delta = use_relative_positions;
 

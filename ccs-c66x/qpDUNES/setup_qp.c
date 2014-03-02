@@ -310,11 +310,11 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
 
     /* numerical tolerances */
     options.stationarityTolerance       = 1e-6f;
-    options.equalityTolerance           = 2.221e-16f;
+    options.equalityTolerance           = 2.221e-14f;
     options.newtonHessDiagRegTolerance  = 1e-10f;
     options.activenessTolerance         = 1e4f * options.equalityTolerance;
-    options.QPDUNES_ZERO                = 1e-20f;
-    options.QPDUNES_INFTY               = 1e12f;
+    options.QPDUNES_ZERO                = 1e-16f;
+    options.QPDUNES_INFTY               = 1e16f;
     options.ascentCurvatureTolerance    = 1e-6f;
 
     /* additional options */
@@ -339,8 +339,8 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
     options.lineSearchIncreaseFactor        = 1.5f;  /**< needs to be greater than 1 */
     options.lineSearchMinAbsProgress        = options.equalityTolerance;
     options.lineSearchMinRelProgress        = 1e-10f;
-    options.lineSearchStationarityTolerance = 1e-3f;
-    options.lineSearchMaxStepSize           = 1.0f;
+    options.lineSearchStationarityTolerance = 1e-6f;
+    options.lineSearchMaxStepSize           = 0.25f;
     options.lineSearchNbrGridPoints         = 5;
 
     /* qpOASES options */
