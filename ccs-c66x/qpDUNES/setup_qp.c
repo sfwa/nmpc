@@ -68,6 +68,7 @@ const real_t* const zUpp_) {
 
     /* write Hessian blocks */
     H->sparsityType = QPDUNES_DIAGONAL;
+    cholH->sparsityType = QPDUNES_DIAGONAL;
     /*
     Write diagonal in first line for cache efficiency. Also factorize the
     matrix (producing a diagonal cholH) and write the reciprocals of those
@@ -113,12 +114,15 @@ const real_t* const zUpp_) {
     size_t nV = interval->nV;
     size_t i;
 
-    vv_matrix_t* H = &(interval->H);
+    vv_matrix_t *restrict H = &(interval->H),
+                *restrict cholH = &(interval->cholH);
 
     /** (1) quadratic term of cost function */
     H->sparsityType = QPDUNES_DIAGONAL;
+    cholH->sparsityType = QPDUNES_DIAGONAL;
     for (i = 0; i < _NX_; i++) {
         H->data[i] = H_[i];
+        cholH->data[i] = recip_f(H_[i]);
     }
 
     /** (2) linear term of cost function -- unused */

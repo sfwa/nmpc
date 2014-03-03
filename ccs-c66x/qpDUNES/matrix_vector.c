@@ -24,6 +24,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <assert.h>
 
 #include "matrix_vector.h"
@@ -181,30 +182,45 @@ const vv_matrix_t* const cholH) {
     return QPDUNES_OK;
 }
 
-/* Inverse matrix times identity matrix product res = Q^-1 * I */
-return_t getInvQ(qpData_t* const qpData, xx_matrix_t* const res,
-const vv_matrix_t* const cholH, size_t nV) {
-    assert(qpData && res && cholH && res->data && cholH->data);
+/*
+Inverse matrix times identity matrix product res = Q^-1 * I
+
+This is only called in qpDUNES_setupNewtonSystem, and the elements of cholH
+above _NX_ are ignored, so support _NX_ only.
+
+The returned matrix is made dense, and any elements where the corresponding
+value in y is greater than the equality tolerance are zeroed.
+*/
+return_t getInvQ(qpData_t* const qpData, xx_matrix_t* restrict const res,
+const vv_matrix_t* restrict const cholH,
+const d2_vector_t* restrict const y) {
+    assert(qpData && res && cholH && res->data && cholH->data && y->data);
     assert(cholH->sparsityType == QPDUNES_DIAGONAL);
     _nassert((size_t)res->data % 4 == 0);
     _nassert((size_t)cholH->data % 4 == 0);
+    _nassert((size_t)y->data % 4 == 0);
 
     size_t j;
+    real_t val;
 
     /*
     Backsolve on diagonal matrix: res for cholH*res = I. All elements of cholH
     are reciprocal.
     */
-    if (nV == 15u) {
-        #pragma MUST_ITERATE(15, 15)
-        for (j = 0; j < 15u; j++) {
-            res->data[j] = cholH->data[j];
+    res->sparsityType = QPDUNES_DENSE;
+    memset(res->data, 0, sizeof(real_t) * _NX_ * _NX_);
+    #pragma MUST_ITERATE(_NX_, _NX_)
+    for (j = 0; j < _NX_; j++) {
+        /* check if local constraints lb_x or ub_x are active */
+        /* WARNING: weakly active constraints are excluded here!*/
+        if (y->data[2u * j] < qpData->options.equalityTolerance &&
+                y->data[2u * j + 1u] < qpData->options.equalityTolerance) {
+            val = cholH->data[j];
+        } else {
+            val = 0.0f;
         }
-    } else {
-        #pragma MUST_ITERATE(12, 12)
-        for (j = 0; j < 12u; j++) {
-            res->data[j] = cholH->data[j];
-        }
+
+        res->data[j * (_NX_ + 1u)] = val;
     }
 
     return QPDUNES_OK;
@@ -220,9 +236,7 @@ zx_matrix_t* const restrict zxMatTmp) { /* temporary matrix of shape dim1 x dim0
     return_t result = QPDUNES_OK;
 
     assert(cholM1->sparsityType == QPDUNES_DIAGONAL);
-
-    qpDUNES_makeMatrixDense(res, _NX_, _NX_);
-
+    assert(res->sparsityType == QPDUNES_DENSE);
     /* compute M1^-1/2 * M2.T */
 
     /*

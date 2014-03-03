@@ -228,20 +228,7 @@ return_t qpDUNES_setupNewtonSystem(qpData_t* const qpData) {
                 (intervals[kk + 1u]->actSetHasChanged == QPDUNES_TRUE)) {
             /* get EPE part -- getInvQ not supported with matrices other than diagonal... is this even possible?*/
             getInvQ(qpData, xxMatTmp, &intervals[kk + 1u]->cholH,
-                    intervals[kk + 1u]->nV);
-
-            /* Annihilate columns in invQ; WARNING: this can really only be applied for diagonal matrices */
-            qpDUNES_makeMatrixDense(xxMatTmp, _NX_, _NX_);
-            #pragma MUST_ITERATE(_NX_, _NX_)
-            for (ii = 0; ii < _NX_; ii++) {
-                /* check if local constraint lb_x is active*/
-                if ((intervals[kk + 1u]->y.data[2 * ii] >= qpData->options.equalityTolerance) ||
-                    /* check if local constraint ub_x is active*/
-                    /* WARNING: weakly active constraints are excluded here!*/
-                        (intervals[kk + 1u]->y.data[2u * ii + 1u] >= qpData->options.equalityTolerance)) {
-                    xxMatTmp->data[ii * _NX_ + ii] = 0.0f;
-                }
-            }
+                    &intervals[kk + 1u]->y);
 
             /* add CPC part */
             addCInvHCT(qpData, xxMatTmp, &intervals[kk]->cholH,
@@ -253,12 +240,6 @@ return_t qpDUNES_setupNewtonSystem(qpData_t* const qpData) {
                 #pragma MUST_ITERATE(_NX_, _NX_)
                 for (jj = 0; jj < _NX_; jj++) {
                     accHessian(kk, 0, ii, jj) = xxMatTmp->data[ii * _NX_ + jj];
-                    /* clean xxMatTmp */
-                    /*
-                    TODO: this cleaning part is probably not needed, but we
-                    need to be very careful if we decide to leave it out!
-                    */
-                    xxMatTmp->data[ii * _NX_ + jj] = 0.0f;
                 }
             }
         }
@@ -609,7 +590,7 @@ boolean_t newtonHessianRegularized) {
 }
 
 return_t qpDUNES_backTrackingLineSearch(qpData_t* const qpData,
-real_t* const alpha, uint_t* const itCntr,
+real_t* const alpha, uint_t* restrict const itCntr,
 const xn_vector_t* const deltaLambdaFS, size_t nV, real_t alphaMin,
 real_t alphaMax, real_t const objValIncumbent) {
     real_t objVal;
@@ -645,7 +626,7 @@ real_t alphaMax, real_t const objValIncumbent) {
 }
 
 return_t qpDUNES_bisectionIntervalSearch(qpData_t* const qpData,
-real_t* const alpha, uint_t* const itCntr,
+real_t* const alpha, uint_t* restrict const itCntr,
 const xn_vector_t* const deltaLambdaFS, size_t nV, real_t alphaMin,
 real_t alphaMax) {
     size_t k, i;

@@ -57,8 +57,9 @@ return_t multiplyAInvQ(qpData_t* const qpData,
 xx_matrix_t* restrict const res, const xx_matrix_t* const C,
 const vv_matrix_t* const cholH);
 
-return_t getInvQ(qpData_t* const qpData, xx_matrix_t* const res,
-const xx_matrix_t* const cholM1, size_t nV);
+return_t getInvQ(qpData_t* const qpData, xx_matrix_t* restrict const res,
+const vv_matrix_t* restrict const cholH,
+const d2_vector_t* restrict const y);
 
 return_t addScaledVector(xn_vector_t* const res, real_t scalingFactor,
 const xn_vector_t* restrict const update, size_t len);
