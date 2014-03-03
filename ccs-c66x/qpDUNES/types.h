@@ -117,9 +117,9 @@
 
 /** MATRIX ACCESS */
 /*                                                block offset   row offset   column offset (0=diag,-1=supDiag)   column */
-#define accHessian( K, L, I, J )	hessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (1u+L)*_NX_                         + (J) ]
+#define accHessian( K, L, I, J )	hessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (uint_t)((1+L)*(int_t)_NX_)                         + (J) ]
 /*                                                        block offset   row offset   column offset (0=diag,-1=supDiag)   column */
-#define accCholHessian( K, L, I, J )	cholHessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (1u+L)*_NX_                         + (J) ]
+#define accCholHessian( K, L, I, J )	cholHessian->data[ (K)*2u*_NX_*_NX_  + (I)*2u*_NX_   + (uint_t)((1+L)*(int_t)_NX_)                         + (J) ]
 
 #define accH( I, J )	H->data[ (I)*nV + (J) ]
 #define accC( I, J )	C->data[ (I)*_NZ_ + (J) ]
@@ -382,41 +382,31 @@ typedef struct
 {
 	uint_t id;					/**< stage index */
 
-
 	/* dimensions */
-	uint_t nD;					/**< number of constraints */
 	uint_t nV;					/**< number of variables */
-
 
 	/* primal objective function */
 	vv_matrix_t H;				/**< Hessian */
 	vv_matrix_t cholH;			/**< inverse of Hessian */
-	real_t HQNorm;				/**< norm of Q-part of Hessian */     /*FIXME: choose which norm to compute exactly, etc.*/
-
 
 	/* dualized objective function */
 	z_vector_t q;				/**< linear objective function term after dualization */
 	real_t p;					/**< constant objective function term after dualization */
 
-
 	/* dynamic system */
 	xz_matrix_t C;				/**< u-part of constraint matrix */
 	x_vector_t  c;				/**< constant part */
-
 
 	/* constraints */
 	z_vector_t  zLow;			/**< lower variable bound */
 	z_vector_t  zUpp;			/**< upper variable bound */
 
-
 	/* primal QP solution */
 	z_vector_t z;				/**< full primal solution for current lambda guess */
 	real_t optObjVal;			/**< objective value */
 
-
 	/* dual QP solution */
 	d2_vector_t y;				/**< stage constraint multiplier vector  */
-
 
 	/* QP solver */
 	qpSolverClipping_t qpSolverClipping;	/**< workspace for clipping QP solver */
@@ -424,13 +414,10 @@ typedef struct
 	boolean_t actSetHasChanged;				/**< indicator flag whether an active set change occurred on this
 										     	 interval during the current iteration */
 
-
 	/* workspace */
 	x_vector_t lambdaK;		/**<  */
 	x_vector_t lambdaK1;	/**<  */
 
-	x_vector_t xVecTmp;			/**<  */
-	u_vector_t uVecTmp;			/**<  */
 	z_vector_t zVecTmp;			/**<  */
 
 } interval_t;
@@ -449,12 +436,12 @@ typedef struct
 typedef struct
 {
 	/* iteration limits */
-	int_t maxIter;
-	int_t maxNumLineSearchIterations;			/**< maximum number of line search steps in solution of Newton system */
-	int_t maxNumLineSearchRefinementIterations;	/**< maximum number of refinement line search steps to find point with AS change */
+	uint_t maxIter;
+	uint_t maxNumLineSearchIterations;			/**< maximum number of line search steps in solution of Newton system */
+	uint_t maxNumLineSearchRefinementIterations;	/**< maximum number of refinement line search steps to find point with AS change */
 
 	/* printing */
-	int_t printLevel;							/**< Amount of information printed:   0 = no output
+	uint_t printLevel;							/**< Amount of information printed:   0 = no output
 																					  1 = only errors and success
 																					  2 = additionally iterations and warnings
 																					  3 = debug information
@@ -462,7 +449,7 @@ typedef struct
 	/* logging */
 	logLevel_t logLevel;						/**< Amount of information logged */
 
-	int_t printIntervalHeader;
+	uint_t printIntervalHeader;
 	boolean_t printIterationTiming;
 	boolean_t printLineSearchTiming;
 	/* TODO: use print precision here for variable precision matrix and vector printing */
@@ -478,7 +465,7 @@ typedef struct
 	real_t ascentCurvatureTolerance;	/**< Tolerance when a step is called a zero curvature step */
 
 	/* additional options */
-	int_t nbrInitialGradientSteps;		/**< after the first Newton step a number of cheaper gradient
+	uint_t nbrInitialGradientSteps;		/**< after the first Newton step a number of cheaper gradient
 											 steps with line search can be used to drive the method
 											 faster to the solution */
 	boolean_t checkForInfeasibility;	/**< perform checks for infeasibility of the problem */
@@ -497,7 +484,7 @@ typedef struct
 	real_t lineSearchMinRelProgress;
 	real_t lineSearchStationarityTolerance;
 	real_t lineSearchMaxStepSize;
-	int_t lineSearchNbrGridPoints;		/**< number of grid points for grid line search */
+	uint_t lineSearchNbrGridPoints;		/**< number of grid points for grid line search */
 
 	/* qpOASES options */
 	real_t qpOASES_terminationTolerance;
@@ -590,7 +577,7 @@ typedef struct
 	/* iterations log */
 	itLog_t* itLog;
 
-	int_t numIter;
+	uint_t numIter;
 
 } log_t;
 
@@ -632,8 +619,6 @@ typedef struct
 
 	/* workspace */
 	x_vector_t xVecTmp;			/**<  */
-	u_vector_t uVecTmp;			/**<  */
-	z_vector_t zVecTmp;			/**<  */
 	xn_vector_t xnVecTmp;		/**<  */
 	xn_vector_t xnVecTmp2;		/**<  */
 

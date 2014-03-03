@@ -50,14 +50,13 @@ return_t qpDUNES_setupFinalInterval(qpData_t* const qpData,
 interval_t* interval, const real_t* const H_, const real_t* const zLow_,
 const real_t* const zUpp_);
 
-return_t qpDUNES_updateIntervalData(qpData_t* const qpData,
-interval_t* interval, const real_t* const C_, const real_t* const c_,
-const real_t* const zLow_, const real_t* const zUpp_);
+return_t qpDUNES_updateIntervalConstraints(qpData_t* const qpData,
+interval_t* interval, const real_t* const zLow_, const real_t* const zUpp_);
 
 return_t qpDUNES_setupAllLocalQPs(qpData_t* const qpData);
 
 return_t qpDUNES_setupStageQP(qpData_t* const qpData,
-interval_t* const interval, boolean_t copyCholH);
+interval_t* const interval);
 
 return_t qpDUNES_shiftIntervals(qpData_t* const qpData);
 

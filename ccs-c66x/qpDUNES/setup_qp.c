@@ -38,7 +38,7 @@ void qpDUNES_indicateDataChange(qpData_t* const qpData) {
     Hessian refactorization
     */
     for (k = 0; k < _NI_ + 1u; k++) {
-        for (i = 0; i < _ND(k) + _NV(k); i++) {
+        for (i = 0; i < _NV(k); i++) {
             /* some safe dummy value */
             qpData->log.itLog[0].prevIeqStatus[k][i] = -42;
         }
@@ -52,34 +52,36 @@ const real_t* const zUpp_) {
     size_t i;
     size_t nV = interval->nV;
 
-    vv_matrix_t* H = &(interval->H);
-    xz_matrix_t* C = &(interval->C);
+    vv_matrix_t *restrict H = &(interval->H),
+                *restrict cholH = &(interval->cholH);
+    xz_matrix_t *restrict C = &(interval->C);
 
-    sparsityType_t sparsityQ;
-    sparsityType_t sparsityR;
+    assert(Q_);
+    assert(R_);
+    assert(C_);
+    assert(c_);
+    assert(zLow_);
+    assert(zUpp_);
 
     /** (1) quadratic term of cost function */
-    /* assemble Hessian */
-    /* TODO: move Q, R out to MPC module */
-    /* detect sparsity of Q, R */
-    sparsityQ = (Q_ != 0) ?
-        qpDUNES_detectMatrixSparsity(Q_, _NX_, _NX_) : QPDUNES_IDENTITY;
-    sparsityR = (R_ != 0) ?
-        qpDUNES_detectMatrixSparsity(R_, _NU_, _NU_) : QPDUNES_IDENTITY;
-
-    assert(sparsityQ == QPDUNES_DIAGONAL);
-    assert(sparsityR == QPDUNES_DIAGONAL);
+    /* assemble Hessian from diagonals in Q and R */
 
     /* write Hessian blocks */
     H->sparsityType = QPDUNES_DIAGONAL;
-    /* write diagonal in first line for cache efficiency */
+    /*
+    Write diagonal in first line for cache efficiency. Also factorize the
+    matrix (producing a diagonal cholH) and write the reciprocals of those
+    elements to cholH.
+    */
     /* Q part */
     for (i = 0; i < _NX_; i++) {
-        accH(0, i) = Q_[i * _NX_ + i];
+        H->data[i] = Q_[i];
+        cholH->data[i] = recip_f(Q_[i]);
     }
     /* R part */
     for (i = 0; i < _NU_; i++) {
-        accH(0, _NX_ + i) = R_[i * _NU_ + i];
+        H->data[_NX_ + i] = R_[i];
+        cholH->data[_NX_ + i] = recip_f(R_[i]);
     }
 
     /** (2) linear term of cost function -- always 0 */
@@ -88,19 +90,8 @@ const real_t* const zUpp_) {
     if (C->sparsityType == QPDUNES_MATRIX_UNDEFINED) {
         C->sparsityType = QPDUNES_DENSE;
     }
-    if (C_) {
-        /* set up C directly */
-        qpDUNES_updateMatrixData((matrix_t*)C, C_, _NX_, _NZ_);
-    } else {
-        return QPDUNES_ERR_INVALID_ARGUMENT;
-    }
-
-    if (c_) {
-        qpDUNES_setupVector((vector_t*)&(interval->c), c_, _NX_);
-    }
-    else {
-        qpDUNES_setupZeroVector((vector_t*)&(interval->c), _NX_);
-    }
+    qpDUNES_updateMatrixData((matrix_t*)C, C_, _NX_, _NZ_);
+    qpDUNES_setupVector((vector_t*)&(interval->c), c_, _NX_);
 
     /** (4) bounds */
     qpDUNES_setupUniformVector(
@@ -120,16 +111,14 @@ return_t qpDUNES_setupFinalInterval(qpData_t* const qpData,
 interval_t* interval, const real_t* const H_, const real_t* const zLow_,
 const real_t* const zUpp_) {
     size_t nV = interval->nV;
+    size_t i;
 
     vv_matrix_t* H = &(interval->H);
 
     /** (1) quadratic term of cost function */
-    if (H_) {    /* H given */
-        H->sparsityType = qpDUNES_detectMatrixSparsity(H_, nV, nV);
-        qpDUNES_updateMatrixData((matrix_t*)H, H_, nV, nV);
-    } else {
-        qpDUNES_setupScaledIdentityMatrix(_NX_, qpData->options.regParam,
-                                          (matrix_t*)H);
+    H->sparsityType = QPDUNES_DIAGONAL;
+    for (i = 0; i < _NX_; i++) {
+        H->data[i] = H_[i];
     }
 
     /** (2) linear term of cost function -- unused */
@@ -146,21 +135,13 @@ const real_t* const zUpp_) {
 }
 
 
-return_t qpDUNES_updateIntervalData(qpData_t* const qpData,
-interval_t* interval, const real_t* const C_, const real_t* const c_,
-const real_t* const zLow_, const real_t* const zUpp_) {
+return_t qpDUNES_updateIntervalConstraints(qpData_t* const qpData,
+interval_t* interval, const real_t* const zLow_, const real_t* const zUpp_) {
+#pragma unused(qpData)
     size_t nV = interval->nV;
 
     qpDUNES_updateVector((vector_t*)&(interval->zLow), zLow_, nV);
     qpDUNES_updateVector((vector_t*)&(interval->zUpp), zUpp_, nV);
-
-    /** re-factorize Hessian for direct QP solver if needed */
-    if (C_ || c_) {
-        /** copy data */
-        qpDUNES_updateMatrixData((matrix_t*)&(interval->C), C_, _NX_, _NZ_);
-        qpDUNES_updateVector((vector_t*)&(interval->c), c_, _NX_);
-        qpDUNES_setupStageQP(qpData, interval, QPDUNES_TRUE);
-    }
 
     return QPDUNES_OK;
 }
@@ -168,26 +149,10 @@ const real_t* const zLow_, const real_t* const zUpp_) {
 
 return_t qpDUNES_setupAllLocalQPs(qpData_t* const qpData) {
     size_t k;
-    interval_t* interval;
 
-    /* (1) set up initial lambda guess */
-    qpDUNES_updateVector(
-        &(qpData->intervals[0]->lambdaK1), &(qpData->lambda.data[0]), _NX_);
-    for (k = 1u; k < _NI_; k++) {
-        qpDUNES_updateVector(&(qpData->intervals[k]->lambdaK),
-                             &(qpData->lambda.data[(k - 1u) * _NX_]), _NX_);
-        qpDUNES_updateVector(&(qpData->intervals[k]->lambdaK1),
-                             &(qpData->lambda.data[k * _NX_]), _NX_ );
-    }
-    qpDUNES_updateVector(&(qpData->intervals[_NI_]->lambdaK),
-                         &(qpData->lambda.data[(_NI_ - 1u) * _NX_]), _NX_);
-
-    /* (2) decide which QP solver to use and set up */
+    /* (c) prepare stage QP solvers */
     for (k = 0; k < _NI_ + 1u; k++) {
-        interval = qpData->intervals[k];
-
-        /* (c) prepare stage QP solvers */
-        qpDUNES_setupStageQP(qpData, interval, QPDUNES_TRUE);
+        qpDUNES_setupStageQP(qpData, qpData->intervals[k]);
     }
 
     return QPDUNES_OK;
@@ -195,22 +160,12 @@ return_t qpDUNES_setupAllLocalQPs(qpData_t* const qpData) {
 
 
 return_t qpDUNES_setupStageQP(qpData_t* const qpData,
-interval_t* const interval, boolean_t refactorHessian) {
+interval_t* const interval) {
     assert(qpData && interval);
 
     return_t statusFlag;
 
     /* (b) prepare clipping QP solver */
-    if (refactorHessian == QPDUNES_TRUE) {
-        /*
-        Only first Hessian needs to be factorized in LTI case, others can
-        be copied; last one might still be different, due to terminal
-        cost, even in LTI case
-        */
-        factorizeH(qpData, &(interval->cholH), &(interval->H),
-                   interval->nV);
-    }
-
     /* (c) solve unconstrained local QP for g and initial lambda guess: */
     /*     - get (possibly updated) lambda guess */
     if (interval->id > 0) {     /* lambdaK exists */

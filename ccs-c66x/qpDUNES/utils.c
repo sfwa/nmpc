@@ -30,51 +30,6 @@
 #include "../c66math.h"
 
 
-sparsityType_t qpDUNES_detectMatrixSparsity(const real_t* const M,
-size_t nRows, size_t nCols) {
-    sparsityType_t sparsityM;
-    size_t i, j;
-
-    if (!nRows || !nCols || !M) {
-        return (sparsityType_t)QPDUNES_OK;
-    }
-
-    if (nRows != nCols) {
-        sparsityM = QPDUNES_DENSE;
-    }
-
-    /* check for sparsity */
-    sparsityM = QPDUNES_DIAGONAL;
-
-    for (i = 0; i < nRows && sparsityM != QPDUNES_DENSE; i++) { /* check if dense */
-        for (j = 0; i && sparsityM != QPDUNES_DENSE && j < i - 1u; j++) {   /* lower triangle */
-            if (abs_f(M[i * nCols + j]) > 1e-15f) { /* TODO: make threshold adjustable! */
-                sparsityM = QPDUNES_DENSE;
-            }
-        }
-        for (j = i + 1u; sparsityM != QPDUNES_DENSE && j < nCols; j++) {    /* upper triangle */
-            if (abs_f(M[i * nCols + j]) > 1e-15f) {
-                sparsityM = QPDUNES_DENSE;
-            }
-        }
-    }
-
-    /* check whether diagonal or identity */
-    if (sparsityM != QPDUNES_DENSE) {
-        sparsityM = QPDUNES_IDENTITY;
-
-        for (i = 0; i < nRows; i++) {
-            if (abs_f(M[i * nCols + i] - 1.0f) > 1e-15f) {
-                sparsityM = QPDUNES_DIAGONAL;
-                break;
-            }
-        }
-    }
-
-    return sparsityM;
-}
-
-
 return_t qpDUNES_updateMatrixData(matrix_t* const to,
 const real_t* const from, size_t nRows, size_t nCols) {
     size_t i;
@@ -111,44 +66,10 @@ const real_t* const from, size_t nRows, size_t nCols) {
 }
 
 
-return_t qpDUNES_setupZeroMatrix(size_t nRows, size_t nCols, matrix_t* to) {
-    assert(to && to->data);
-    _nassert((size_t)to->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < nRows * nCols; i++) {
-        to->data[i] = 0.0;
-    }
-
-    to->sparsityType = QPDUNES_ALLZEROS;
-
-    return QPDUNES_OK;
-}
-
-
 return_t qpDUNES_setMatrixNull(matrix_t* const matrix) {
     assert(matrix);
 
     matrix->sparsityType = QPDUNES_MATRIX_UNDEFINED;
-
-    return QPDUNES_OK;
-}
-
-
-return_t qpDUNES_setupScaledIdentityMatrix(size_t nRows, real_t scalar,
-matrix_t* to) {
-    assert(to && to->data);
-    _nassert((size_t)to->data % 4 == 0);
-
-    size_t i;
-
-    qpDUNES_setupZeroMatrix(nRows, nRows, to);
-    for (i = 0; i < nRows; i++) {
-        to->data[i * nRows + i] = scalar;
-    }
-
-    to->sparsityType = QPDUNES_DIAGONAL;
 
     return QPDUNES_OK;
 }

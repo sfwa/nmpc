@@ -60,54 +60,12 @@ const vv_matrix_t* const cholH);
 return_t getInvQ(qpData_t* const qpData, xx_matrix_t* const res,
 const xx_matrix_t* const cholM1, size_t nV);
 
-return_t factorizeH(qpData_t* const qpData, vv_matrix_t* const cholH,
-const vv_matrix_t* const H, size_t nV);
-
 return_t addScaledVector(xn_vector_t* const res, real_t scalingFactor,
 const xn_vector_t* restrict const update, size_t len);
 
 return_t addVectorScaledVector(vector_t* restrict const res,
 const vector_t* restrict const x, real_t scalingFactor,
 const vector_t* restrict const y, size_t len);
-
-return_t backsolveDiagonal(qpData_t* const qpData, real_t* const res,
-const real_t* const M, const real_t* const b, size_t n);
-
-return_t backsolveMatrixDiagonalIdentity(qpData_t* const qpData,
-real_t* const res, const real_t* const M1, size_t dim0);
-
-return_t factorizePosDefMatrix(qpData_t* const qpData, matrix_t* const cholM,
-const matrix_t* const M, size_t dim0);
-
-return_t denseCholeskyFactorization(qpData_t* const qpData,
-matrix_t* const cholM, const matrix_t* const M, size_t dim0);
-
-return_t backsolveMatrixTDiagonalDense(qpData_t* const qpData,
-real_t* const res, const real_t* const M1,
-const real_t* const M2,	/* untransposed M2 */
-size_t dim0, size_t dim1); /* dimensions of M2 */
-
-return_t multiplyMatrixVector(vector_t* const res, const matrix_t* const M,
-const vector_t* const x, size_t dim0, size_t dim1);
-
-real_t multiplyVectorMatrixVector(const matrix_t* const M,
-const vector_t* const x, size_t dim0);
-
-return_t multiplyInvMatrixVector(qpData_t* const qpData, vector_t* const res,
-const matrix_t* const cholH, const vector_t* const x,
-size_t dim0); /* dimension of symmetric matrix */
-
-return_t multiplyMatrixVectorDense(real_t* const res, const real_t* const M,
-const real_t* const x, size_t dim0, size_t dim1);
-
-return_t multiplyMatrixVectorSparse(real_t* const res, const real_t* const M,
-const real_t* const x, size_t dim0, size_t dim1);
-
-return_t multiplyMatrixVectorDiagonal(real_t* const res,
-const real_t* const M, const real_t* const x, size_t dim0);
-
-real_t multiplyVectorMatrixVectorDiagonal(const real_t* const M,
-const real_t* const x, size_t dim0	);
 
 /** Low-level scalar product */
 real_t scalarProd(const vector_t* const x, const vector_t* const y,

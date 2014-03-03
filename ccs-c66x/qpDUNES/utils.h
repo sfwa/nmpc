@@ -29,18 +29,11 @@
 #include "../c66math.h"
 
 
-sparsityType_t qpDUNES_detectMatrixSparsity(const real_t* const M,
-size_t nRows, size_t nCols);
 
 return_t qpDUNES_updateMatrixData(matrix_t* const to,
 const real_t* const from, size_t nRows, size_t nCols);
 
-return_t qpDUNES_setupZeroMatrix(size_t nRows, size_t nCols, matrix_t* to);
-
 return_t qpDUNES_setMatrixNull(matrix_t* const matrix);
-
-return_t qpDUNES_setupScaledIdentityMatrix(size_t nRows, real_t scalar,
-matrix_t* to);
 
 return_t qpDUNES_setupVector(vector_t* const to, const real_t* const from,
 size_t n);

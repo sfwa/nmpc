@@ -63,22 +63,11 @@ return_t qpDUNES_updateAllLocalQPs(	qpData_t* const qpData,
 									const xn_vector_t* const lambda
 									);
 
-
-/* ----------------------------------------------
- * solve local QP
- *
- >>>>>>                                           */
-return_t qpDUNES_solveLocalQP(	qpData_t* const qpData,
-							interval_t* const interval
-							);
-
-
 return_t qpDUNES_setupNewtonSystem(	qpData_t* const qpData
 									);
 
 return_t qpDUNES_factorNewtonSystem(	qpData_t* const qpData,
-									boolean_t* const isHessianRegularized,
-									int_t lastActSetChangeIdx
+									boolean_t* const isHessianRegularized
 									);
 
 
@@ -89,9 +78,7 @@ return_t qpDUNES_computeNewtonGradient(	qpData_t* const qpData,
 
 return_t qpDUNES_factorizeNewtonHessianBottomUp(	qpData_t* const qpData,
 												xn2x_matrix_t* const cholHessian,
-												xn2x_matrix_t* const hessian,
-												int_t lastActSetChangeIdx,
-												boolean_t* isHessianRegularized
+												xn2x_matrix_t* const hessian
 												);
 
 return_t qpDUNES_solveNewtonEquationBottomUp(	qpData_t* const qpData,
@@ -113,7 +100,6 @@ return_t qpDUNES_backTrackingLineSearch(qpData_t* const qpData,
 										real_t* const alpha,
 										uint_t* const itCntr,
 										const xn_vector_t* const deltaLambdaFS,
-										xn_vector_t* const lambdaTry,
 										size_t nV,
 										real_t alphaMin,
 										real_t alphaMax,
@@ -124,7 +110,6 @@ return_t qpDUNES_bisectionIntervalSearch(	qpData_t* const qpData,
 										real_t* const alpha,
 										uint_t* const itCntr,
 										const xn_vector_t* const deltaLambdaFS,
-										xn_vector_t* const lambdaTry,
 										size_t nV,
 										real_t alphaMin,
 										real_t alphaMax

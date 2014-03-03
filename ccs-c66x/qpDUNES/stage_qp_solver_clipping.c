@@ -164,11 +164,18 @@ z_vector_t* const q, real_t* const p) {
                                   &(interval->zUpp), interval->nV);
 
     /* update q */
-    #pragma MUST_ITERATE(NMPC_DELTA_DIM, NMPC_DELTA_DIM + NMPC_CONTROL_DIM, \
-                         NMPC_CONTROL_DIM)
-    for (i = 0; i < interval->nV; i++) {
-        q->data[i] = interval->q.data[i] +
-                     alpha * interval->qpSolverClipping.qStep.data[i];
+    if (interval->nV == 15u) {
+        #pragma MUST_ITERATE(15, 15)
+        for (i = 0; i < 15u; i++) {
+            q->data[i] = interval->q.data[i] +
+                         alpha * interval->qpSolverClipping.qStep.data[i];
+        }
+    } else {
+        #pragma MUST_ITERATE(12, 12)
+        for (i = 0; i < 12u; i++) {
+            q->data[i] = interval->q.data[i] +
+                         alpha * interval->qpSolverClipping.qStep.data[i];
+        }
     }
 
     /* update p */
