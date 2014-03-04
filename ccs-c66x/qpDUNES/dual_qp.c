@@ -497,7 +497,7 @@ const xn_vector_t* const gradient) {
             /* divide by diagonal element */
             res->data[kk * _NX_ + ii] = divide_f(
                  /* intermediate result of first backsolve is stored in res */
-                gradient->data[kk * _NX_ + ii] + tmp,
+                res->data[kk * _NX_ + ii] + tmp,
                 accCholHessian(kk, 0, ii, ii));
         }
     }
