@@ -685,7 +685,8 @@ static real_t _solve_qp(void) {
         */
         for (i = 0; i < NMPC_CONTROL_DIM; i++) {
             ocp_control_value[i] = ocp_control_reference[i] +
-                ocp_qp_data.qpdata.intervals[0]->z.data[NMPC_DELTA_DIM + i] * 0.2f;
+                ocp_qp_data.qpdata.intervals[0]->z.data[NMPC_DELTA_DIM + i] *
+                0.3f;
         }
 
         /* Flag an error in some appropriate way */
