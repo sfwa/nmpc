@@ -93,15 +93,8 @@ struct static_qpdata_t {
     real_t cholHessian_data[nX * 2u * nX * nI]; /* 115200B */
     real_t gradient_data[nX * nI]; /* 4800B */
     real_t xVecTmp_data[nX]; /* 48B */
-    real_t xnVecTmp_data[nX * nI]; /* 4800B */
-    real_t xnVecTmp2_data[nX * nI]; /* 4800B */
     real_t xxMatTmp_data[nX * nX]; /* 576B */
-    real_t xxMatTmp2_data[nX * nX]; /* 576B */
-    real_t xzMatTmp_data[nX * nZ]; /* 720B */
-    real_t uxMatTmp_data[nU * nX]; /* 144B */
     real_t zxMatTmp_data[nZ * nX]; /* 720B */
-    real_t zzMatTmp_data[nZ * nZ]; /* 900B */
-    real_t zzMatTmp2_data[nZ * nZ]; /* 900B */
 
     /* Logging data */
     itLog_t itLog_data;
@@ -796,15 +789,8 @@ const qpOptions_t *opts) {
     qp->qpdata.gradient.data = qp->gradient_data;
 
     qp->qpdata.xVecTmp.data = qp->xVecTmp_data;
-    qp->qpdata.xnVecTmp.data = qp->xnVecTmp_data;
-    qp->qpdata.xnVecTmp2.data = qp->xnVecTmp2_data;
     qp->qpdata.xxMatTmp.data = qp->xxMatTmp_data;
-    qp->qpdata.xxMatTmp2.data = qp->xxMatTmp2_data;
-    qp->qpdata.xzMatTmp.data = qp->xzMatTmp_data;
-    qp->qpdata.uxMatTmp.data = qp->uxMatTmp_data;
     qp->qpdata.zxMatTmp.data = qp->zxMatTmp_data;
-    qp->qpdata.zzMatTmp.data = qp->zzMatTmp_data;
-    qp->qpdata.zzMatTmp2.data = qp->zzMatTmp2_data;
 
     qp->qpdata.optObjVal = -qp->qpdata.options.QPDUNES_INFTY;
 

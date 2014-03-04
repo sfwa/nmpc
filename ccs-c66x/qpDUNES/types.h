@@ -619,16 +619,9 @@ typedef struct
 
 	/* workspace */
 	x_vector_t xVecTmp;			/**<  */
-	xn_vector_t xnVecTmp;		/**<  */
-	xn_vector_t xnVecTmp2;		/**<  */
 
 	xx_matrix_t xxMatTmp;		/**<  */
-	xx_matrix_t xxMatTmp2;		/**<  */
-	ux_matrix_t uxMatTmp;		/**<  */
-	xz_matrix_t xzMatTmp;		/**<  */
 	zx_matrix_t zxMatTmp;		/**<  */
-	zz_matrix_t zzMatTmp;		/**<  */
-	zz_matrix_t zzMatTmp2;		/**<  */
 
 	/* log */
 	log_t log;

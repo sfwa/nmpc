@@ -630,9 +630,10 @@ real_t* const alpha, uint_t* restrict const itCntr,
 const xn_vector_t* const deltaLambdaFS, size_t nV, real_t alphaMin,
 real_t alphaMax) {
     size_t k, i;
-    interval_t* restrict interval;
+    interval_t** restrict intervals = qpData->intervals;
 
     z_vector_t* restrict zTry;
+    x_vector_t *restrict xVec = &qpData->xVecTmp;
     real_t alphaC = 1.0;
     real_t alphaSlope;
     real_t slopeNormalization;
@@ -640,10 +641,6 @@ real_t alphaMax) {
     /* demand more stationarity for smaller steps */
     slopeNormalization = qpDUNES_fmin(
         1.0f, vectorNorm((vector_t*)deltaLambdaFS, nV));
-
-    /* todo: get memory passed on from determine step length */
-    xn_vector_t* restrict gradientTry = &(qpData->xnVecTmp2);
-    /* todo: no need to recompute gradient in next Newton iteration! */
 
     /*
     TODO: take line search iterations and maxNumLineSearchRefinementIterations
@@ -657,38 +654,36 @@ real_t alphaMax) {
 
         /* update z locally according to alpha guess */
         for (k = 0; k <= _NI_; k++) {
-            interval = qpData->intervals[k];
-            zTry = &(interval->zVecTmp);
+            zTry = &(intervals[k]->zVecTmp);
             /* get primal variables for trial step length */
             addVectorScaledVector(
-                zTry, &(interval->qpSolverClipping.zUnconstrained), alphaMax,
-                &(interval->qpSolverClipping.dz), interval->nV);
+                zTry, &(intervals[k]->qpSolverClipping.zUnconstrained),
+                alphaMax, &(intervals[k]->qpSolverClipping.dz),
+                intervals[k]->nV);
             directQpSolver_saturateVector(
-                qpData, zTry, &(interval->y), &(interval->zLow),
-                &(interval->zUpp), interval->nV);
+                qpData, zTry, &(intervals[k]->y), &(intervals[k]->zLow),
+                &(intervals[k]->zUpp), intervals[k]->nV);
         }
 
         /*
         manual gradient computation; TODO: use function, but watch out with
         z, dz, zTry, etc.
         */
+        alphaSlope = 0.0f;
         for (k = 0; k < _NI_; k++) {
             /* ( A_kk*x_kk^opt + B_kk*u_kk^opt + c_kk ) - x_(kk+1)^opt */
-            multiplyCz(qpData, &(qpData->xVecTmp),
-                      &(qpData->intervals[k]->C),
-                      &(qpData->intervals[k]->zVecTmp));
-            addToVector(
-                &(qpData->xVecTmp), &(qpData->intervals[k]->c), _NX_);
+            multiplyCz(qpData, xVec, &(intervals[k]->C),
+                      &(intervals[k]->zVecTmp));
 
             /* write gradient part */
             #pragma MUST_ITERATE(_NX_, _NX_)
             for (i = 0; i < _NX_; i++) {
-                qpData->xVecTmp.data[i] -=
-                    qpData->intervals[k + 1]->zVecTmp.data[i];
-                gradientTry->data[k * _NX_ + i] = qpData->xVecTmp.data[i];
+                xVec->data[i] += intervals[k]->c.data[i];
+                xVec->data[i] -= intervals[k + 1]->zVecTmp.data[i];
+                alphaSlope += xVec->data[i] *
+                              deltaLambdaFS->data[k * _NX_ + i];
             }
         }
-        alphaSlope = scalarProd(gradientTry, deltaLambdaFS, nV);
 
         /* take full step if stationary */
         if (abs_f(alphaSlope) <=
@@ -723,38 +718,36 @@ real_t alphaMax) {
 
         /* update z locally according to alpha guess */
         for (k = 0; k <= _NI_; k++) {
-            interval = qpData->intervals[k];
-            zTry = &(interval->zVecTmp);
+            zTry = &(intervals[k]->zVecTmp);
             /* get primal variables for trial step length */
             addVectorScaledVector(
-                zTry, &(interval->qpSolverClipping.zUnconstrained), alphaC,
-                &(interval->qpSolverClipping.dz), interval->nV);
+                zTry, &(intervals[k]->qpSolverClipping.zUnconstrained),
+                alphaC, &(intervals[k]->qpSolverClipping.dz),
+                intervals[k]->nV);
             directQpSolver_saturateVector(
-                qpData, zTry, &(interval->y), &(interval->zLow),
-                &(interval->zUpp), interval->nV);
+                qpData, zTry, &(intervals[k]->y), &(intervals[k]->zLow),
+                &(intervals[k]->zUpp), intervals[k]->nV);
         }
 
         /*
         manual gradient computation; TODO: use function, but watch out with
         z, dz, zTry, etc.
         */
+        alphaSlope = 0.0f;
         for (k = 0; k < _NI_; k++) {
             /* ( A_kk*x_kk^opt + B_kk*u_kk^opt + c_kk ) - x_(kk+1)^opt */
-            multiplyCz(qpData, &(qpData->xVecTmp),
-                       &(qpData->intervals[k]->C),
-                       &(qpData->intervals[k]->zVecTmp));
-            addToVector(
-                &(qpData->xVecTmp), &(qpData->intervals[k]->c), _NX_);
+            multiplyCz(qpData, xVec, &(intervals[k]->C),
+                       &(intervals[k]->zVecTmp));
 
             /* write gradient part */
             #pragma MUST_ITERATE(_NX_, _NX_)
             for (i = 0; i < _NX_; i++) {
-                qpData->xVecTmp.data[i] -=
-                    qpData->intervals[k + 1]->zVecTmp.data[i];
-                gradientTry->data[k * _NX_ + i] = qpData->xVecTmp.data[i];
+                xVec->data[i] += intervals[k]->c.data[i];
+                xVec->data[i] -= intervals[k + 1]->zVecTmp.data[i];
+                alphaSlope += xVec->data[i] *
+                              deltaLambdaFS->data[k * _NX_ + i];
             }
         }
-        alphaSlope = scalarProd(gradientTry, deltaLambdaFS, nV);
 
         /* check for stationarity in search direction */
         if (abs_f(alphaSlope) <=
