@@ -101,8 +101,8 @@ const vv_matrix_t* const cholH, const z_vector_t* const z, const size_t nV) {
 }
 
 /* Matrix-vector product res = C*z */
-return_t multiplyCz(qpData_t* const qpData, x_vector_t* const res,
-const xz_matrix_t* const C, const z_vector_t* const z) {
+return_t multiplyCz(qpData_t* const qpData, x_vector_t* restrict const res,
+const xz_matrix_t* restrict const C, const z_vector_t* restrict const z) {
     assert(qpData && res && C && z && res->data && C->data && z->data);
     _nassert((size_t)res->data % 4 == 0);
     _nassert((size_t)C->data % 4 == 0);
@@ -124,8 +124,8 @@ const xz_matrix_t* const C, const z_vector_t* const z) {
 }
 
 /* Matrix-vector product z = C.T*y */
-return_t multiplyCTy(qpData_t* const qpData, z_vector_t* const res,
-const xz_matrix_t* const C, const x_vector_t* const y) {
+return_t multiplyCTy(qpData_t* const qpData, z_vector_t* restrict const res,
+const xz_matrix_t* restrict const C, const x_vector_t* restrict const y) {
     assert(qpData && res && C && y && res->data && C->data && y->data);
     _nassert((size_t)res->data % 4 == 0);
     _nassert((size_t)C->data % 4 == 0);
@@ -309,36 +309,6 @@ const vector_t* restrict const y, size_t len) {
 
     for (i = 0; i < len; i++) {
         res->data[i] = x->data[i] + scalingFactor * y->data[i];
-    }
-
-    return QPDUNES_OK;
-}
-
-return_t addToVector(vector_t* restrict const res,
-const vector_t* restrict const update, size_t len) {
-    assert(res && update && res->data && update->data);
-    _nassert((size_t)res->data % 4 == 0);
-    _nassert((size_t)update->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < len; i++) {
-        res->data[i] += update->data[i];
-    }
-
-    return QPDUNES_OK;
-}
-
-return_t subtractFromVector(vector_t* restrict const res,
-const vector_t* const update, size_t len) {
-    assert(res && update && res->data && update->data);
-    _nassert((size_t)res->data % 4 == 0);
-    _nassert((size_t)update->data % 4 == 0);
-
-    size_t i;
-
-    for (i = 0; i < len; i++) {
-        res->data[i] -= update->data[i];
     }
 
     return QPDUNES_OK;

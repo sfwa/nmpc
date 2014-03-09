@@ -403,7 +403,7 @@ const real_t *restrict state, const real_t *restrict control) {
     Determine airflow magnitude, and the magnitudes of the components in
     the vertical and horizontal planes
     */
-    real_t rpm = control[0] * 30000.0f, thrust,
+    real_t rpm = control[0] * 12000.0f, thrust,
            ve2 = (0.0025f * 0.0025f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
     thrust = (ve2 - airflow_v2) *
@@ -416,7 +416,7 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t v_inv, horizontal_v2, vertical_v, vertical_v_inv, qbar;
 
     horizontal_v2 = airflow_x2 + airflow_y2;
-    qbar = (RHO * 0.5f) * horizontal_v2;
+    qbar = (RHO * 0.5f) * airflow_v2;
     v_inv = recip_sqrt_f(max(1.0f, airflow_v2));
 
     vertical_v = sqrt_f(airflow_x2 + airflow_z2);
@@ -437,13 +437,13 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.15f);
+    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.13f);
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
-    side_force = (qbar * 0.26315789473684f) * 0.3f * sin_beta * cos_beta;
+    side_force = (qbar * 0.26315789473684f) * 0.2f * sin_beta * cos_beta;
 
     /* Convert aerodynamic forces from wind frame to body frame */
-    real_t x_aero_f = lift * sin_alpha - drag * cos_alpha -
+    real_t x_aero_f = lift * sin_alpha - drag * cos_alpha +
                              side_force * sin_beta,
            z_aero_f = lift * cos_alpha + drag * sin_alpha,
            y_aero_f = side_force * cos_beta;
@@ -460,9 +460,9 @@ const real_t *restrict state, const real_t *restrict control) {
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
-                   0.08f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+                   0.04f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.15f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+                  0.07f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.01f * (absval(left_aileron) + absval(right_aileron)) *
                  vertical_v * 0.1f;
@@ -481,9 +481,9 @@ const real_t *restrict state, const real_t *restrict control) {
         0 5.88235 0
         0.277444 0 2.49202
     */
-    out[3 + Y] = 25.8823528f * pitch_moment;
-    out[3 + X] = (1.864222f * roll_moment + 0.27744448f * yaw_moment);
-    out[3 + Z] = (0.27744448f * roll_moment + 0.4920163f * yaw_moment);
+    out[3 + Y] = 5.8823528f * pitch_moment;
+    out[3 + X] = (3.864222f * roll_moment + 0.27744448f * yaw_moment);
+    out[3 + Z] = (0.27744448f * roll_moment + 2.4920163f * yaw_moment);
 }
 
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
@@ -643,8 +643,6 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
     status_flag = qpDUNES_updateIntervalConstraints(
         &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[0], z_low, z_upp);
     assert(status_flag == QPDUNES_OK);
-
-    qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
 
 /* Solves the QP using qpDUNES. */
@@ -803,8 +801,6 @@ const qpOptions_t *opts) {
         qp->qpdata.log.itLog[0].prevIeqStatus[i] =
             &(qp->prevIeqStatus_n_data[i * qp->qpdata.nZ]);
     }
-
-    qpDUNES_indicateDataChange(&qp->qpdata);
 }
 
 #pragma FUNC_EXT_CALLED(nmpc_init);
@@ -865,12 +861,11 @@ void nmpc_init(bool use_relative_positions) {
     assert(status_flag == QPDUNES_OK);
 
     qpDUNES_setupAllLocalQPs(&ocp_qp_data.qpdata);
-
-    qpDUNES_indicateDataChange(&ocp_qp_data.qpdata);
 }
 
 #pragma FUNC_EXT_CALLED(nmpc_preparation_step);
 void nmpc_preparation_step(void) {
+    qpDUNES_prepare(&ocp_qp_data.qpdata);
 }
 
 #pragma FUNC_EXT_CALLED(nmpc_feedback_step);

@@ -46,11 +46,11 @@ const size_t nV);
 return_t multiplyInvHz(qpData_t* const qpData, z_vector_t* const res,
 const vv_matrix_t* const cholH, const z_vector_t* const z, const size_t nV);
 
-return_t multiplyCz(qpData_t* const qpData, x_vector_t* const res,
-const xz_matrix_t* const C, const z_vector_t* const z);
+return_t multiplyCz(qpData_t* const qpData, x_vector_t* restrict const res,
+const xz_matrix_t* restrict const C, const z_vector_t* restrict const z);
 
-return_t multiplyCTy(qpData_t* const qpData, z_vector_t* const res,
-const xz_matrix_t* const C, const x_vector_t* const y);
+return_t multiplyCTy(qpData_t* const qpData, z_vector_t* restrict const res,
+const xz_matrix_t* restrict const C, const x_vector_t* restrict const y);
 
 /** Inverse matrix times matrix product res = Q^-1 * A */
 return_t multiplyAInvQ(qpData_t* const qpData,
@@ -70,12 +70,6 @@ const vector_t* restrict const y, size_t len);
 
 /** Low-level scalar product */
 real_t scalarProd(const vector_t* const x, const vector_t* const y,
-size_t len);
-
-return_t addToVector(vector_t* restrict const res,
-const vector_t* restrict const update, size_t len);
-
-return_t subtractFromVector(vector_t* const res, const vector_t* const update,
 size_t len);
 
 return_t negateVector(vector_t* const res, size_t len);

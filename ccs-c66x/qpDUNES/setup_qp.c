@@ -28,23 +28,6 @@
 #include "../c66math.h"
 
 
-void qpDUNES_indicateDataChange(qpData_t* const qpData) {
-    assert(qpData);
-
-    size_t k, i;
-
-    /*
-    initialize prevIeqStatus to safe values when data was changed to force
-    Hessian refactorization
-    */
-    for (k = 0; k < _NI_ + 1u; k++) {
-        for (i = 0; i < _NV(k); i++) {
-            /* some safe dummy value */
-            qpData->log.itLog[0].prevIeqStatus[k][i] = -42;
-        }
-    }
-}
-
 return_t qpDUNES_setupRegularInterval(qpData_t* const qpData,
 interval_t* interval, const real_t* const Q_, const real_t* const R_,
 const real_t* const C_, const real_t* const c_, const real_t* const zLow_,

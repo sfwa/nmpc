@@ -613,6 +613,7 @@ typedef struct
 
 	real_t alpha;
 	real_t optObjVal;
+	real_t objValIncumbent;
 
 	qpOptions_t options;
 

@@ -39,8 +39,6 @@
 #include "utils.h"
 
 
-void qpDUNES_indicateDataChange(qpData_t* const qpData);
-
 return_t qpDUNES_setupRegularInterval(qpData_t* const qpData,
 interval_t* interval, const real_t* const Q_, const real_t* const R_,
 const real_t* const C_, const real_t* const c_, const real_t* const zLow_,
