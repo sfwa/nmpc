@@ -239,7 +239,8 @@ static real_t wind_velocity[3];
 static real_t ocp_state_reference[(OCP_HORIZON_LENGTH + 1u) * NMPC_STATE_DIM];
 
 /* 6000B */
-static real_t ocp_control_reference[OCP_HORIZON_LENGTH * NMPC_CONTROL_DIM];
+static real_t ocp_control_reference[(OCP_HORIZON_LENGTH + 1u) *
+                                    NMPC_CONTROL_DIM];
 
 static real_t ocp_lower_state_bound[NMPC_DELTA_DIM];
 static real_t ocp_upper_state_bound[NMPC_DELTA_DIM];
@@ -413,9 +414,8 @@ const real_t *restrict state, const real_t *restrict control) {
     Calculate airflow in the horizontal and vertical planes, as well as
     pressure
     */
-    real_t v_inv, horizontal_v2, vertical_v, vertical_v_inv, qbar;
+    real_t v_inv, vertical_v, vertical_v_inv, qbar;
 
-    horizontal_v2 = airflow_x2 + airflow_y2;
     qbar = (RHO * 0.5f) * airflow_v2;
     v_inv = recip_sqrt_f(max(1.0f, airflow_v2));
 
@@ -460,11 +460,11 @@ const real_t *restrict state, const real_t *restrict control) {
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
-                   0.04f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+                   0.1f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.07f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+                  0.2f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
-                 0.01f * (absval(left_aileron) + absval(right_aileron)) *
+                 0.02f * (absval(left_aileron) + absval(right_aileron)) *
                  vertical_v * 0.1f;
     pitch_moment *= qbar;
     roll_moment *= qbar;
@@ -628,6 +628,16 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
     and the initial state horizon point.
     */
     _state_to_delta(z_low, ocp_state_reference, measurement);
+
+    //z_low[0] = 0.0;
+    //z_low[1] = 0.0;
+    //z_low[2] = 0.0;
+    //z_low[3] = 0.0;
+    //z_low[4] = 0.0;
+    //z_low[5] = 0.0;
+
+    memset(z_low, 0, sizeof(z_low));
+
     memcpy(z_upp, z_low, sizeof(real_t) * NMPC_DELTA_DIM);
 
     /* Control constraints are unchanged. */
@@ -902,13 +912,19 @@ void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
     memmove(ocp_state_reference, &ocp_state_reference[NMPC_STATE_DIM],
             sizeof(real_t) * NMPC_STATE_DIM * OCP_HORIZON_LENGTH);
     memmove(ocp_control_reference, &ocp_control_reference[NMPC_CONTROL_DIM],
-            sizeof(real_t) * NMPC_CONTROL_DIM * (OCP_HORIZON_LENGTH - 1u));
+            sizeof(real_t) * NMPC_CONTROL_DIM * OCP_HORIZON_LENGTH);
 
     /* Prepare the QP for the next solution. */
     qpDUNES_shiftLambda(&ocp_qp_data.qpdata);
     qpDUNES_shiftIntervals(&ocp_qp_data.qpdata);
 
     nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH);
+
+    //size_t i;
+    //for (i = 0; i < OCP_HORIZON_LENGTH - 1u; i++) {
+    //    qpDUNES_setupStageQP(&ocp_qp_data.qpdata,
+    //                         ocp_qp_data.qpdata.intervals[i]);
+    //}
 }
 
 #pragma FUNC_EXT_CALLED(nmpc_set_state_weights);
@@ -958,6 +974,8 @@ uint32_t i) {
 
     memcpy(&ocp_state_reference[i * NMPC_STATE_DIM], coeffs,
            sizeof(real_t) * NMPC_STATE_DIM);
+    memcpy(&ocp_control_reference[i * NMPC_CONTROL_DIM],
+           &coeffs[NMPC_STATE_DIM], sizeof(real_t) * NMPC_CONTROL_DIM);
 
     /*
     Only set control and solve IVPs for regular points, not the final one
@@ -972,10 +990,6 @@ uint32_t i) {
         real_t *control_ref =
                     &ocp_control_reference[(i - 1u) * NMPC_CONTROL_DIM];
         size_t j;
-
-        /* Copy the control reference */
-        memcpy(control_ref, &coeffs[NMPC_STATE_DIM],
-               sizeof(real_t) * NMPC_CONTROL_DIM);
 
         /* Update state and control constraints */
         memcpy(z_low, ocp_lower_state_bound, sizeof(real_t) * NMPC_DELTA_DIM);
@@ -1022,6 +1036,15 @@ uint32_t i) {
         qpDUNES_setupStageQP(
                 &ocp_qp_data.qpdata, ocp_qp_data.qpdata.intervals[i - 1u]);
     }
+}
+
+#pragma FUNC_EXT_CALLED(nmpc_get_reference_point);
+void nmpc_get_reference_point(real_t coeffs[NMPC_REFERENCE_DIM], uint32_t i) {
+    assert(coeffs);
+    assert(i <= OCP_HORIZON_LENGTH);
+
+    memcpy(coeffs, &ocp_state_reference[i * NMPC_STATE_DIM],
+           sizeof(real_t) * NMPC_STATE_DIM);
 }
 
 #pragma FUNC_EXT_CALLED(nmpc_set_wind_velocity);

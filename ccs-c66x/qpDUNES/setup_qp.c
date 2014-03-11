@@ -169,6 +169,7 @@ interval_t* const interval) {
     }
 
     interval->p = 0.0f;
+    interval->optObjVal = 0.0;
 
     /*     - update first order term */
     /* reset q; qStep is added in qpDUNES_solve, when bounds are known */
