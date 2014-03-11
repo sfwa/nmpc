@@ -437,7 +437,7 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.13f);
+    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.18f);
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.2f * sin_beta * cos_beta;
@@ -462,7 +462,7 @@ const real_t *restrict state, const real_t *restrict control) {
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
                    0.1f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.2f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+                  0.15f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
                  0.02f * (absval(left_aileron) + absval(right_aileron)) *
                  vertical_v * 0.1f;
@@ -481,7 +481,7 @@ const real_t *restrict state, const real_t *restrict control) {
         0 5.88235 0
         0.277444 0 2.49202
     */
-    out[3 + Y] = 5.8823528f * pitch_moment;
+    out[3 + Y] = 10.8823528f * pitch_moment;
     out[3 + X] = (3.864222f * roll_moment + 0.27744448f * yaw_moment);
     out[3 + Z] = (0.27744448f * roll_moment + 2.4920163f * yaw_moment);
 }
@@ -541,8 +541,6 @@ const real_t *restrict next_state_ref, real_t *restrict out_residuals) {
     /*
     Calculate integration residuals -- the difference between the integrated
     state and the next state.
-
-    FIXME: this allows delta positions to be specified, rather than absolute.
     */
     if (ocp_state_position_is_delta) {
         integrated_state[0] -= state_ref[0];
@@ -628,15 +626,6 @@ static void _initial_constraint(const real_t measurement[NMPC_STATE_DIM]) {
     and the initial state horizon point.
     */
     _state_to_delta(z_low, ocp_state_reference, measurement);
-
-    //z_low[0] = 0.0;
-    //z_low[1] = 0.0;
-    //z_low[2] = 0.0;
-    //z_low[3] = 0.0;
-    //z_low[4] = 0.0;
-    //z_low[5] = 0.0;
-
-    memset(z_low, 0, sizeof(z_low));
 
     memcpy(z_upp, z_low, sizeof(real_t) * NMPC_DELTA_DIM);
 
@@ -920,11 +909,11 @@ void nmpc_update_horizon(real_t new_reference[NMPC_REFERENCE_DIM]) {
 
     nmpc_set_reference_point(new_reference, OCP_HORIZON_LENGTH);
 
-    //size_t i;
-    //for (i = 0; i < OCP_HORIZON_LENGTH - 1u; i++) {
-    //    qpDUNES_setupStageQP(&ocp_qp_data.qpdata,
-    //                         ocp_qp_data.qpdata.intervals[i]);
-    //}
+    size_t i;
+    for (i = 0; i < OCP_HORIZON_LENGTH - 1u; i++) {
+        qpDUNES_setupStageQP(&ocp_qp_data.qpdata,
+                             ocp_qp_data.qpdata.intervals[i]);
+    }
 }
 
 #pragma FUNC_EXT_CALLED(nmpc_set_state_weights);
