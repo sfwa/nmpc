@@ -452,6 +452,11 @@ const real_t *restrict state, const real_t *restrict control) {
     out[0 + X] += x_aero_f + thrust;
     out[0 + Z] -= z_aero_f;
 
+    /* Limit the cubic portion of control surface moments to a sane value */
+    if (vertical_v < 20.0f) {
+        vertical_v = 20.0f;
+    }
+
     /* Determine moments */
     real_t pitch_moment, yaw_moment, roll_moment,
            yaw_rate = state[10 + Z],
@@ -460,11 +465,11 @@ const real_t *restrict state, const real_t *restrict control) {
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
-                   0.1f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+                   0.15f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.15f * (left_aileron - right_aileron) * vertical_v * 0.1f;
-    yaw_moment = -0.02f * sin_beta - 0.05f * yaw_rate -
-                 0.02f * (absval(left_aileron) + absval(right_aileron)) *
+                  0.2f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+    yaw_moment = 0.05f * sin_beta - 0.1f * yaw_rate -
+                 0.05f * (absval(left_aileron) - absval(right_aileron)) *
                  vertical_v * 0.1f;
     pitch_moment *= qbar;
     roll_moment *= qbar;
@@ -481,7 +486,7 @@ const real_t *restrict state, const real_t *restrict control) {
         0 5.88235 0
         0.277444 0 2.49202
     */
-    out[3 + Y] = 10.8823528f * pitch_moment;
+    out[3 + Y] = 15.8823528f * pitch_moment;
     out[3 + X] = (3.864222f * roll_moment + 0.27744448f * yaw_moment);
     out[3 + Z] = (0.27744448f * roll_moment + 2.4920163f * yaw_moment);
 }
