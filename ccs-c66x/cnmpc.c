@@ -405,10 +405,10 @@ const real_t *restrict state, const real_t *restrict control) {
     the vertical and horizontal planes
     */
     real_t rpm = control[0] * 12000.0f, thrust,
-           ve2 = (0.0025f * 0.0025f) * rpm * rpm;
+           ve2 = (0.003f * 0.003f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
     thrust = (ve2 - airflow_v2) *
-             (0.26315789473684f * 0.5f * RHO * 0.02f);
+             (0.26315789473684f * 0.5f * RHO * 0.05f);
 
     /*
     Calculate airflow in the horizontal and vertical planes, as well as

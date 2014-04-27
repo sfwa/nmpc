@@ -253,12 +253,12 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
 
     /* numerical tolerances */
     options.stationarityTolerance       = 1e-6f;
-    options.equalityTolerance           = 2.221e-14f;
+    options.equalityTolerance           = 2.221e-10f;
     options.newtonHessDiagRegTolerance  = 1e-10f;
     options.activenessTolerance         = 1e4f * options.equalityTolerance;
     options.QPDUNES_ZERO                = 1e-16f;
     options.QPDUNES_INFTY               = 1e16f;
-    options.ascentCurvatureTolerance    = 1e-6f;
+    options.ascentCurvatureTolerance    = 1e-5f;
 
     /* additional options */
     options.nbrInitialGradientSteps     = 0;
