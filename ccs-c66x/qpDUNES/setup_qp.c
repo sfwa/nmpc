@@ -278,7 +278,7 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
 
     /* line search options */
     options.lsType                          = QPDUNES_LS_ACCELERATED_GRADIENT_BISECTION_LS;
-    options.lineSearchReductionFactor       = 0.2f;  /**< needs to be between 0 and 1 */
+    options.lineSearchReductionFactor       = 0.15f;  /**< needs to be between 0 and 1 */
     options.lineSearchIncreaseFactor        = 1.2f;  /**< needs to be greater than 1 */
     options.lineSearchMinAbsProgress        = options.equalityTolerance;
     options.lineSearchMinRelProgress        = 1e-8f;

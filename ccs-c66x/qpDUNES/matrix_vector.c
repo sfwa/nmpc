@@ -110,14 +110,18 @@ const xz_matrix_t* restrict const C, const z_vector_t* restrict const z) {
 
     /* only dense multiplication */
     size_t i, j;
+    float t1, t2, t3;
 
     #pragma MUST_ITERATE(_NX_, _NX_)
     for (i = 0; i < _NX_; i++) {
-        res->data[i] = 0.0;
-        #pragma MUST_ITERATE(_NZ_, _NZ_)
-        for (j = 0; j < _NZ_; j++) {
-            res->data[i] += accC(i, j) * z->data[j];
+        res->data[i] = t1 = t2 = t3 = 0.0;
+        #pragma MUST_ITERATE(_NZ_/3, _NZ_/3)
+        for (j = 0; j < _NZ_; j += 3u) {
+            t1 += accC(i, j) * z->data[j];
+            t2 += accC(i, j + 1u) * z->data[j + 1u];
+            t3 += accC(i, j + 2u) * z->data[j + 2u];
         }
+        res->data[i] += t1 + t2 + t3;
     }
 
     return QPDUNES_OK;
