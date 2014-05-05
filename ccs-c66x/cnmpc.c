@@ -467,7 +467,7 @@ const real_t *restrict state, const real_t *restrict control) {
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
                    0.15f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.2f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+                  0.3f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = 0.05f * sin_beta - 0.1f * yaw_rate -
                  0.05f * (absval(left_aileron) - absval(right_aileron)) *
                  vertical_v * 0.1f;
