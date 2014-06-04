@@ -278,13 +278,13 @@ qpOptions_t qpDUNES_setupDefaultOptions(void) {
 
     /* line search options */
     options.lsType                          = QPDUNES_LS_ACCELERATED_GRADIENT_BISECTION_LS;
-    options.lineSearchReductionFactor       = 0.15f;  /**< needs to be between 0 and 1 */
-    options.lineSearchIncreaseFactor        = 1.2f;  /**< needs to be greater than 1 */
+    options.lineSearchReductionFactor       = 0.5f;  /**< needs to be between 0 and 1 */
+    options.lineSearchIncreaseFactor        = 2.0f;  /**< needs to be greater than 1 */
     options.lineSearchMinAbsProgress        = options.equalityTolerance;
     options.lineSearchMinRelProgress        = 1e-8f;
     options.lineSearchStationarityTolerance = 1e-6f;
     options.lineSearchMaxStepSize           = 0.5f;
-    options.lineSearchNbrGridPoints         = 5;
+    options.lineSearchNbrGridPoints         = 3;
 
     /* qpOASES options */
     options.qpOASES_terminationTolerance    = 1e-12f;   /*< stationarity tolerance for qpOASES, see qpOASES::Options -> terminationTolerance */
