@@ -404,7 +404,7 @@ const real_t *restrict state, const real_t *restrict control) {
     Determine airflow magnitude, and the magnitudes of the components in
     the vertical and horizontal planes
     */
-    real_t rpm = control[0] * 12000.0f, thrust,
+    real_t rpm = (control[0] - 0.15) * 16000.0f, thrust,
            ve2 = (0.003f * 0.003f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
     thrust = (ve2 - airflow_v2) *
@@ -437,7 +437,7 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.8f * sin_cos_alpha + 0.18f);
+    lift = (qbar * 0.26315789473684f) * (0.6f * sin_cos_alpha + 0.18f);
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.2f * sin_beta * cos_beta;
@@ -465,9 +465,9 @@ const real_t *restrict state, const real_t *restrict control) {
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
-                   0.15f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+                   0.08f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.3f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+                  0.25f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = 0.05f * sin_beta - 0.1f * yaw_rate -
                  0.05f * (absval(left_aileron) - absval(right_aileron)) *
                  vertical_v * 0.1f;
