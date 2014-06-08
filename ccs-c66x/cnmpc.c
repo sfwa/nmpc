@@ -404,11 +404,14 @@ const real_t *restrict state, const real_t *restrict control) {
     Determine airflow magnitude, and the magnitudes of the components in
     the vertical and horizontal planes
     */
-    real_t rpm = (control[0] - 0.15f) * 24000.0f, thrust,
-           ve2 = (0.003f * 0.003f) * rpm * rpm;
+    real_t rpm = (control[0] - 0.15f) * 12000.0f, thrust,
+           ve2 = (0.012f * 0.012f) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
     thrust = (ve2 - airflow_v2) *
-             (0.26315789473684f * 0.5f * RHO * 0.05f);
+             (0.26315789473684f * 0.5f * RHO * 0.02f);
+    if (thrust < 0.0f) {
+        thrust = 0.0f;
+    }
 
     /*
     Calculate airflow in the horizontal and vertical planes, as well as
@@ -437,10 +440,10 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.5f * sin_cos_alpha + 0.1f);
+    lift = (qbar * 0.26315789473684f) * (0.7f * sin_cos_alpha + 0.05f);
     drag = (qbar * 0.26315789473684f) *
-           (0.1f + 0.7f * sin_alpha * sin_alpha);
-    side_force = (qbar * 0.26315789473684f) * 0.05f * sin_beta * cos_beta;
+           (0.03f + 0.7f * sin_alpha * sin_alpha);
+    side_force = (qbar * 0.26315789473684f) * 0.1f * sin_beta * cos_beta;
 
     /* Convert aerodynamic forces from wind frame to body frame */
     real_t x_aero_f = lift * sin_alpha - drag * cos_alpha +
@@ -467,8 +470,8 @@ const real_t *restrict state, const real_t *restrict control) {
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
                    0.2f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.1f * roll_rate +
-                  0.4f * (left_aileron - right_aileron) * vertical_v * 0.1f;
-    yaw_moment = 0.01f * sin_beta - 0.1f * yaw_rate -
+                  0.45f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+    yaw_moment = 0.05f * sin_beta - 0.1f * yaw_rate -
                  0.05f * (absval(left_aileron) - absval(right_aileron)) *
                  vertical_v * 0.1f;
     pitch_moment *= qbar;
