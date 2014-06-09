@@ -442,7 +442,7 @@ const real_t *restrict state, const real_t *restrict control) {
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
     lift = (qbar * 0.26315789473684f) * (0.7f * sin_cos_alpha + 0.05f);
     drag = (qbar * 0.26315789473684f) *
-           (0.03f + 0.7f * sin_alpha * sin_alpha);
+           (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.1f * sin_beta * cos_beta;
 
     /* Convert aerodynamic forces from wind frame to body frame */
