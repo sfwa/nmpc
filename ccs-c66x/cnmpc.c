@@ -440,7 +440,7 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.7f * sin_cos_alpha + 0.1f);
+    lift = (qbar * 0.26315789473684f) * (0.7f * sin_cos_alpha + 0.13f);
     drag = (qbar * 0.26315789473684f) *
            (0.05f + 0.7f * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.05f * sin_beta * cos_beta;
@@ -468,11 +468,11 @@ const real_t *restrict state, const real_t *restrict control) {
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
     pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
-                   0.1f * (left_aileron + right_aileron) * vertical_v * 0.1f;
+                   0.15f * (left_aileron + right_aileron) * vertical_v * 0.1f;
     roll_moment = 0.05f * sin_beta - 0.05f * roll_rate +
-                  0.2f * (left_aileron - right_aileron) * vertical_v * 0.1f;
+                  0.25f * (left_aileron - right_aileron) * vertical_v * 0.1f;
     yaw_moment = 0.025f * sin_beta - 0.025f * yaw_rate -
-                 0.15f * (absval(left_aileron) - absval(right_aileron)) *
+                 0.1f * (absval(left_aileron) - absval(right_aileron)) *
                  vertical_v * 0.1f;
     pitch_moment *= qbar;
     roll_moment *= qbar;
