@@ -365,16 +365,28 @@ static float x8_yaw_due_to_control = 0.25f;
 static float x8_yaw_due_to_beta = 0.15f;
 static float x8_yaw_due_to_yaw_rate = 0.15f;
 
+static float x8_roll_inertia_inv = 3.9f;
+static float x8_pitch_inertia_inv = 16.0f;
+static float x8_yaw_inertia_inv = 2.5f;
+static float x8_roll_yaw_inertia_inv = 0.3f;
+static float x8_lift_due_to_alpha = 0.7f;
+static float x8_lift_constant = 0.2f;
+static float x8_drag_due_to_alpha = 0.7f;
+
 void update_x8_dynamics_params(float roll_due_to_control,
 float roll_due_to_beta, float roll_due_to_roll_rate,
 float pitch_due_to_control, float yaw_due_to_control, float yaw_due_to_beta,
-float yaw_due_to_yaw_rate);
+float yaw_due_to_yaw_rate, float roll_inertia_inv, float pitch_inertia_inv,
+float yaw_inertia_inv, float roll_yaw_inertia_inv, float lift_due_to_alpha,
+float lift_constant, float drag_due_to_alpha);
 
 #pragma FUNC_EXT_CALLED(update_x8_dynamics_params);
 void update_x8_dynamics_params(float roll_due_to_control,
 float roll_due_to_beta, float roll_due_to_roll_rate,
 float pitch_due_to_control, float yaw_due_to_control, float yaw_due_to_beta,
-float yaw_due_to_yaw_rate) {
+float yaw_due_to_yaw_rate, float roll_inertia_inv, float pitch_inertia_inv,
+float yaw_inertia_inv, float roll_yaw_inertia_inv, float lift_due_to_alpha,
+float lift_constant, float drag_due_to_alpha) {
     x8_roll_due_to_control = roll_due_to_control;
     x8_roll_due_to_beta = roll_due_to_beta;
     x8_roll_due_to_roll_rate = roll_due_to_roll_rate;
@@ -382,6 +394,13 @@ float yaw_due_to_yaw_rate) {
     x8_yaw_due_to_control = yaw_due_to_control;
     x8_yaw_due_to_beta = yaw_due_to_beta;
     x8_yaw_due_to_yaw_rate = yaw_due_to_yaw_rate;
+    x8_roll_inertia_inv = roll_inertia_inv;
+    x8_pitch_inertia_inv = pitch_inertia_inv;
+    x8_yaw_inertia_inv = yaw_inertia_inv;
+    x8_roll_yaw_inertia_inv = roll_yaw_inertia_inv;
+    x8_lift_due_to_alpha = lift_due_to_alpha;
+    x8_lift_constant = lift_constant;
+    x8_drag_due_to_alpha = drag_due_to_alpha;
 }
 
 static void _state_x8_dynamics(real_t *restrict out,
@@ -468,9 +487,10 @@ const real_t *restrict state, const real_t *restrict control) {
     real_t lift, drag, side_force;
 
     /* 0.26315789473684 is the reciprocal of mass (3.8kg) */
-    lift = (qbar * 0.26315789473684f) * (0.7f * sin_cos_alpha + 0.2f);
+    lift = (qbar * 0.26315789473684f) *
+           (x8_lift_due_to_alpha * sin_cos_alpha + x8_lift_constant);
     drag = (qbar * 0.26315789473684f) *
-           (0.05f + 0.7f * sin_alpha * sin_alpha);
+           (0.05f + x8_drag_due_to_alpha * sin_alpha * sin_alpha);
     side_force = (qbar * 0.26315789473684f) * 0.05f * sin_beta * cos_beta;
 
     /* Convert aerodynamic forces from wind frame to body frame */
@@ -521,9 +541,11 @@ const real_t *restrict state, const real_t *restrict control) {
         0 5.88235 0
         0.277444 0 2.49202
     */
-    out[3 + Y] = 15.8823528f * pitch_moment;
-    out[3 + X] = (3.864222f * roll_moment + 0.27744448f * yaw_moment);
-    out[3 + Z] = (0.27744448f * roll_moment + 2.4920163f * yaw_moment);
+    out[3 + Y] = x8_pitch_inertia_inv * pitch_moment;
+    out[3 + X] = (x8_roll_inertia_inv * roll_moment +
+                  x8_roll_yaw_inertia_inv * yaw_moment);
+    out[3 + Z] = (x8_roll_yaw_inertia_inv * roll_moment +
+                  x8_yaw_inertia_inv * yaw_moment);
 }
 
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
