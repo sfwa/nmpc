@@ -373,12 +373,14 @@ static float x8_lift_due_to_alpha = 0.7f;
 static float x8_lift_constant = 0.2f;
 static float x8_drag_due_to_alpha = 0.7f;
 
+static float x8_thrust_cve = 0.012f;
+
 void update_x8_dynamics_params(float roll_due_to_control,
 float roll_due_to_beta, float roll_due_to_roll_rate,
 float pitch_due_to_control, float yaw_due_to_control, float yaw_due_to_beta,
 float yaw_due_to_yaw_rate, float roll_inertia_inv, float pitch_inertia_inv,
 float yaw_inertia_inv, float roll_yaw_inertia_inv, float lift_due_to_alpha,
-float lift_constant, float drag_due_to_alpha);
+float lift_constant, float drag_due_to_alpha, float thrust_cve);
 
 #pragma FUNC_EXT_CALLED(update_x8_dynamics_params);
 void update_x8_dynamics_params(float roll_due_to_control,
@@ -386,7 +388,7 @@ float roll_due_to_beta, float roll_due_to_roll_rate,
 float pitch_due_to_control, float yaw_due_to_control, float yaw_due_to_beta,
 float yaw_due_to_yaw_rate, float roll_inertia_inv, float pitch_inertia_inv,
 float yaw_inertia_inv, float roll_yaw_inertia_inv, float lift_due_to_alpha,
-float lift_constant, float drag_due_to_alpha) {
+float lift_constant, float drag_due_to_alpha, float thrust_cve) {
     x8_roll_due_to_control = roll_due_to_control;
     x8_roll_due_to_beta = roll_due_to_beta;
     x8_roll_due_to_roll_rate = roll_due_to_roll_rate;
@@ -401,6 +403,7 @@ float lift_constant, float drag_due_to_alpha) {
     x8_lift_due_to_alpha = lift_due_to_alpha;
     x8_lift_constant = lift_constant;
     x8_drag_due_to_alpha = drag_due_to_alpha;
+    x8_thrust_cve = thrust_cve;
 }
 
 static void _state_x8_dynamics(real_t *restrict out,
@@ -452,7 +455,7 @@ const real_t *restrict state, const real_t *restrict control) {
     the vertical and horizontal planes
     */
     real_t rpm = (control[0] - 0.15f) * 12000.0f, thrust,
-           ve2 = (0.012f * 0.012f) * rpm * rpm;
+           ve2 = (x8_thrust_cve * x8_thrust_cve) * rpm * rpm;
     /* 1 / 3.8kg times area * density of air */
     thrust = (ve2 - airflow_v2) *
              (0.26315789473684f * 0.5f * RHO * 0.02f);
