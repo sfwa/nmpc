@@ -356,55 +356,19 @@ const real_t delta) {
     }
 }
 
-// FIXME -- tuning only!
-static float x8_roll_due_to_control = 0.35f;
-static float x8_roll_due_to_beta = 0.05f;
-static float x8_roll_due_to_roll_rate = 0.05f;
-static float x8_pitch_due_to_control = 0.25f;
-static float x8_yaw_due_to_control = 0.25f;
-static float x8_yaw_due_to_beta = 0.15f;
-static float x8_yaw_due_to_yaw_rate = 0.15f;
+static const float x8_roll_due_to_control = 120.0f * 0.005f;
+static const float x8_roll_due_to_beta = 10.0f * 0.005f;
+static const float x8_pitch_due_to_control = 80.0f * 0.005f;
+static const float x8_yaw_due_to_control = 30.0f * 0.005f;
 
-static float x8_roll_inertia_inv = 3.9f;
-static float x8_pitch_inertia_inv = 16.0f;
-static float x8_yaw_inertia_inv = 2.5f;
-static float x8_roll_yaw_inertia_inv = 0.3f;
-static float x8_lift_due_to_alpha = 0.7f;
-static float x8_lift_constant = 0.2f;
-static float x8_drag_due_to_alpha = 0.7f;
+static const float x8_roll_inertia_inv = 20.0f * 0.1f;
+static const float x8_pitch_inertia_inv = 160.0f * 0.1f;
+static const float x8_yaw_inertia_inv = 10.0f * 0.1f;
+static const float x8_lift_due_to_alpha = 160.0f * 0.01f;
+static const float x8_lift_constant = 15.0f * 0.01f;
+static const float x8_drag_due_to_alpha = 200.0f * 0.01f;
 
-static float x8_thrust_cve = 0.012f;
-
-void update_x8_dynamics_params(float roll_due_to_control,
-float roll_due_to_beta, float roll_due_to_roll_rate,
-float pitch_due_to_control, float yaw_due_to_control, float yaw_due_to_beta,
-float yaw_due_to_yaw_rate, float roll_inertia_inv, float pitch_inertia_inv,
-float yaw_inertia_inv, float roll_yaw_inertia_inv, float lift_due_to_alpha,
-float lift_constant, float drag_due_to_alpha, float thrust_cve);
-
-#pragma FUNC_EXT_CALLED(update_x8_dynamics_params);
-void update_x8_dynamics_params(float roll_due_to_control,
-float roll_due_to_beta, float roll_due_to_roll_rate,
-float pitch_due_to_control, float yaw_due_to_control, float yaw_due_to_beta,
-float yaw_due_to_yaw_rate, float roll_inertia_inv, float pitch_inertia_inv,
-float yaw_inertia_inv, float roll_yaw_inertia_inv, float lift_due_to_alpha,
-float lift_constant, float drag_due_to_alpha, float thrust_cve) {
-    x8_roll_due_to_control = roll_due_to_control;
-    x8_roll_due_to_beta = roll_due_to_beta;
-    x8_roll_due_to_roll_rate = roll_due_to_roll_rate;
-    x8_pitch_due_to_control = pitch_due_to_control;
-    x8_yaw_due_to_control = yaw_due_to_control;
-    x8_yaw_due_to_beta = yaw_due_to_beta;
-    x8_yaw_due_to_yaw_rate = yaw_due_to_yaw_rate;
-    x8_roll_inertia_inv = roll_inertia_inv;
-    x8_pitch_inertia_inv = pitch_inertia_inv;
-    x8_yaw_inertia_inv = yaw_inertia_inv;
-    x8_roll_yaw_inertia_inv = roll_yaw_inertia_inv;
-    x8_lift_due_to_alpha = lift_due_to_alpha;
-    x8_lift_constant = lift_constant;
-    x8_drag_due_to_alpha = drag_due_to_alpha;
-    x8_thrust_cve = thrust_cve;
-}
+static const float x8_thrust_cve = 14.0f * 0.0005f;
 
 static void _state_x8_dynamics(real_t *restrict out,
 const real_t *restrict state, const real_t *restrict control) {
@@ -513,21 +477,14 @@ const real_t *restrict state, const real_t *restrict control) {
 
     /* Determine moments */
     real_t pitch_moment, yaw_moment, roll_moment,
-           yaw_rate = state[10 + Z],
-           pitch_rate = state[10 + Y],
-           roll_rate = state[10 + X],
            left_aileron = control[1] - 0.5f,
            right_aileron = control[2] - 0.5f;
-    pitch_moment = 0.0f - 0.0f * sin_alpha - 0.0f * pitch_rate -
-                   x8_pitch_due_to_control * (left_aileron + right_aileron) *
+    pitch_moment = -x8_pitch_due_to_control * (left_aileron + right_aileron) *
                    vertical_v * 0.1f;
-    roll_moment = x8_roll_due_to_beta * sin_beta -
-                  x8_roll_due_to_roll_rate * roll_rate +
+    roll_moment = x8_roll_due_to_beta * sin_beta +
                   x8_roll_due_to_control * (left_aileron - right_aileron) *
                   vertical_v * 0.1f;
-    yaw_moment = x8_yaw_due_to_beta * sin_beta -
-                 x8_yaw_due_to_yaw_rate * yaw_rate -
-                 x8_yaw_due_to_control * (absval(left_aileron) - absval(right_aileron)) *
+    yaw_moment = -x8_yaw_due_to_control * (absval(left_aileron) - absval(right_aileron)) *
                  vertical_v * 0.1f;
     pitch_moment *= qbar;
     roll_moment *= qbar;
@@ -545,10 +502,8 @@ const real_t *restrict state, const real_t *restrict control) {
         0.277444 0 2.49202
     */
     out[3 + Y] = x8_pitch_inertia_inv * pitch_moment;
-    out[3 + X] = (x8_roll_inertia_inv * roll_moment +
-                  x8_roll_yaw_inertia_inv * yaw_moment);
-    out[3 + Z] = (x8_roll_yaw_inertia_inv * roll_moment +
-                  x8_yaw_inertia_inv * yaw_moment);
+    out[3 + X] = x8_roll_inertia_inv * roll_moment;
+    out[3 + Z] = x8_yaw_inertia_inv * yaw_moment;
 }
 
 static void _state_to_delta(real_t *delta, const real_t *restrict s1,
