@@ -7,9 +7,10 @@ import ctypes
 import vectors
 import bisect
 import datetime
+import copy
 
 import nmpc
-nmpc.init()
+nmpc.init(implementation="c")
 from nmpc import _cnmpc, state
 
 def socket_readlines(socket):
@@ -84,11 +85,11 @@ initial_time = 0.0
 MAX_THROTTLE = 25000.0
 
 nmpc.setup(
-    state_weights=[1e-1, 1e-1, 1e-1, 1, 1, 1, 1, 1, 1, 1e1, 1e1, 1e1],
-    control_weights=[1e-7, 1e-1, 1e-1],
+    state_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1e1, 7e-1, 7e-1, 1e1],
+    control_weights=[1e-1, 1e3, 1e3],
     terminal_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    upper_control_bound=[MAX_THROTTLE, 0.8, 0.8],
-    lower_control_bound=[0, -0.8, -0.8])
+    upper_control_bound=[1.0, 1.0, 1.0],
+    lower_control_bound=[0, 0, 0])
 nmpc.initialise_horizon()
 
 xplane_reference_points = []
@@ -168,32 +169,33 @@ sock.sendall("sub sim/flightmodel/position/local_vz 0\n")
 sock.sendall("sub sim/flightmodel/engine/ENGN_thro_use\n")
 sock.sendall("sub sim/flightmodel/controls/wing1l_ail1def\n")
 sock.sendall("sub sim/flightmodel/controls/wing1r_ail1def\n")
+sock.sendall("sub sim/weather/wind_now_x_msc\n")
+sock.sendall("sub sim/weather/wind_now_y_msc\n")
+sock.sendall("sub sim/weather/wind_now_z_msc\n")
 sock.sendall("extplane-set update_interval 0.02\n")
 
 sock.recv(1024)
 sock.sendall("world-set -37.8136 144.9 200\n")
 position_offset = [0, 0, 0]
 time.sleep(1.0)
-response = sock.recv(1024)
-for line in response.split("\n"):
-    if line.find("local_x") >= 0:
-        position_offset[1] = float(line.split(" ")[-1])
-    elif line.find("local_y") >= 0:
-        position_offset[2] = -float(line.split(" ")[-1])
-    elif line.find("local_z") >= 0:
-        position_offset[0] = -float(line.split(" ")[-1])
+
+try:
+    for line in socket_readlines(sock):
+        if line.find("local_x") >= 0:
+            position_offset[1] = float(line.split(" ")[-1])
+        elif line.find("local_y") >= 0:
+            position_offset[2] = -float(line.split(" ")[-1])
+        elif line.find("local_z") >= 0:
+            position_offset[0] = -float(line.split(" ")[-1])
+except socket.error:
+    pass
 
 # Set up the NMPC reference trajectory using correct interpolation.
-for i in xrange(0, nmpc.HORIZON_LENGTH):
+for i in xrange(0, nmpc.HORIZON_LENGTH+1):
     horizon_point = [a for a in interpolate_reference(
         i*nmpc.STEP_LENGTH, xplane_reference_points)]
-    horizon_point.extend([15000, 0, 0])
+    horizon_point.extend([0.5, 0.5, 0.5])
     nmpc.set_reference(horizon_point[1:], i)
-
-# Set up terminal reference. No need for control values as they'd be ignored.
-terminal_point = [a for a in interpolate_reference(
-    nmpc.HORIZON_LENGTH*nmpc.STEP_LENGTH, xplane_reference_points)]
-nmpc.set_reference(terminal_point[1:], nmpc.HORIZON_LENGTH)
 
 # Set up initial attitude, velocity and angular velocity.
 initial_point = interpolate_reference(0, xplane_reference_points)
@@ -257,6 +259,8 @@ measured_state = {
     "wz": initial_point[13]
 }
 
+wind_velocity = [0, 0, 0]
+
 # Prepare to re-enable the flight model.
 update = "set sim/operation/override/override_planepath [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]\n"
 
@@ -264,9 +268,6 @@ sock.setblocking(0)
 
 for i in xrange(1000):
     start_iteration = datetime.datetime.now()
-
-    horizon_point = [a for a in interpolate_reference(
-        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
 
     nmpc.prepare()
 
@@ -300,8 +301,16 @@ for i in xrange(1000):
                 measured_state["wy"] = math.radians(float(fields[2]))
             elif fields[1] == "sim/flightmodel/position/R":
                 measured_state["wz"] = math.radians(float(fields[2]))
+            elif fields[1] == "sim/weather/wind_now_x_msc":
+                wind_velocity[1] = float(fields[2])
+            elif fields[1] == "sim/weather/wind_now_y_msc":
+                wind_velocity[2] = -float(fields[2])
+            elif fields[1] == "sim/weather/wind_now_z_msc":
+                wind_velocity[0] = -float(fields[2])
     except socket.error:
         pass
+
+    nmpc.set_wind_velocity(wind_velocity)
 
     # Recalculate quaternion in case euler angles have been updated.
     attitude = euler_to_q(yaw, pitch, roll)
@@ -316,7 +325,7 @@ for i in xrange(1000):
         measured_state["qz"] = attitude[2]
         measured_state["qw"] = attitude[3]
 
-    nmpc.solve([
+    state = [
         measured_state["x"],
         measured_state["y"],
         measured_state["z"],
@@ -329,18 +338,22 @@ for i in xrange(1000):
         measured_state["qw"],
         measured_state["wx"],
         measured_state["wy"],
-        measured_state["wz"]])
+        measured_state["wz"]]
+    print state
+
+    nmpc.solve(state)
 
     control_vec = nmpc.get_controls()
-    print control_vec
+    print ("t: %.2f " % (i*nmpc.STEP_LENGTH)) + repr(control_vec)
 
-    update += "set sim/flightmodel/engine/ENGN_thro_use [%.6f,0,0,0,0,0,0,0]\n" % (control_vec[0] / MAX_THROTTLE)
-    update += "set sim/flightmodel/controls/wing1l_ail1def %.6f\n" % math.degrees(control_vec[1])
-    update += "set sim/flightmodel/controls/wing1r_ail1def %.6f\n" % math.degrees(control_vec[2])
+    update += "set sim/flightmodel/engine/ENGN_thro_use [%.6f,0,0,0,0,0,0,0]\n" % control_vec[0]
+    update += "set sim/flightmodel/controls/wing1l_ail1def %.6f\n" % math.degrees(control_vec[1] - 0.5)
+    update += "set sim/flightmodel/controls/wing1r_ail1def %.6f\n" % math.degrees(control_vec[2] - 0.5)
 
+    # Add one to the index because of the terminal point.
     horizon_point = [a for a in interpolate_reference(
-        (i+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
-    horizon_point.extend([15000, 0, 0])
+        (i+1+nmpc.HORIZON_LENGTH)*nmpc.STEP_LENGTH, xplane_reference_points)]
+    horizon_point.extend([0.5, 0.5, 0.5])
     nmpc.update_horizon(horizon_point[1:])
 
     sock.sendall(update)
