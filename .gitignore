@@ -1,3 +1,5 @@
+*.m~
+
 *.py[cod]
 .DS_Store
 
