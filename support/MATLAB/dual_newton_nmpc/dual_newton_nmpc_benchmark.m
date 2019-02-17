@@ -4,31 +4,34 @@
 % Set up OCP.
 horizon_length = 100;
 dt = 0.1;
-control_horizon = zeros(2, horizon_length);
-state_horizon = zeros(5, horizon_length);
 
 % Initial conditions.
-state_horizon(:, 1) = [
-    10;         % x-position
-    -10;        % y-position
-    0;          % x-velocity
-    3;          % y-velocity
-    30*pi/180;  % heading
+init_state = [
+    10;         % X-position
+    -10;        % Y-position
+    0;          % X-velocity
+    3;          % Y-velocity
+    30*pi/180;  % Heading
 ];
 
-% Propagate initial condition though state horizon.
-for ii = 2:horizon_length
-    state_horizon(:, ii) = bench_ivp(dt, ...
-        state_horizon(:, ii-1), control_horizon(:, ii-1));
-end
+init_control = [
+    0;          % Angular rate
+    0;          % Acceleration
+];
 
 control_min = [-180*pi/180; 0];
 control_max = [180*pi/180; 10];
 speed_max = 10;
 
-% Solve optimal control problem for each iteration.
-[x_out, u_out, fval, exitflag, output] = bench_ocp(dt, ...
-    state_horizon, control_horizon, control_min, control_max, speed_max);
+% Set up optimal control problem.
+[state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn] = bench_ocp(...
+    init_state, init_control, horizon_length, dt, control_min, control_max, speed_max);
+
+% Set up initial dual vector.
+lambda = zeros(size(state_horizon));
+
+[x, u, lambda, H, epsilon] = newton_iteration(state_horizon, control_horizon, lambda, ...
+    process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn);
 
 hFig = figure; axis equal; hold on; grid on; grid minor;
 xlim([min(min(x_out(2, :)) - 2, 0) max(max(x_out(2, :)) + 2, 0)]);
