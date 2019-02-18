@@ -38,6 +38,11 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     D_k = cell(N+1, 1);
     lb = reshape(lb, nz, N+1);
     ub = reshape(ub, nz, N+1);
+    
+    % Set up first stage initial value constraint.
+    lb(1:nx, 1) = x(:, 1);
+    ub(1:nx, 1) = x(:, 1);
+    
     for kk = 0:N
         ii = kk + 1;
 
