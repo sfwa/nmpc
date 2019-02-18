@@ -8,21 +8,21 @@ function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_
     assert(isscalar(dt), 'Time step must be scalar');
     assert(isscalar(speed_max), 'Maximum speed must be scalar');
 
-    state_horizon = zeros(5, N);
+    state_horizon = zeros(5, N+1);
     state_horizon(:, 1) = x0;
-    control_horizon = zeros(2, N);
+    control_horizon = zeros(2, N+1);
     control_horizon(:, 1) = u0;
 
     % Propagate initial condition though state horizon using process
     % function.
-    for ii = 2:N
+    for ii = 2:N+1
         state_horizon(:, ii) = bench_process(dt, ...
             state_horizon(:, ii-1), control_horizon(:, ii-1));
     end
 
     % Set state vector lower and upper bounds (inc. control).
-    lb = reshape(repmat([-inf(5, 1); u_min], 1, N), [], 1);
-    ub = reshape(repmat([inf(5, 1); u_max], 1, N), [], 1);
+    lb = reshape(repmat([-inf(5, 1); u_min], 1, N+1), [], 1);
+    ub = reshape(repmat([inf(5, 1); u_max], 1, N+1), [], 1);
     
     process_fcn = @(z) bench_process(dt, z(1:5, :), z(6:7, :));
     cost_fcn = @(z) bench_objective(z);

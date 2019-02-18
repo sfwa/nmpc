@@ -28,10 +28,18 @@ speed_max = 10;
     init_state, init_control, horizon_length, dt, control_min, control_max, speed_max);
 
 % Set up initial dual vector.
-lambda = zeros(size(state_horizon));
+lambda = zeros(size(state_horizon, 1), horizon_length+2);
 
-[x, u, lambda, H, epsilon] = newton_iteration(state_horizon, control_horizon, lambda, ...
-    process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn);
+% Number of Newton iterations to execute.
+numIterations = 5;
+for ii = 1:numIterations
+    [state_horizon, control_horizon, lambda, epsilon, fStar] = newton_iteration(...
+        state_horizon, control_horizon, lambda, ...
+        process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn);
+
+    % Store information and set up for next iteration.
+    fprintf('Iteration %d\n', ii);
+end
 
 hFig = figure; axis equal; hold on; grid on; grid minor;
 xlim([min(min(x_out(2, :)) - 2, 0) max(max(x_out(2, :)) + 2, 0)]);
