@@ -1,6 +1,10 @@
 % Solve the optimal control problem using MATLAB's fmincon().
 function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn] = bench_ocp(...
-        x0, u0, N, dt, u_min, u_max, speed_max)
+        x0, u0, N, dt, x_min, x_max, u_min, u_max, speed_max)
+    assert(iscolumn(x_min) & numel(x_min) == 5, ...
+        'Wrong dimension for state lower bound');
+    assert(iscolumn(x_max) & numel(x_max) == 5, ...
+        'Wrong dimension for state upper bound');
     assert(iscolumn(u_min) & numel(u_min) == 2, ...
         'Wrong dimension for control lower bound');
     assert(iscolumn(u_max) & numel(u_max) == 2, ...
@@ -21,8 +25,8 @@ function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_
     end
 
     % Set state vector lower and upper bounds (inc. control).
-    lb = reshape(repmat([-inf(5, 1); u_min], 1, N+1), [], 1);
-    ub = reshape(repmat([inf(5, 1); u_max], 1, N+1), [], 1);
+    lb = reshape(repmat([x_min; u_min], 1, N+1), [], 1);
+    ub = reshape(repmat([x_max; u_max], 1, N+1), [], 1);
     
     process_fcn = @(z) bench_process(dt, z(1:5, :), z(6:7, :));
     cost_fcn = @(z) bench_objective(z);

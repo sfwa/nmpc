@@ -19,13 +19,16 @@ init_control = [
     0;          % Acceleration
 ];
 
+state_min = [-inf; -inf; -inf; -inf; -inf];
+state_max = [inf; inf; inf; inf; inf];
 control_min = [-180*pi/180; 0];
 control_max = [180*pi/180; 10];
 speed_max = 10;
 
 % Set up optimal control problem.
 [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn] = bench_ocp(...
-    init_state, init_control, horizon_length, dt, control_min, control_max, speed_max);
+    init_state, init_control, horizon_length, dt, state_min, state_max, ...
+    control_min, control_max, speed_max);
 
 % Solve the OCP using fmincon.
 opts = optimoptions('fmincon', ...
