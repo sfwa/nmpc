@@ -85,12 +85,15 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
         % re-calculated if there's an active set change. Also, if a constant
         % Hessian is used and no active set change occurred, this step can be
         % skipped entirely.
+        %
+        % Use the pseudo-inverse when calculating the reduced Hessian in
+        % order to be able to handle a positive semidefinite objective.
         active_set = (mu_k{ii} >= act_tol);
         n_act = sum(active_set);
         D_k_act = D_k{ii}(active_set, :);
         [Q_k, ~] = qr(D_k_act');
         Z_k = Q_k(:, n_act+1:end); % Might need to transpose Q_k?
-        P_k = Z_k * inv(transpose(Z_k) * H_k{ii} * Z_k) * transpose(Z_k);
+        P_k = Z_k * pinv(transpose(Z_k) * H_k{ii} * Z_k) * transpose(Z_k);
 
         % Diagonal part.
         if kk > 0
@@ -232,7 +235,7 @@ function [E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, D_k] = setup_stage_qp
     %
     % Should also consider Gauss-Newton and L-BFGS Hessian approximations
     % here.
-    H_k = diag(hessdiag(cost_fcn, z_k)) + eye(size(z_k, 1))*1e-6;
+    H_k = hessian(cost_fcn, z_k);
     g_k = transpose(gradest(cost_fcn, z_k));
 
     % Linearise constraints for each stage.
