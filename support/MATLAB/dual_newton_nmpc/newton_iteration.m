@@ -18,8 +18,6 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 
     act_tol = 1e-6; % Tolerance for active constraints.
 
-    % Initial value embedding – first stage equality constraint.
-
     % Set up stage QPs. This could be optionally parallelised.
     %
     % Ideally with the active-set solver, the stage Hessians would be
