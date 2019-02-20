@@ -273,7 +273,6 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
     % order as the constraints in D_k.
     active_bounds = (abs(lagrange.lower) > act_tol) | (abs(lagrange.upper) > act_tol);
     D_k_bounds = eye(numel(lagrange.lower));
-    D_k_bounds = D_k_bounds(active_bounds, :);
 
     % Linearise nonlinear constraints.
     D_k_eqnonlin = jacobianest(constr_eq_fcn, z_k);
@@ -283,10 +282,7 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
     active_ineqnonlin = abs(lagrange.ineqnonlin) > act_tol;
     
     active_set = [active_bounds; active_eqnonlin; active_ineqnonlin];
-    D_k = [D_k_bounds;
-        D_k_eqnonlin(active_eqnonlin, :);
-        D_k_ineqnonlin(active_ineqnonlin, :)
-    ];
+    D_k = [D_k_bounds; D_k_eqnonlin; D_k_ineqnonlin];
 
 %     fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
 end
