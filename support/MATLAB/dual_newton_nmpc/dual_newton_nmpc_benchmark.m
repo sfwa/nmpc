@@ -19,8 +19,8 @@ init_control = [
     0;          % Acceleration
 ];
 
-state_min = [-inf; -inf; -10; -10; -inf];
-state_max = [inf; inf; 10; 10; inf];
+state_min = [-inf; -inf; -inf; -inf; -inf];
+state_max = [inf; inf; inf; inf; inf];
 control_min = [-180*pi/180; 0];
 control_max = [180*pi/180; 10];
 speed_max = 10;

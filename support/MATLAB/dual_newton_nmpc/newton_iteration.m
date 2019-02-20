@@ -27,13 +27,6 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     E_k = cell(N+1, 1);
     C_k = cell(N+1, 1);
     c_k = cell(N+1, 1);
-    H_k = cell(N+1, 1);
-    g_k = cell(N+1, 1);
-    Aeq_k = cell(N+1, 1);
-    beq_k = cell(N+1, 1);
-    A_k = cell(N+1, 1);
-    b_k = cell(N+1, 1);
-    D_k = cell(N+1, 1);
     lb = reshape(lb, nz, N+1);
     ub = reshape(ub, nz, N+1);
     
@@ -44,9 +37,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     for kk = 0:N
         ii = kk + 1;
 
-        [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, ...
-        Aeq_k{ii}, beq_k{ii}, A_k{ii}, b_k{ii}, D_k{ii}] = setup_stage_qp(...
-            x(:, ii), u(:, ii), process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
+        [E_k{ii}, C_k{ii}, c_k{ii}] = setup_stage_qp(x(:, ii), u(:, ii), process_fcn);
         
         % Special cases.
         if kk == 0
@@ -60,8 +51,8 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 
     % Solve stage QPs to get imcumbent objective function value and initial
     % primal estimate.
-    [z, mu_k, fStar_inc] = solve_all_stage_qps(x, u, lambda, ...
-        E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, lb, ub, act_tol);
+    [z, active_set, fStar_inc, H_k, g_k, D_k] = solve_all_stage_qps(x, u, lambda, ...
+        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
 
     % Calculate newton gradient.
     g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -86,9 +77,9 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
         %
         % Use the pseudo-inverse when calculating the reduced Hessian in
         % order to be able to handle a positive semidefinite objective.
-        active_set = (mu_k{ii} >= act_tol);
-        n_act = sum(active_set);
-        D_k_act = D_k{ii}(active_set, :);
+        active_set_k = active_set{ii};
+        n_act = sum(active_set_k);
+        D_k_act = D_k{ii}(active_set_k, :);
         [Q_k, ~] = qr(D_k_act');
         Z_k = Q_k(:, n_act+1:end); % Might need to transpose Q_k?
         P_k = Z_k * pinv(transpose(Z_k) * H_k{ii} * Z_k) * transpose(Z_k);
@@ -117,11 +108,6 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     %
     % Use the algorithm on page 13 of "A Parallel Quadratic Programming
     % Method for Dynamic Optimization Problems" by Frasch et al.
-    %
-    % Regularisation here is calculated if needed.
-    if det(H) < 1e-6
-        H = H + eye(nx*N)*1e-6;
-    end
     dLambda = -mldivide(H, g);
 
     % Calculate the step size via backtracking line search followed by
@@ -146,7 +132,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
         lambda_cand = reshape(lambda_cand, nx, []);
 
         [~, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, ...
-            E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, lb, ub, act_tol);
+            E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
 
         % Terminate line search at the appropriate point.
         if fStar_cand > fStar_inc
@@ -174,7 +160,8 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
             lambda_cand = reshape(lambda_cand, nx, []);
 
             [z, ~, ~] = solve_all_stage_qps(x, u, lambda_cand, ...
-                E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, lb, ub, act_tol);
+                E_k, C_k, c_k, lb, ub, cost_fcn, ...
+                constr_eq_fcn, constr_bound_fcn, act_tol);
 
             % Calculate Newton gradient for current dual variables.
             g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -204,7 +191,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     
     % Re-solve stage QPs for a final time.
     [z, ~, fStar] = solve_all_stage_qps(x, u, lambda, ...
-        E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, lb, ub, act_tol);
+        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
     
     % Compute the primal infeasibility from the Newton gradient.
     g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -215,69 +202,37 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 end
 
 % Set up a stage QP.
-function [E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, D_k] = setup_stage_qp(...
-        x_k, u_k, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn)
+function [E_k, C_k, c_k] = setup_stage_qp(x_k, u_k, process_fcn)
     z_k = [x_k; u_k];
     
     C_k = jacobianest(process_fcn, z_k);
     c_k = process_fcn(zeros(size(z_k, 1), 1));
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
-
-    % Estimate unconstrained Hessian for each stage.
-    %
-    % For now, use 'hessdiag' to get a diagonal Hessian estimate. Should
-    % also compare this to just using 'hessian' to get a dense Hessian
-    % approximation. Also, for now, add a small diagonal regularisation
-    % value.
-    %
-    % Should also consider Gauss-Newton and L-BFGS Hessian approximations
-    % here.
-    H_k = hessian(cost_fcn, z_k);
-    g_k = transpose(gradest(cost_fcn, z_k));
-
-    % Linearise constraints for each stage.
-    if ~isempty(constr_eq_fcn)
-        Aeq_k = jacobianest(constr_eq_fcn, z_k);
-        beq_k = -constr_eq_fcn(zeros(size(z_k, 1), 1));
-    else
-        Aeq_k = zeros(0, size(z_k, 1));
-        beq_k = [];
-    end
-
-    if ~isempty(constr_bound_fcn)
-        A_k = jacobianest(constr_bound_fcn, z_k);
-        b_k = -constr_bound_fcn(zeros(size(z_k, 1), 1));
-    else
-        A_k = zeros(0, size(z_k, 1));
-        b_k = [];
-    end
-
-    % Construct linearised constraint matrix D_k. Note that the form of the
-    % constraints here is a bit different to that in the qpDUNES paper; the
-    % affine constraints with upper and lower bounds are more general than
-    % these.
-    D_k = [eye(size(z_k, 1)); eye(size(z_k, 1)); A_k; Aeq_k];
 end
 
 % Solve all stage QPs and return the objective value.
-function [z, mu_k, fStar] = solve_all_stage_qps(x, u, lambda, ...
-        E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, lb, ub, act_tol)
+function [z, active_set, fStar, H_k, g_k, D_k] = solve_all_stage_qps(x, u, lambda, ...
+        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol)
     fStar = 0;
-    z = zeros(size(x, 1) + size(u, 1), size(x, 2));
+    N = size(x, 2)-1;
+    H_k = cell(N+1, 1);
+    g_k = cell(N+1, 1);
+    D_k = cell(N+1, 1);
+    z = zeros(size(x, 1) + size(u, 1), N+1);
 
     % Solve stage QPs. This could be optionally parallelised.
     %
     % One-based indexing messes everything up here, so care needs to be taken
     % to avoid off-by-one errors in the indices.
-    mu_k = cell(size(x, 2), 1);
-    for kk = 0:size(x, 2)-1
+    active_set = cell(N+1, 1);
+    for kk = 0:N
         ii = kk + 1;
 
-        [z(:, ii), mu_k{ii}, fStar_k] = solve_stage_qp(x(:, ii), u(:, ii), ...
+        [z(:, ii), active_set{ii}, fStar_k, H_k{ii}, g_k{ii}, D_k{ii}] = ...
+        solve_stage_qp(x(:, ii), u(:, ii), ...
             lambda(:, ii), lambda(:, ii+1), E_k{ii}, C_k{ii}, c_k{ii}, ...
-            H_k{ii}, g_k{ii}, Aeq_k{ii}, beq_k{ii}, A_k{ii}, b_k{ii}, ...
-            lb(:, ii), ub(:, ii), act_tol);
+            lb(:, ii), ub(:, ii), cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
 
         % Add stage objective value to total objective value.
         fStar = fStar + fStar_k;
@@ -291,29 +246,54 @@ end
 % function. Also, if the cost function is really going to be nonlinear,
 % probably want to use a Quasi-Newton method for online estimation of the
 % Hessian.
-function [z_k, mu_k, fStar_k] = solve_stage_qp(x_k, u_k, lambda_k, lambda_k_1, ...
-        E_k, C_k, c_k, H_k, g_k, Aeq_k, beq_k, A_k, b_k, lb, ub, act_tol)
+function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
+        x_k, u_k, lambda_k, lambda_k_1, ...
+        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol)
     % Calculate linearised continuity constraints for each stage.
     z_k = [x_k; u_k];
 
     % Update p_k and q_k with latest dual estimate.
-    p_k = g_k + transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
+    p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
     q_k = transpose([zeros(size(x_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
-
+    
     % Solve the QP.
-    opts = optimoptions('quadprog', ...
-        'Algorithm', 'interior-point-convex', ...
+    opts = optimoptions('fmincon', ...
+        'Algorithm', 'active-set', ...
+        'MaxFunctionEvaluations', inf, ...
         'MaxIterations', 100, ...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
-    [z_k, ~, ~, ~, lagrange] = quadprog(...
-        H_k, p_k, A_k, b_k, Aeq_k, beq_k, lb, ub, z_k, opts);
+    % 'PlotFcn', {'optimplotfval', 'optimplotfunccount'}
+    [z_k, fStar_k, ~, ~, lagrange, g_k, H_k] = fmincon(...
+        @(x) cost_fcn(x) + transpose(p_k) * x + q_k, ...
+        z_k, [], [], [], [], lb, ub, ...
+        @(x) combined_constraints(x, constr_eq_fcn, constr_bound_fcn), opts);
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.
-    mu_k = [lagrange.lower; lagrange.upper; lagrange.ineqlin; lagrange.eqlin];
+    active_bounds = (abs(lagrange.lower) > act_tol) | (abs(lagrange.upper) > act_tol);
+    D_k_bounds = eye(numel(lagrange.lower));
+    D_k_bounds = D_k_bounds(active_bounds, :);
 
-    fStar_k = transpose(z_k) * H_k * z_k + transpose(p_k) * z_k + q_k;
+    % Linearise nonlinear constraints.
+    D_k_eqnonlin = jacobianest(constr_eq_fcn, z_k);
+    D_k_ineqnonlin = jacobianest(constr_bound_fcn, z_k);
+
+    active_eqnonlin = abs(lagrange.eqnonlin) > act_tol;
+    active_ineqnonlin = abs(lagrange.ineqnonlin) > act_tol;
+    
+    active_set = [active_bounds; active_eqnonlin; active_ineqnonlin];
+    D_k = [D_k_bounds;
+        D_k_eqnonlin(active_eqnonlin, :);
+        D_k_ineqnonlin(active_ineqnonlin, :)
+    ];
+
+%     fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
+end
+
+function [c, ceq] = combined_constraints(z, constr_eq_fcn, constr_bound_fcn)
+    c = constr_bound_fcn(z);
+    ceq = constr_eq_fcn(z);
 end
 
 function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
