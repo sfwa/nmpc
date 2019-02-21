@@ -94,7 +94,8 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
             % Sub-diagonal part.
             if kk < N
                 H((kk-1)*nx + span, kk*nx + span) = -C_k{ii} * P_k * transpose(E_k{ii});
-                H(kk*nx + span, (kk-1)*nx + span) = H((kk-1)*nx + span, kk*nx + span);
+                H(kk*nx + span, (kk-1)*nx + span) = transpose(...
+                    -C_k{ii} * P_k * transpose(E_k{ii}));
             end
         end
 
@@ -108,6 +109,10 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     %
     % Use the algorithm on page 13 of "A Parallel Quadratic Programming
     % Method for Dynamic Optimization Problems" by Frasch et al.
+    %
+    % Alternatively, consider using the conjugate gradient method as
+    % described in "An Improved Distributed Dual Newton-CG Method for
+    % Convex Quadratic Programming Problems" by Kozma et al.
     dLambda = -mldivide(H, g);
 
     % Calculate the step size via backtracking line search followed by
@@ -123,7 +128,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     % initial dual estimate, in which case there's no point trying any
     % shorter step.
     nMaxLineSearch = 20;
-    alphaScale = 0.3;
+    alphaScale = 0.8;
     for ii = 1:nMaxLineSearch
         % Calculate candidate objective function value for the current step
         % size.
@@ -136,6 +141,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 
         % Terminate line search at the appropriate point.
         if fStar_cand > fStar_inc
+            alphaMax = min(alphaMax / alphaScale, 1);
             break;
         end
 
@@ -148,8 +154,8 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
         % Bisection interval search. If the backtracking line search has found
         % the interval where the optimal objective lies, this step refines the
         % step length further within that interval.
-        nMaxIntervalSearch = 20;
-        bisectionTolerance = 1e-8;
+        nMaxIntervalSearch = 50;
+        bisectionTolerance = 1e-3;
         for ii = 1:nMaxIntervalSearch
             alpha = 0.5 * (alphaMax + alphaMin);
 
@@ -159,7 +165,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
             lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
             lambda_cand = reshape(lambda_cand, nx, []);
 
-            [z, ~, ~] = solve_all_stage_qps(x, u, lambda_cand, ...
+            [z, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, ...
                 E_k, C_k, c_k, lb, ub, cost_fcn, ...
                 constr_eq_fcn, constr_bound_fcn, act_tol);
 
@@ -171,9 +177,9 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 
             if abs(fDash) < bisectionTolerance
                 break;
-            elseif fDash < 0
-                alphaMax = alpha;
             elseif fDash > 0
+                alphaMax = alpha;
+            elseif fDash < 0
                 alphaMin = alpha;
             end
         end

@@ -78,7 +78,7 @@ end
 % get to 0).
 function obj_val = bench_objective(z)
     z = reshape(z, 3, []);
-    obj_val = dot(z(1, :), z(1, :));
+    obj_val = dot(z(1, :), z(1, :)) + dot(z(2, :), z(2, :));
 end
 
 % Constraints for the optimal control problem.
