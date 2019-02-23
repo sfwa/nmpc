@@ -183,11 +183,6 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
                 alphaMin = alpha;
             end
         end
-        
-        % If the bisection search failed, take the full step.
-        if abs(fDash) > bisectionTolerance
-            alpha = 1;
-        end
     end
 
     % Make the step.
@@ -281,8 +276,17 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
     D_k_bounds = eye(numel(lagrange.lower));
 
     % Linearise nonlinear constraints.
-    D_k_eqnonlin = jacobianest(constr_eq_fcn, z_k);
-    D_k_ineqnonlin = jacobianest(constr_bound_fcn, z_k);
+    if ~isempty(constr_eq_fcn)
+        D_k_eqnonlin = jacobianest(constr_eq_fcn, z_k);
+    else
+        D_k_eqnonlin = zeros(0, numel(z_k));
+    end
+    
+    if ~isempty(constr_bound_fcn)
+        D_k_ineqnonlin = jacobianest(constr_bound_fcn, z_k);
+    else
+        D_k_ineqnonlin = zeros(0, numel(z_k));
+    end
 
     active_eqnonlin = abs(lagrange.eqnonlin) > act_tol;
     active_ineqnonlin = abs(lagrange.ineqnonlin) > act_tol;
@@ -294,8 +298,17 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
 end
 
 function [c, ceq] = combined_constraints(z, constr_eq_fcn, constr_bound_fcn)
-    c = constr_bound_fcn(z);
-    ceq = constr_eq_fcn(z);
+    if ~isempty(constr_bound_fcn)
+        c = constr_bound_fcn(z);
+    else
+        c = [];
+    end
+    
+    if ~isempty(constr_eq_fcn)
+        ceq = constr_eq_fcn(z);
+    else
+        ceq = [];
+    end
 end
 
 function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)

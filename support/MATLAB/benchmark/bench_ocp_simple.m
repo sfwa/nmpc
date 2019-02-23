@@ -10,7 +10,6 @@ function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_
     assert(iscolumn(u_max) & numel(u_max) == 1, ...
         'Wrong dimension for control upper bound');
     assert(isscalar(dt), 'Time step must be scalar');
-    assert(isscalar(speed_max), 'Maximum speed must be scalar');
 
     state_horizon = zeros(2, N+1);
     state_horizon(:, 1) = x0;
@@ -88,5 +87,9 @@ end
 
 function c = bench_bound_constraints(z, speed_max)
     % Set up maximum speed constraint.
-    c = abs(z(2, :)) - speed_max;
+    if ~isempty(speed_max)
+        c = abs(z(2, :)) - speed_max;
+    else
+        c = [];
+    end
 end

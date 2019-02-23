@@ -17,7 +17,7 @@ state_min = [-inf; -inf];
 state_max = [inf; inf];
 control_min = -10;
 control_max = 10;
-speed_max = 10;
+speed_max = [];
 
 % Set up optimal control problem.
 [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn] = bench_ocp_simple(...
