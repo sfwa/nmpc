@@ -93,8 +93,8 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 
             % Sub-diagonal part.
             if kk < N
-                H((kk-1)*nx + span, kk*nx + span) = -C_k{ii} * P_k * transpose(E_k{ii});
-                H(kk*nx + span, (kk-1)*nx + span) = transpose(...
+                H(kk*nx + span, (kk-1)*nx + span) = -C_k{ii} * P_k * transpose(E_k{ii});
+                H((kk-1)*nx + span, kk*nx + span) = transpose(...
                     -C_k{ii} * P_k * transpose(E_k{ii}));
             end
         end
@@ -113,7 +113,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = -mldivide(H, g);
+    dLambda = mldivide(H, g);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -177,9 +177,9 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
 
             if abs(fDash) < bisectionTolerance
                 break;
-            elseif fDash > 0
-                alphaMax = alpha;
             elseif fDash < 0
+                alphaMax = alpha;
+            elseif fDash > 0
                 alphaMin = alpha;
             end
         end
@@ -318,8 +318,10 @@ function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
     for kk = 0:N
         ii = kk + 1;
 
-        % Set up the Newton gradient for this stage.
-        grad_block = -([-E_k{ii}; C_k{ii}] * z(:, ii) + [zeros(nx, 1); c_k{ii}]);
+        % Set up the Newton gradient for this stage. Note that the negative
+        % sign in front of the right hand side of equation (6) in the
+        % qpDUNES paper is erroneous.
+        grad_block = [-E_k{ii}; C_k{ii}] * z(:, ii) + [zeros(nx, 1); c_k{ii}];
 
         if kk > 0
             g(:, kk) = g(:, kk) + grad_block(1:nx);
