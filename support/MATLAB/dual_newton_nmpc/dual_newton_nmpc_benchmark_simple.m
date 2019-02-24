@@ -15,8 +15,8 @@ init_control = 0; % Acceleration
 
 state_min = [-inf; -inf];
 state_max = [inf; inf];
-control_min = -10;
-control_max = 10;
+control_min = -inf;
+control_max = inf;
 speed_max = [];
 
 % Set up optimal control problem.
@@ -28,7 +28,7 @@ speed_max = [];
 lambda = zeros(size(state_horizon, 1), horizon_length+2);
 
 % Number of Newton iterations to execute.
-numIterations = 50;
+numIterations = 200;
 for ii = 1:numIterations
     [state_horizon, control_horizon, lambda, epsilon, fStar] = newton_iteration(...
         state_horizon, control_horizon, lambda, ...

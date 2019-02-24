@@ -155,7 +155,7 @@ function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
         % the interval where the optimal objective lies, this step refines the
         % step length further within that interval.
         nMaxIntervalSearch = 50;
-        bisectionTolerance = 1e-3;
+        bisectionTolerance = 1e-6;
         for ii = 1:nMaxIntervalSearch
             alpha = 0.5 * (alphaMax + alphaMin);
 
