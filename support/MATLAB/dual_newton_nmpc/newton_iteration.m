@@ -250,49 +250,62 @@ end
 function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
         x_k, u_k, lambda_k, lambda_k_1, ...
         E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol)
-    % Calculate linearised continuity constraints for each stage.
     z_k = [x_k; u_k];
-
+    
     % Update p_k and q_k with latest dual estimate.
     p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
     q_k = transpose([zeros(size(x_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
     
+    % Could solve unconstrained problem here to get a point to linearise
+    % the constraints around.
+    
+    % Linearise nonlinear constraints.
+    if ~isempty(constr_eq_fcn)
+        Aeq = jacobianest(constr_eq_fcn, z_k);
+        beq = -constr_eq_fcn(zeros(size(z_k)));
+    else
+        Aeq = [];
+        beq = [];
+    end
+    
+    if ~isempty(constr_bound_fcn)
+        A = jacobianest(constr_bound_fcn, z_k);
+        b = -constr_bound_fcn(zeros(size(z_k)));
+    else
+        A = [];
+        b = [];
+    end
+    
+    % Calculate linearised cost function.
+    H_k = hessian(cost_fcn, z_k);
+    g_k = transpose(gradest(cost_fcn, z_k));
+    
     % Solve the QP.
-    opts = optimoptions('fmincon', ...
-        'Algorithm', 'interior-point', ...
+    opts = optimoptions('quadprog', ...
+        'Algorithm', 'interior-point-convex', ...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
-    % 'PlotFcn', {'optimplotfval', 'optimplotfunccount'}
-    [z_k, fStar_k, ~, ~, lagrange, g_k, H_k] = fmincon(...
-        @(x) cost_fcn(x) + transpose(p_k) * x + q_k, ...
-        z_k, [], [], [], [], lb, ub, ...
-        @(x) combined_constraints(x, constr_eq_fcn, constr_bound_fcn), opts);
+    [z_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
+        A, b, Aeq, beq, lb, ub, z_k, opts);
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.
     active_bounds = (abs(lagrange.lower) > act_tol) | (abs(lagrange.upper) > act_tol);
     D_k_bounds = eye(numel(lagrange.lower));
+    active_set = active_bounds;
+    D_k = D_k_bounds;
 
-    % Linearise nonlinear constraints.
-    if ~isempty(constr_eq_fcn)
-        D_k_eqnonlin = jacobianest(constr_eq_fcn, z_k);
-    else
-        D_k_eqnonlin = zeros(0, numel(z_k));
+    if ~isempty(Aeq)
+        active_set = [active_set; abs(lagrange.eqnonlin) > act_tol];
+        D_k = [D_k; Aeq];
     end
     
-    if ~isempty(constr_bound_fcn)
-        D_k_ineqnonlin = jacobianest(constr_bound_fcn, z_k);
-    else
-        D_k_ineqnonlin = zeros(0, numel(z_k));
+    if ~isempty(A)
+        active_set = [active_set; abs(lagrange.ineqnonlin) > act_tol];
+        D_k = [D_k; A];
     end
 
-    active_eqnonlin = abs(lagrange.eqnonlin) > act_tol;
-    active_ineqnonlin = abs(lagrange.ineqnonlin) > act_tol;
-    
-    active_set = [active_bounds; active_eqnonlin; active_ineqnonlin];
-    D_k = [D_k_bounds; D_k_eqnonlin; D_k_ineqnonlin];
-
-%     fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
+    fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
 end
 
 function [c, ceq] = combined_constraints(z, constr_eq_fcn, constr_bound_fcn)
