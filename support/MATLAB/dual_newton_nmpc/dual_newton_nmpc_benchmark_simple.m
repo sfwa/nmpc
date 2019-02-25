@@ -15,8 +15,8 @@ init_control = 0; % Acceleration
 
 state_min = [-inf; -inf];
 state_max = [inf; inf];
-control_min = -inf;
-control_max = inf;
+control_min = -10;
+control_max = 10;
 speed_max = [];
 
 % Set up optimal control problem.
@@ -36,4 +36,8 @@ for ii = 1:numIterations
 
     % Store information and set up for next iteration.
     fprintf('Iteration %d, primal: %.1f, dual: %.1f\n', ii, epsilon, fStar);
+    
+    if epsilon < 1e-6
+        break;
+    end
 end
