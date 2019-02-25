@@ -278,7 +278,7 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
     
     % Calculate linearised cost function.
     H_k = hessian(cost_fcn, z_k);
-    g_k = transpose(gradest(cost_fcn, z_k));
+    g_k = transpose(gradest(cost_fcn, zeros(size(z_k))));
     
     % Solve the QP.
     opts = optimoptions('quadprog', ...
