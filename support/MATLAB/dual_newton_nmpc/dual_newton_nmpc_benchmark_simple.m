@@ -30,12 +30,12 @@ lambda = zeros(size(state_horizon, 1), horizon_length+2);
 % Number of Newton iterations to execute.
 numIterations = 200;
 for ii = 1:numIterations
-    [state_horizon, control_horizon, lambda, epsilon, fStar] = newton_iteration(...
+    [state_horizon, control_horizon, lambda, epsilon, fStar, H] = newton_iteration(...
         state_horizon, control_horizon, lambda, ...
         process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn);
 
     % Store information and set up for next iteration.
-    fprintf('Iteration %d, primal: %.1f, dual: %.1f\n', ii, epsilon, fStar);
+    fprintf('Iteration %d, primal: %.1f, dual: %.1f, rcond: %e\n', ii, epsilon, fStar, rcond(H));
     
     if epsilon < 1e-6
         break;

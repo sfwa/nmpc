@@ -1,5 +1,5 @@
 % Do a single unconstrained Newton iteration of the OCP.
-function [x, u, lambda, epsilon, fStar] = newton_iteration(x, u, lambda, ...
+function [x, u, lambda, epsilon, fStar, H] = newton_iteration(x, u, lambda, ...
         process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn)
     % MATLAB's one-based indexing is a real pain here for trying to be
     % consistent with the notation used in the paper.
@@ -296,12 +296,12 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
     D_k = D_k_bounds;
 
     if ~isempty(Aeq)
-        active_set = [active_set; abs(lagrange.eqnonlin) > act_tol];
+        active_set = [active_set; abs(lagrange.eqlin) > act_tol];
         D_k = [D_k; Aeq];
     end
     
     if ~isempty(A)
-        active_set = [active_set; abs(lagrange.ineqnonlin) > act_tol];
+        active_set = [active_set; abs(lagrange.ineqlin) > act_tol];
         D_k = [D_k; A];
     end
 
