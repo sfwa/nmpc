@@ -1,5 +1,5 @@
 % Do a single unconstrained Newton iteration of the OCP.
-function [x, u, lambda, epsilon, fStar, H] = newton_iteration(x, u, lambda, ...
+function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambda, ...
         process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn)
     % MATLAB's one-based indexing is a real pain here for trying to be
     % consistent with the notation used in the paper.
