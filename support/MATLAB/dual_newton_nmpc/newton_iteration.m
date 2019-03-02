@@ -114,7 +114,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
 %     dLambda = mldivide(H, g);
-    dLambda = reverse_cholesky(nx, N, H, g);
+    dLambda = reverse_cholesky(nx, N, H, g, 1e-8, 1e-6);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -129,7 +129,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % initial dual estimate, in which case there's no point trying any
     % shorter step.
     nMaxLineSearch = 20;
-    alphaScale = 0.8;
+    alphaScale = 0.3;
     for ii = 1:nMaxLineSearch
         % Calculate candidate objective function value for the current step
         % size.
@@ -156,7 +156,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         % the interval where the optimal objective lies, this step refines the
         % step length further within that interval.
         nMaxIntervalSearch = 50;
-        bisectionTolerance = 1e-6;
+        bisectionTolerance = 1e-8;
         for ii = 1:nMaxIntervalSearch
             alpha = 0.5 * (alphaMax + alphaMin);
 
@@ -352,7 +352,7 @@ end
 %
 % Use the algorithm on page 13 of "A Parallel Quadratic Programming
 % Method for Dynamic Optimization Problems" by Frasch et al.
-function [x, R] = reverse_cholesky(nx, N, H, g)
+function [x, R] = reverse_cholesky(nx, N, H, g, regTol, regEps)
     R = zeros(size(H));
     
     for kk = fliplr(1:N)
@@ -367,6 +367,11 @@ function [x, R] = reverse_cholesky(nx, N, H, g)
                 w = w - R(jj, ll)^2;
             end
 
+            % Apply on-the-fly regularisation here if necessary.
+            if w < regTol
+                w = w + regEps;
+            end
+            
             R(jj, jj) = sqrt(w);
 
             for ii = fliplr(imax:jj-1)
@@ -382,7 +387,6 @@ function [x, R] = reverse_cholesky(nx, N, H, g)
                     w = w - R(jj, ll) * R(ii, ll);
                 end
 
-                % Apply on-the-fly regularisation here if necessary.
                 R(ii, jj) = w / R(jj, jj);
             end
         end

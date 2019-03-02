@@ -13,7 +13,7 @@ init_state = [
 
 init_control = 0; % Acceleration
 
-state_min = [-inf; -inf];
+state_min = [0; -inf];
 state_max = [inf; inf];
 control_min = -10;
 control_max = 10;
