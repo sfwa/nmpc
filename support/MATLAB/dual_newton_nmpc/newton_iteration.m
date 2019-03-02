@@ -113,7 +113,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = mldivide(H, g);
+%     dLambda = mldivide(H, g);
+    dLambda = reverse_cholesky(nx, N, H, g);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -344,4 +345,79 @@ function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
     end
     
     g = reshape(g, [], 1);
+end
+
+% Solve the Newton system using banded Cholesky factorisation, to yield
+% the step direction. Consider adding on-the-fly regularisation.
+%
+% Use the algorithm on page 13 of "A Parallel Quadratic Programming
+% Method for Dynamic Optimization Problems" by Frasch et al.
+function [x, R] = reverse_cholesky(nx, N, H, g)
+    R = zeros(size(H));
+    
+    for kk = fliplr(1:N)
+        imax = max(1, (kk - 2)*nx + 1);
+        
+        for jj = fliplr(((kk - 1)*nx + 1):kk*nx)
+            w = H(jj, jj);
+            
+            lmax = min(N*nx, (kk + 1)*nx);
+
+            for ll = jj+1:lmax
+                w = w - R(jj, ll)^2;
+            end
+
+            R(jj, jj) = sqrt(w);
+
+            for ii = fliplr(imax:jj-1)
+                w = H(ii, jj);
+
+                if ii > (kk - 1) * nx
+                    lmax = min(N*nx, (kk + 1)*nx);
+                else
+                    lmax = min(N*nx, kk*nx);
+                end
+
+                for ll = jj+1:lmax
+                    w = w - R(jj, ll) * R(ii, ll);
+                end
+
+                % Apply on-the-fly regularisation here if necessary.
+                R(ii, jj) = w / R(jj, jj);
+            end
+        end
+    end
+    
+    x = zeros(size(g));
+    y = zeros(size(g));
+    
+    % Solve the R * y = g part using back substitution.
+    for kk = fliplr(1:N)
+        lmax = min(N*nx, (kk + 1)*nx);
+        
+        for jj = fliplr(((kk - 1)*nx + 1):kk*nx)
+            w = g(jj);
+
+            for ll = jj+1:lmax
+                w = w - R(jj, ll) * y(ll);
+            end
+            
+            y(jj) = w / R(jj, jj);
+        end
+    end
+    
+    % Solve the R^T * x = y part using forward substitution.
+    for kk = 1:N
+        lmax = max(1, (kk - 2)*nx + 1);
+        
+        for jj = ((kk - 1)*nx + 1):kk*nx
+            w = y(jj);
+
+            for ll = lmax:jj-1
+                w = w - R(ll, jj) * x(ll);
+            end
+            
+            x(jj) = w / R(jj, jj);
+        end
+    end
 end
