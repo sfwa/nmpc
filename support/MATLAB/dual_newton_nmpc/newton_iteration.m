@@ -24,6 +24,12 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % calculated once during initialisation using finite differences, and
     % then kept up to date using L-BFGS or a Gauss-Newton approximation for
     % least-squares objectives.
+    H_k = cell(N+1, 1);
+    g_k = cell(N+1, 1);
+    A = cell(N+1, 1);
+    b = cell(N+1, 1);
+    Aeq = cell(N+1, 1);
+    beq = cell(N+1, 1);
     E_k = cell(N+1, 1);
     C_k = cell(N+1, 1);
     c_k = cell(N+1, 1);
@@ -37,7 +43,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     for kk = 0:N
         ii = kk + 1;
 
-        [E_k{ii}, C_k{ii}, c_k{ii}] = setup_stage_qp(x(:, ii), u(:, ii), process_fcn);
+        [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}] = setup_stage_qp(...
+            x(:, ii), u(:, ii), process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
         
         % Special cases.
         if kk == 0
@@ -51,8 +58,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
     % Solve stage QPs to get imcumbent objective function value and initial
     % primal estimate.
-    [z, active_set, fStar_inc, H_k, g_k, D_k] = solve_all_stage_qps(x, u, lambda, ...
-        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
+    [z, active_set, fStar_inc, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
+        E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
 
     % Calculate newton gradient.
     g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -137,8 +144,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alphaMax * dLambda;
         lambda_cand = reshape(lambda_cand, nx, []);
 
-        [~, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, ...
-            E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
+        [~, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+            E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
 
         % Terminate line search at the appropriate point.
         if fStar_cand > fStar_inc
@@ -166,9 +173,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
             lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
             lambda_cand = reshape(lambda_cand, nx, []);
 
-            [z, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, ...
-                E_k, C_k, c_k, lb, ub, cost_fcn, ...
-                constr_eq_fcn, constr_bound_fcn, act_tol);
+            [z, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+                E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
 
             % Calculate Newton gradient for current dual variables.
             g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -192,8 +198,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     lambda = reshape(lambda, nx, []);
     
     % Re-solve stage QPs for a final time.
-    [z, ~, fStar] = solve_all_stage_qps(x, u, lambda, ...
-        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
+    [z, ~, fStar] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
+        E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
     
     % Compute the primal infeasibility from the Newton gradient.
     g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -204,61 +210,17 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 end
 
 % Set up a stage QP.
-function [E_k, C_k, c_k] = setup_stage_qp(x_k, u_k, process_fcn)
+function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq] = setup_stage_qp(x_k, u_k, ...
+        process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn)
     z_k = [x_k; u_k];
     
     C_k = jacobianest(process_fcn, z_k);
     c_k = process_fcn(zeros(size(z_k, 1), 1));
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
-end
 
-% Solve all stage QPs and return the objective value.
-function [z, active_set, fStar, H_k, g_k, D_k] = solve_all_stage_qps(x, u, lambda, ...
-        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol)
-    fStar = 0;
-    N = size(x, 2)-1;
-    H_k = cell(N+1, 1);
-    g_k = cell(N+1, 1);
-    D_k = cell(N+1, 1);
-    z = zeros(size(x, 1) + size(u, 1), N+1);
-
-    % Solve stage QPs. This could be optionally parallelised.
-    %
-    % One-based indexing messes everything up here, so care needs to be taken
-    % to avoid off-by-one errors in the indices.
-    active_set = cell(N+1, 1);
-    for kk = 0:N
-        ii = kk + 1;
-
-        [z(:, ii), active_set{ii}, fStar_k, H_k{ii}, g_k{ii}, D_k{ii}] = ...
-        solve_stage_qp(x(:, ii), u(:, ii), ...
-            lambda(:, ii), lambda(:, ii+1), E_k{ii}, C_k{ii}, c_k{ii}, ...
-            lb(:, ii), ub(:, ii), cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol);
-
-        % Add stage objective value to total objective value.
-        fStar = fStar + fStar_k;
-    end
-end
-
-% Solve a stage QP.
-
-% In the future, write an online active-set solver which can take advantage
-% of warm-starting when doing RTI. For now, just use the MATLAB 'fmincon'
-% function. Also, if the cost function is really going to be nonlinear,
-% probably want to use a Quasi-Newton method for online estimation of the
-% Hessian.
-function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
-        x_k, u_k, lambda_k, lambda_k_1, ...
-        E_k, C_k, c_k, lb, ub, cost_fcn, constr_eq_fcn, constr_bound_fcn, act_tol)
-    z_k = [x_k; u_k];
-    
-    % Update p_k and q_k with latest dual estimate.
-    p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
-    q_k = transpose([zeros(size(x_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
-    
     % Could solve unconstrained problem here to get a point to linearise
-    % the constraints around.
+    % the constraints around?
     
     % Linearise nonlinear constraints.
     if ~isempty(constr_eq_fcn)
@@ -280,6 +242,49 @@ function [z_k, active_set, fStar_k, H_k, g_k, D_k] = solve_stage_qp(...
     % Calculate linearised cost function.
     H_k = hessian(cost_fcn, z_k);
     g_k = transpose(gradest(cost_fcn, zeros(size(z_k))));
+end
+
+% Solve all stage QPs and return the objective value.
+function [z, active_set, fStar, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
+        E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol)
+    fStar = 0;
+    N = size(x, 2)-1;
+    D_k = cell(N+1, 1);
+    z = zeros(size(x, 1) + size(u, 1), N+1);
+
+    % Solve stage QPs. This could be optionally parallelised.
+    %
+    % One-based indexing messes everything up here, so care needs to be taken
+    % to avoid off-by-one errors in the indices.
+    active_set = cell(N+1, 1);
+    for kk = 0:N
+        ii = kk + 1;
+
+        [z(:, ii), active_set{ii}, fStar_k, D_k{ii}] = ...
+        solve_stage_qp(x(:, ii), u(:, ii), lambda(:, ii), lambda(:, ii+1), ...
+            H_k{ii}, g_k{ii}, E_k{ii}, C_k{ii}, c_k{ii}, ...
+            lb(:, ii), ub(:, ii), A{ii}, b{ii}, Aeq{ii}, beq{ii}, act_tol);
+
+        % Add stage objective value to total objective value.
+        fStar = fStar + fStar_k;
+    end
+end
+
+% Solve a stage QP.
+
+% In the future, write an online active-set solver which can take advantage
+% of warm-starting when doing RTI. For now, just use the MATLAB 'fmincon'
+% function. Also, if the cost function is really going to be nonlinear,
+% probably want to use a Quasi-Newton method for online estimation of the
+% Hessian.
+function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
+        x_k, u_k, lambda_k, lambda_k_1, H_k, g_k, ...
+        E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol)
+    z_k = [x_k; u_k];
+    
+    % Update p_k and q_k with latest dual estimate.
+    p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
+    q_k = transpose([zeros(size(x_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
     
     % Solve the QP.
     opts = optimoptions('quadprog', ...
