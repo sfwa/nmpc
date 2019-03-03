@@ -114,7 +114,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
 %     dLambda = mldivide(H, g);
-    dLambda = reverse_cholesky(nx, N, H, g, 1e-8, 1e-6);
+    dLambda = reverse_cholesky(nx, N, H, g, 1e-8, 1e-4);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -176,7 +176,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
             % Work out the Newton objective gradient.
             fDash = transpose(dLambda) * g;
 
-            if abs(fDash) < bisectionTolerance
+            if abs(fDash) <= bisectionTolerance
                 break;
             elseif fDash < 0
                 alphaMax = alpha;
