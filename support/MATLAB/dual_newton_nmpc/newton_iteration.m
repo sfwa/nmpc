@@ -18,48 +18,17 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
     act_tol = 1e-6; % Tolerance for active constraints.
 
-    % Set up stage QPs. This could be optionally parallelised.
-    %
-    % Ideally with the active-set solver, the stage Hessians would be
-    % calculated once during initialisation using finite differences, and
-    % then kept up to date using L-BFGS or a Gauss-Newton approximation for
-    % least-squares objectives.
-    H_k = cell(N+1, 1);
-    g_k = cell(N+1, 1);
-    A = cell(N+1, 1);
-    b = cell(N+1, 1);
-    Aeq = cell(N+1, 1);
-    beq = cell(N+1, 1);
-    E_k = cell(N+1, 1);
-    C_k = cell(N+1, 1);
-    c_k = cell(N+1, 1);
-    lb = reshape(lb, nz, N+1);
-    ub = reshape(ub, nz, N+1);
-    
-    % Set up first stage initial value constraint.
-    lb(1:nx, 1) = x(:, 1);
-    ub(1:nx, 1) = x(:, 1);
-    
-    for kk = 0:N
-        ii = kk + 1;
-
-        [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}] = setup_stage_qp(...
-            x(:, ii), u(:, ii), process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
-        
-        % Special cases.
-        if kk == 0
-            E_k{ii} = zeros(nx, nz);
-        end
-        
-        if kk == N
-            C_k{ii} = zeros(nx, nz);
-        end
-    end
+    [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
+        process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
 
     % Solve stage QPs to get imcumbent objective function value and initial
     % primal estimate.
     [z, active_set, fStar_inc, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
+
+    % Re-linearise constraints and cost function around the solved stage QPs.
+    [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(z(1:nx, :), z(nx+1:end, :), ...
+        process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
 
     % Calculate newton gradient.
     g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -207,6 +176,52 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
     x = z(1:nx, :);
     u = z(nx+1:end, :);
+end
+
+% Set up stage QPs. This could be optionally parallelised.
+%
+% Ideally with the active-set solver, the stage Hessians would be
+% calculated once during initialisation using finite differences, and
+% then kept up to date using L-BFGS or a Gauss-Newton approximation for
+% least-squares objectives.
+function [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, lb, ub, ...
+        process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn)
+    N = size(x, 2)-1;
+    nx = size(x, 1);
+    nu = size(u, 1);
+    nz = nx + nu;
+
+    H_k = cell(N+1, 1);
+    g_k = cell(N+1, 1);
+    A = cell(N+1, 1);
+    b = cell(N+1, 1);
+    Aeq = cell(N+1, 1);
+    beq = cell(N+1, 1);
+    E_k = cell(N+1, 1);
+    C_k = cell(N+1, 1);
+    c_k = cell(N+1, 1);
+    lb = reshape(lb, nz, N+1);
+    ub = reshape(ub, nz, N+1);
+    
+    % Set up first stage initial value constraint.
+    lb(1:nx, 1) = x(:, 1);
+    ub(1:nx, 1) = x(:, 1);
+    
+    for kk = 0:N
+        ii = kk + 1;
+
+        [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}] = setup_stage_qp(...
+            x(:, ii), u(:, ii), process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
+        
+        % Special cases.
+        if kk == 0
+            E_k{ii} = zeros(nx, nz);
+        end
+        
+        if kk == N
+            C_k{ii} = zeros(nx, nz);
+        end
+    end
 end
 
 % Set up a stage QP.
