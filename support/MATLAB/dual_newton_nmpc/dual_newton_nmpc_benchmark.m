@@ -34,11 +34,15 @@ speed_max = 10;
 lambda = zeros(size(state_horizon, 1), horizon_length+2);
 
 % Number of Newton iterations to execute.
-numIterations = 100;
+numIterations = 10000;
 for ii = 1:numIterations
     [state_horizon, control_horizon, lambda, epsilon, fStar, H, alpha] = newton_iteration(...
         state_horizon, control_horizon, lambda, ...
-        process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn);
+        process_fcn, cost_fcn, lb, ub, [], []);
+    
+    % Wrap angles (is this going to cause problems due to the
+    % discontinuity?)
+    state_horizon(5, :) = wrapToPi(state_horizon(5, :));
 
     % Store information and set up for next iteration.
     fprintf('Iteration %d, primal: %.1f, dual: %.1f, rcond: %e, alpha: %e\n', ii, epsilon, fStar, rcond(H), alpha);
@@ -47,6 +51,8 @@ for ii = 1:numIterations
         break;
     end
 end
+
+x_out = state_horizon;
 
 hFig = figure; axis equal; hold on; grid on; grid minor;
 xlim([min(min(x_out(2, :)) - 2, 0) max(max(x_out(2, :)) + 2, 0)]);

@@ -19,7 +19,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     act_tol = 1e-6; % Tolerance for active constraints.
 
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
-        process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
+        lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
 
     % Solve stage QPs to get imcumbent objective function value and initial
     % primal estimate.
@@ -28,7 +28,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
     % Re-linearise constraints and cost function around the solved stage QPs.
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(z(1:nx, :), z(nx+1:end, :), ...
-        process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
+        lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
 
     % Calculate newton gradient.
     g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
@@ -90,7 +90,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
 %     dLambda = mldivide(H, g);
-    dLambda = reverse_cholesky(nx, N, H, g, 1e-8, 1e-4);
+    dLambda = reverse_cholesky(nx, N, H, g, 1e-10, 1e-6);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
