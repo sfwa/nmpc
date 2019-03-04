@@ -96,9 +96,11 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % bisection for refinement. Need to look at each stage QP and find the
     % distance to the closest active set boundary and use that as the minimum
     % step length.
-    alpha = 1;
     alphaMax = 1;
     alphaMin = 0;
+    
+    % Start at maximum step size and backtrack.
+    alpha = alphaMax;
 
     % Backtracking line search. In each iteration, check whether the
     % candidate step length is shorter than the active-set boundary of the
