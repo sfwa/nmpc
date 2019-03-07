@@ -18,13 +18,6 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
     act_tol = 1e-6; % Tolerance for active constraints.
 
-    % Solve the process function IDE over the time horizon using the
-    % control states to generate a primal-feasible trajectory to linearise
-    % around.
-    for ii = 2:N+1
-        x(:, ii) = process_fcn([x(:, ii-1); u(:, ii-1)]);
-    end
-    
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
 
@@ -92,7 +85,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = reverse_cholesky(nx, N, H, g, 1e-8, 1e-4);
+    dLambda = reverse_cholesky(nx, N, H, g, 1e-10, 1e-6);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -136,7 +129,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         % the interval where the optimal objective lies, this step refines the
         % step length further within that interval.
         nMaxIntervalSearch = 50;
-        bisectionTolerance = 1e-6;
+        bisectionTolerance = 1e-10;
         for ii = 1:nMaxIntervalSearch
             alpha = 0.5 * (alphaMax + alphaMin);
 
@@ -331,20 +324,6 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
     end
 
     fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
-end
-
-function [c, ceq] = combined_constraints(z, constr_eq_fcn, constr_bound_fcn)
-    if ~isempty(constr_bound_fcn)
-        c = constr_bound_fcn(z);
-    else
-        c = [];
-    end
-    
-    if ~isempty(constr_eq_fcn)
-        ceq = constr_eq_fcn(z);
-    else
-        ceq = [];
-    end
 end
 
 function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
