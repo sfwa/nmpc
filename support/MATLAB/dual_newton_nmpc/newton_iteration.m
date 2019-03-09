@@ -200,10 +200,6 @@ function [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps
     lb = reshape(lb, nz, N+1);
     ub = reshape(ub, nz, N+1);
     
-    % Set up first stage initial value constraint.
-    lb(1:nx, 1) = x(:, 1);
-    ub(1:nx, 1) = x(:, 1);
-    
     for kk = 0:N
         ii = kk + 1;
 

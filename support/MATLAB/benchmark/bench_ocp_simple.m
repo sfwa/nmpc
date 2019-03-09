@@ -24,8 +24,15 @@ function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_
     end
 
     % Set state vector lower and upper bounds (inc. control).
-    lb = reshape(repmat([x_min; u_min], 1, N+1), [], 1);
-    ub = reshape(repmat([x_max; u_max], 1, N+1), [], 1);
+    lb = repmat([x_min; u_min], 1, N+1);
+    ub = repmat([x_max; u_max], 1, N+1);
+    
+    % Set up initial state constraint.
+    lb(1:size(state_horizon, 1), 1) = x0;
+    ub(1:size(state_horizon, 1), 1) = x0;
+    
+    lb = reshape(lb, [], 1);
+    ub = reshape(ub, [], 1);
     
     process_fcn = @(z) bench_process(dt, z(1:2, :), z(3, :));
     cost_fcn = @(z, ii) bench_objective(z - reshape([x_ref(:, ii); u_ref(:, ii)], [], 1));
