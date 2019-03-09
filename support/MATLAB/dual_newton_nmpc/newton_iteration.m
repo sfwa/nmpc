@@ -53,7 +53,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         n_act = sum(active_set_k);
         D_k_act = D_k{ii}(active_set_k, :);
         [Q_k, ~] = qr(D_k_act');
-        Z_k = Q_k(:, n_act+1:end); % Might need to transpose Q_k?
+        Z_k = Q_k(:, n_act+1:end);
         P_k = Z_k * pinv(transpose(Z_k) * H_k{ii} * Z_k) * transpose(Z_k);
 
         % Diagonal part.
@@ -85,7 +85,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = reverse_cholesky(nx, N, H, g, 1e-10, 1e-6);
+    dLambda = reverse_cholesky(nx, N, H, -g, 1e-8, 1e-4);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -150,9 +150,9 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
             if abs(fDash) <= bisectionTolerance
                 break;
-            elseif fDash < 0
-                alphaMax = alpha;
             elseif fDash > 0
+                alphaMax = alpha;
+            elseif fDash < 0
                 alphaMin = alpha;
             end
         end
@@ -202,9 +202,15 @@ function [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps
     
     for kk = 0:N
         ii = kk + 1;
+        
+        if kk < N
+            x_k_1 = x(:, ii+1);
+        else
+            x_k_1 = process_fcn([x(:, ii); u(:, ii)]);
+        end
 
-        [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}] = setup_stage_qp(...
-            x(:, ii), u(:, ii), process_fcn, @(x) cost_fcn(x, ii), constr_eq_fcn, constr_bound_fcn);
+        [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}, lb(:, ii), ub(:, ii)] = setup_stage_qp(...
+            x(:, ii), x_k_1, u(:, ii), lb(:, ii), ub(:, ii), process_fcn, @(x) cost_fcn(x, ii), constr_eq_fcn, constr_bound_fcn);
         
         % Special cases.
         if kk == 0
@@ -218,12 +224,12 @@ function [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps
 end
 
 % Set up a stage QP.
-function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq] = setup_stage_qp(x_k, u_k, ...
+function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k, x_k_1, u_k, lb, ub, ...
         process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn)
     z_k = [x_k; u_k];
     
     C_k = estimate_jacobian(process_fcn, z_k);
-    c_k = process_fcn(zeros(size(z_k)));
+    c_k = zeros(size(x_k));%process_fcn(z_k) - x_k_1;
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
 
@@ -247,9 +253,13 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq] = setup_stage_qp(x_k, u_k, ..
         b = [];
     end
     
+    % Calculate lower and upper bounds.
+    lb = lb - z_k;
+    ub = ub - z_k;
+    
     % Calculate linearised cost function.
     H_k = hessian(cost_fcn, z_k);
-    g_k = transpose(gradest(cost_fcn, zeros(size(z_k))));
+    g_k = transpose(gradest(cost_fcn, z_k));
 end
 
 % Solve all stage QPs and return the objective value.
@@ -269,7 +279,7 @@ function [z, active_set, fStar, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_
         ii = kk + 1;
 
         [z(:, ii), active_set{ii}, fStar_k, D_k{ii}] = ...
-        solve_stage_qp(x(:, ii), u(:, ii), lambda(:, ii), lambda(:, ii+1), ...
+        solve_stage_qp([x(:, ii); u(:, ii)], lambda(:, ii), lambda(:, ii+1), ...
             H_k{ii}, g_k{ii}, E_k{ii}, C_k{ii}, c_k{ii}, ...
             lb(:, ii), ub(:, ii), A{ii}, b{ii}, Aeq{ii}, beq{ii}, act_tol);
 
@@ -286,21 +296,20 @@ end
 % probably want to use a Quasi-Newton method for online estimation of the
 % Hessian.
 function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
-        x_k, u_k, lambda_k, lambda_k_1, H_k, g_k, ...
+        z_k, lambda_k, lambda_k_1, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol)
-    z_k = [x_k; u_k];
     
     % Update p_k and q_k with latest dual estimate.
     p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
-    q_k = transpose([zeros(size(x_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
+    q_k = transpose([zeros(size(lambda_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
     
     % Solve the QP.
     opts = optimoptions('quadprog', ...
         'Algorithm', 'interior-point-convex', ...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
-    [z_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
-        A, b, Aeq, beq, lb, ub, z_k, opts);
+    [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
+        A, b, Aeq, beq, lb, ub, [], opts);
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.
@@ -318,7 +327,8 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
         active_set = [active_set; abs(lagrange.ineqlin) > act_tol];
         D_k = [D_k; A];
     end
-
+    
+    z_k = z_k + dz_k;
     fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
 end
 
@@ -332,7 +342,7 @@ function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
         % Set up the Newton gradient for this stage. Note that the negative
         % sign in front of the right hand side of equation (6) in the
         % qpDUNES paper is erroneous.
-        grad_block = [-E_k{ii}; C_k{ii}] * z(:, ii) + [zeros(nx, 1); c_k{ii}];
+        grad_block = -[-E_k{ii}; C_k{ii}] * z(:, ii) + [zeros(nx, 1); c_k{ii}];
 
         if kk > 0
             g(:, kk) = g(:, kk) + grad_block(1:nx);

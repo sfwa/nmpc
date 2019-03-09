@@ -22,7 +22,7 @@ speed_max = [];
 x_ref = zeros(size(init_state, 1), horizon_length+1);
 u_ref = zeros(size(init_control, 1), horizon_length+1);
 
-x_ref(1, :) = 1:21;
+% x_ref(1, :) = 1:21;
 
 % Set up optimal control problem.
 [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn] = bench_ocp_simple(...
