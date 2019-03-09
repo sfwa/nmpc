@@ -48,8 +48,8 @@ for ii = 1:numIterations
 end
 
 subplot(3, 1, 1)
-plot(x_out(1, :))
+plot(state_horizon(1, :))
 subplot(3, 1, 2)
-plot(x_out(2, :))
+plot(state_horizon(2, :))
 subplot(3, 1, 3)
-plot(u_out)
+plot(control_horizon)
