@@ -43,10 +43,6 @@ for ii = 1:numIterations
         state_horizon, control_horizon, lambda, ...
         process_fcn, cost_fcn, lb, ub, [], []);
     
-    % Wrap angles (is this going to cause problems due to the
-    % discontinuity?)
-    state_horizon(5, :) = wrapToPi(state_horizon(5, :));
-
     % Store information and set up for next iteration.
     fprintf('Iteration %d, primal: %.1f, dual: %.1f, rcond: %e, alpha: %e\n', ii, epsilon, fStar, rcond(H), alpha);
     
