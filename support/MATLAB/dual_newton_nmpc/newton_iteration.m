@@ -226,8 +226,8 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq] = setup_stage_qp(x_k, u_k, ..
         process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn)
     z_k = [x_k; u_k];
     
-    C_k = jacobianest(process_fcn, z_k);
-    c_k = process_fcn(zeros(size(z_k, 1), 1));
+    C_k = estimate_jacobian(process_fcn, z_k);
+    c_k = process_fcn(zeros(size(z_k)));
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
 
@@ -236,7 +236,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq] = setup_stage_qp(x_k, u_k, ..
     
     % Linearise nonlinear constraints.
     if ~isempty(constr_eq_fcn)
-        Aeq = jacobianest(constr_eq_fcn, z_k);
+        Aeq = estimate_jacobian(constr_eq_fcn, z_k);
         beq = -constr_eq_fcn(zeros(size(z_k)));
     else
         Aeq = [];
@@ -244,7 +244,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq] = setup_stage_qp(x_k, u_k, ..
     end
     
     if ~isempty(constr_bound_fcn)
-        A = jacobianest(constr_bound_fcn, z_k);
+        A = estimate_jacobian(constr_bound_fcn, z_k);
         b = -constr_bound_fcn(zeros(size(z_k)));
     else
         A = [];
@@ -426,5 +426,20 @@ function [x, R] = reverse_cholesky(nx, N, H, g, regTol, regEps)
             
             x(jj) = w / R(jj, jj);
         end
+    end
+end
+
+% Simple function to estimate a Jacobian using central differences.
+function J_est = estimate_jacobian(fcn, x, h)
+    if nargin < 3
+        h = 1e-6;
+    end
+
+    N = size(x, 1);
+    J_est = zeros(size(fcn(x), 1), N);
+    for ii = 1:N
+        dx = zeros(size(x));
+        dx(ii) = h;
+        J_est(:, ii) = (fcn(x + dx) - fcn(x - dx)) / (2*h);
     end
 end
