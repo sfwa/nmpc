@@ -208,7 +208,7 @@ function [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps
         ii = kk + 1;
 
         [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}] = setup_stage_qp(...
-            x(:, ii), u(:, ii), process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
+            x(:, ii), u(:, ii), process_fcn, @(x) cost_fcn(x, ii), constr_eq_fcn, constr_bound_fcn);
         
         % Special cases.
         if kk == 0

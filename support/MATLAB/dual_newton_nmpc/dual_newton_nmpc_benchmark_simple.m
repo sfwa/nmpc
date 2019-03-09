@@ -19,9 +19,14 @@ control_min = -10;
 control_max = 10;
 speed_max = [];
 
+x_ref = zeros(size(init_state, 1), horizon_length+1);
+u_ref = zeros(size(init_control, 1), horizon_length+1);
+
+x_ref(1, :) = 1:21;
+
 % Set up optimal control problem.
 [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_eq_fcn, constr_bound_fcn] = bench_ocp_simple(...
-    init_state, init_control, horizon_length, dt, state_min, state_max, ...
+    init_state, init_control, x_ref, u_ref, horizon_length, dt, state_min, state_max, ...
     control_min, control_max, speed_max);
 
 % Set up initial dual vector.
@@ -41,3 +46,10 @@ for ii = 1:numIterations
         break;
     end
 end
+
+subplot(3, 1, 1)
+plot(x_out(1, :))
+subplot(3, 1, 2)
+plot(x_out(2, :))
+subplot(3, 1, 3)
+plot(u_out)
