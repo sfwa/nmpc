@@ -21,14 +21,14 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
 
-    % Solve stage QPs to get imcumbent objective function value and initial
+    % Solve stage QPs to get incumbent objective function value and initial
     % primal estimate.
-    [z, active_set, fStar_inc, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
+    [z, p, q, active_set, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-    fStar_inc = cost_fcn(reshape(z, [], 1), 1:N+1);
+    fStar_inc = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(z, [], 1), reshape(p, [], 1)) + sum(q);
 
     % Calculate newton gradient.
-    g = calculate_newton_gradient(nx, N, z, process_fcn);
+    g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
     
     % Newton Hessian calculation.
     for kk = 0:N
@@ -95,6 +95,28 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     alphaMax = 1;
     alphaMin = 0;
     
+%     fDash = zeros(100, 1);
+%     fStar = zeros(100, 1);
+%     for ii = 1:100
+%         alpha = ii/100;
+% 
+%         % Calculate candidate objective function value for the current step
+%         % size.
+%         lambda_cand = reshape(lambda, [], 1);
+%         lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
+%         lambda_cand = reshape(lambda_cand, nx, []);
+% 
+%         [z, p, q, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+%             E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
+%         fStar(ii) = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(z, [], 1), reshape(p, [], 1)) + sum(q);
+% 
+%         % Calculate Newton gradient for current dual variables.
+%         g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
+% 
+%         % Work out the Newton objective gradient.
+%         fDash(ii) = transpose(dLambda) * -g;
+%     end
+    
     % Start at maximum step size and backtrack.
     alpha = alphaMax;
 
@@ -111,9 +133,9 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alphaMax * dLambda;
         lambda_cand = reshape(lambda_cand, nx, []);
 
-        [z, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+        [z, p, q, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
             E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-        fStar_cand = cost_fcn(reshape(z, [], 1), 1:N+1);
+        fStar_cand = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(z, [], 1), reshape(p, [], 1)) + sum(q);
 
         % Terminate line search at the appropriate point.
         if fStar_cand > fStar_inc
@@ -141,28 +163,30 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
             lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
             lambda_cand = reshape(lambda_cand, nx, []);
 
-            [z, ~, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+            [z, ~, ~, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
                 E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
 
             % Calculate Newton gradient for current dual variables.
-            g = calculate_newton_gradient(nx, N, z, process_fcn);
+            g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
 
             % Work out the Newton objective gradient.
-            fDash = transpose(dLambda) * g;
+            fDash = transpose(dLambda) * -g;
 
             if abs(fDash) <= bisectionTolerance
                 break;
             elseif fDash > 0
-                alphaMax = alpha;
-            elseif fDash < 0
                 alphaMin = alpha;
+            elseif fDash < 0
+                alphaMax = alpha;
             end
         end
         
         if abs(fDash) > bisectionTolerance
             fprintf('Bisection search failed, min fDash: %e\n', abs(fDash));
-            alpha = 1;
         end
+    else
+        fprintf('Line search failed\n');
+        alpha = 1;
     end
 
     % Make the step.
@@ -171,12 +195,12 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     lambda = reshape(lambda, nx, []);
     
     % Re-solve stage QPs for a final time.
-    [z, ~, fStar] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
+    [z, p, q, ~] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-    fStar = cost_fcn(reshape(z, [], 1), 1:N+1);
+    fStar = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(z, [], 1), reshape(p, [], 1)) + sum(q);
     
     % Compute the primal infeasibility from the Newton gradient.
-    g = calculate_newton_gradient(nx, N, z, process_fcn);
+    g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k);
     epsilon = norm(g);
 
     x = z(1:nx, :);
@@ -237,7 +261,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
     z_k = [x_k; u_k];
     
     C_k = estimate_jacobian(process_fcn, z_k);
-    c_k = process_fcn(z_k) - x_k_1;
+    c_k = zeros(size(x_k));%process_fcn(z_k) - x_k_1;
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
 
@@ -271,12 +295,13 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
 end
 
 % Solve all stage QPs and return the objective value.
-function [z, active_set, fStar, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
+function [z, p, q, active_set, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol)
-    fStar = 0;
     N = size(x, 2)-1;
     D_k = cell(N+1, 1);
     z = zeros(size(x, 1) + size(u, 1), N+1);
+    p = zeros(size(x, 1) + size(u, 1), N+1);
+    q = zeros(1, N+1);
 
     % Solve stage QPs. This could be optionally parallelised.
     %
@@ -286,13 +311,10 @@ function [z, active_set, fStar, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_
     for kk = 0:N
         ii = kk + 1;
 
-        [z(:, ii), active_set{ii}, fStar_k, D_k{ii}] = ...
+        [z(:, ii), p(:, ii), q(:, ii), active_set{ii}, D_k{ii}] = ...
         solve_stage_qp([x(:, ii); u(:, ii)], lambda(:, ii), lambda(:, ii+1), ...
             H_k{ii}, g_k{ii}, E_k{ii}, C_k{ii}, c_k{ii}, ...
             lb(:, ii), ub(:, ii), A{ii}, b{ii}, Aeq{ii}, beq{ii}, act_tol);
-
-        % Add stage objective value to total objective value.
-        fStar = fStar + fStar_k;
     end
 end
 
@@ -303,16 +325,16 @@ end
 % function. Also, if the cost function is really going to be nonlinear,
 % probably want to use a Quasi-Newton method for online estimation of the
 % Hessian.
-function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
+function [z_k, p_k, q_k, active_set, D_k] = solve_stage_qp(...
         z_k, lambda_k, lambda_k_1, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol)
     
     % Update p_k and q_k with latest dual estimate.
-    p_k = g_k + transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
+    p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
     q_k = transpose([zeros(size(lambda_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
     
     % Solve the QP.
-%     dz_k = -pinv(H_k)*p_k;
+%     dz_k = -pinv(H_k)*(g_k + p_k);
 %     active_bounds = ((lb - z_k) > act_tol) | ((dz_k - ub) > act_tol);
 %     dz_k = max(min(dz_k, ub), lb);
     warning('off', 'optim:quadprog:WillBeRemoved');
@@ -320,7 +342,7 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
         'Algorithm', 'active-set', ...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
-    [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, p_k, ...
+    [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
         A, b, Aeq, beq, lb, ub, zeros(size(z_k)), opts);
     warning('on', 'optim:quadprog:WillBeRemoved');
     
@@ -342,19 +364,27 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
     end
     
     z_k = z_k + dz_k;
-    fStar_k = transpose(z_k) * H_k * z_k + transpose(p_k) * z_k + q_k;
 end
 
-% In order to avoid linearisation errors arising from the use of Jacobians,
-% use the actual process model when calculating the Newton gradient.
-function g = calculate_newton_gradient(nx, N, z, process_fcn)
+function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
     % Newton Hessian and gradient calculation.
     g = zeros(nx, N);
     
-    for kk = 0:(N-1)
+    for kk = 0:N
         ii = kk + 1;
-        
-        g(:, ii) = -(process_fcn(z(:, ii)) - z(1:nx, ii+1));
+
+        % Set up the Newton gradient for this stage. Note that the negative
+        % sign in front of the right hand side of equation (6) in the
+        % qpDUNES paper is erroneous.
+        grad_block = -[-E_k{ii}; C_k{ii}] * z(:, ii) + [zeros(nx, 1); c_k{ii}];
+
+        if kk > 0
+            g(:, kk) = g(:, kk) + grad_block(1:nx);
+        end
+
+        if kk < N
+            g(:, kk+1) = g(:, kk+1) + grad_block((nx + 1):end);
+        end
     end
     
     g = reshape(g, [], 1);
