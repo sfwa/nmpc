@@ -16,7 +16,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Newton Hessian.
     H = zeros(nx*N, nx*N);
 
-    act_tol = 1e-6; % Tolerance for active constraints.
+    act_tol = 1e-8; % Tolerance for active constraints.
 
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
@@ -304,12 +304,14 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
     q_k = transpose([zeros(size(lambda_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
     
     % Solve the QP.
+    warning('off', 'optim:quadprog:WillBeRemoved');
     opts = optimoptions('quadprog', ...
-        'Algorithm', 'interior-point-convex', ...
+        'Algorithm', 'active-set', ...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
     [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
         A, b, Aeq, beq, lb, ub, zeros(size(z_k)), opts);
+    warning('on', 'optim:quadprog:WillBeRemoved');
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.
