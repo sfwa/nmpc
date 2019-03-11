@@ -85,7 +85,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = reverse_cholesky(nx, N, H, -g, 1e-8, 1e-4);
+    dLambda = reverse_cholesky(nx, N, H, -g, 1e-10, 1e-6);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -309,7 +309,7 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
     [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
-        A, b, Aeq, beq, lb, ub, [], opts);
+        A, b, Aeq, beq, lb, ub, zeros(size(z_k)), opts);
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.

@@ -44,7 +44,7 @@ for ii = 1:numIterations
         process_fcn, cost_fcn, lb, ub, [], []);
     
     % Store information and set up for next iteration.
-    fprintf('Iteration %d, primal: %.1f, dual: %.1f, rcond: %e, alpha: %e\n', ii, epsilon, fStar, rcond(H), alpha);
+    fprintf('Iteration %d, primal: %.4f, dual: %.1f, rcond: %e, alpha: %e\n', ii, epsilon, fStar, rcond(H), alpha);
     
     if epsilon < 1e-4
         break;
