@@ -16,7 +16,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Newton Hessian.
     H = zeros(nx*N, nx*N);
 
-    act_tol = 1e-8; % Tolerance for active constraints.
+    act_tol = 1e-6; % Tolerance for active constraints.
 
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
@@ -228,7 +228,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
         process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn)
     z_k = [x_k; u_k];
     
-    C_k = jacobianest(process_fcn, z_k);
+    C_k = estimate_jacobian(process_fcn, z_k);
     c_k = process_fcn(z_k) - x_k_1;
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
@@ -238,7 +238,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
     
     % Linearise nonlinear constraints.
     if ~isempty(constr_eq_fcn)
-        Aeq = jacobianest(constr_eq_fcn, z_k);
+        Aeq = estimate_jacobian(constr_eq_fcn, z_k);
         beq = -constr_eq_fcn(zeros(size(z_k)));
     else
         Aeq = [];
@@ -246,7 +246,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
     end
     
     if ~isempty(constr_bound_fcn)
-        A = jacobianest(constr_bound_fcn, z_k);
+        A = estimate_jacobian(constr_bound_fcn, z_k);
         b = -constr_bound_fcn(zeros(size(z_k)));
     else
         A = [];
@@ -259,7 +259,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
     
     % Calculate linearised cost function.
     H_k = hessian(cost_fcn, z_k);
-    g_k = transpose(gradest(cost_fcn, z_k));
+    g_k = transpose(estimate_jacobian(cost_fcn, z_k));
 end
 
 % Solve all stage QPs and return the objective value.
@@ -300,23 +300,26 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol)
     
     % Update p_k and q_k with latest dual estimate.
-    p_k = transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
+    p_k = g_k + transpose([-E_k; C_k]) * [lambda_k; lambda_k_1];
     q_k = transpose([zeros(size(lambda_k, 1), 1); c_k]) * [lambda_k; lambda_k_1];
     
     % Solve the QP.
+%     dz_k = -pinv(H_k)*p_k;
+%     active_bounds = ((dz_k - lb) < act_tol) | ((ub - dz_k) < act_tol);
+%     dz_k = max(min(dz_k, ub), lb);
     warning('off', 'optim:quadprog:WillBeRemoved');
     opts = optimoptions('quadprog', ...
         'Algorithm', 'active-set', ...
         'ConstraintTolerance', act_tol, ...
         'Display', 'off');
-    [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
+    [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, p_k, ...
         A, b, Aeq, beq, lb, ub, zeros(size(z_k)), opts);
     warning('on', 'optim:quadprog:WillBeRemoved');
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.
     active_bounds = (abs(lagrange.lower) > act_tol) | (abs(lagrange.upper) > act_tol);
-    D_k_bounds = eye(numel(lagrange.lower));
+    D_k_bounds = eye(numel(lb));
     active_set = active_bounds;
     D_k = D_k_bounds;
 
@@ -331,7 +334,7 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
     end
     
     z_k = z_k + dz_k;
-    fStar_k = transpose(z_k) * H_k * z_k + transpose(g_k + p_k) * z_k + q_k;
+    fStar_k = transpose(z_k) * H_k * z_k + transpose(p_k) * z_k + q_k;
 end
 
 % In order to avoid linearisation errors arising from the use of Jacobians,
