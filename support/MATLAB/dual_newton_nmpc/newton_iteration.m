@@ -16,7 +16,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Newton Hessian.
     H = zeros(nx*N, nx*N);
 
-    act_tol = 1e-6; % Tolerance for active constraints.
+    act_tol = 1e-8; % Tolerance for active constraints.
 
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
@@ -25,6 +25,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % primal estimate.
     [z, active_set, fStar_inc, D_k] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
+    fStar_inc = cost_fcn(reshape(z, [], 1), 1:N+1);
 
     % Calculate newton gradient.
     g = calculate_newton_gradient(nx, N, z, process_fcn);
@@ -85,7 +86,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = reverse_cholesky(nx, N, H, -g, 1e-10, 1e-6);
+    dLambda = reverse_cholesky(nx, N, H, -g, 1e-6, 1e-4);
 
     % Calculate the step size via backtracking line search followed by
     % bisection for refinement. Need to look at each stage QP and find the
@@ -110,8 +111,9 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alphaMax * dLambda;
         lambda_cand = reshape(lambda_cand, nx, []);
 
-        [~, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+        [z, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
             E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
+        fStar_cand = cost_fcn(reshape(z, [], 1), 1:N+1);
 
         % Terminate line search at the appropriate point.
         if fStar_cand > fStar_inc
@@ -128,8 +130,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         % Bisection interval search. If the backtracking line search has found
         % the interval where the optimal objective lies, this step refines the
         % step length further within that interval.
-        nMaxIntervalSearch = 50;
-        bisectionTolerance = 1e-10;
+        nMaxIntervalSearch = 100;
+        bisectionTolerance = 1e-6;
         for ii = 1:nMaxIntervalSearch
             alpha = 0.5 * (alphaMax + alphaMin);
 
@@ -139,7 +141,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
             lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
             lambda_cand = reshape(lambda_cand, nx, []);
 
-            [z, ~, fStar_cand] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
+            [z, ~, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
                 E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
 
             % Calculate Newton gradient for current dual variables.
@@ -156,6 +158,11 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
                 alphaMin = alpha;
             end
         end
+        
+        if abs(fDash) > bisectionTolerance
+            fprintf('Bisection search failed, min fDash: %e\n', abs(fDash));
+            alpha = 1;
+        end
     end
 
     % Make the step.
@@ -166,6 +173,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Re-solve stage QPs for a final time.
     [z, ~, fStar] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
+    fStar = cost_fcn(reshape(z, [], 1), 1:N+1);
     
     % Compute the primal infeasibility from the Newton gradient.
     g = calculate_newton_gradient(nx, N, z, process_fcn);
@@ -258,7 +266,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
     ub = ub - z_k;
     
     % Calculate linearised cost function.
-    H_k = hessian(cost_fcn, z_k);
+    H_k = estimate_hessian(cost_fcn, z_k);
     g_k = transpose(estimate_jacobian(cost_fcn, z_k));
 end
 
@@ -305,7 +313,7 @@ function [z_k, active_set, fStar_k, D_k] = solve_stage_qp(...
     
     % Solve the QP.
 %     dz_k = -pinv(H_k)*p_k;
-%     active_bounds = ((dz_k - lb) < act_tol) | ((ub - dz_k) < act_tol);
+%     active_bounds = ((lb - z_k) > act_tol) | ((dz_k - ub) > act_tol);
 %     dz_k = max(min(dz_k, ub), lb);
     warning('off', 'optim:quadprog:WillBeRemoved');
     opts = optimoptions('quadprog', ...
@@ -444,4 +452,22 @@ function J_est = estimate_jacobian(fcn, x, h)
         dx(ii) = h;
         J_est(:, ii) = (fcn(x + dx) - fcn(x - dx)) / (2*h);
     end
+end
+
+% Simple function to estimate a Hessian using central differences.
+function H_est = estimate_hessian(fcn, x, h)
+    if nargin < 3
+        h = 1e-3;
+    end
+    
+    N = size(x, 1);
+    H_est = zeros(N);
+    for ii = 1:N
+        dx = zeros(size(x));
+        dx(ii) = h;
+        H_est(ii, :) = (estimate_jacobian(fcn, x + dx, h) - estimate_jacobian(fcn, x - dx, h)) / (2*h);
+    end
+    
+    % Make the estimate symmetric.
+    H_est = 0.5 * (H_est + transpose(H_est));
 end
