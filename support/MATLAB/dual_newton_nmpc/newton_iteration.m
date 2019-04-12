@@ -6,7 +6,6 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     N = size(x, 2)-1;
 
     nx = size(x, 1);
-    nu = size(u, 1);
 
     assert(size(u, 2) == N+1, 'Inconsistent horizon length');
     assert(size(lambda, 2) == N+2, 'Inconsistent horizon length');
@@ -15,7 +14,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Newton Hessian.
     H = zeros(nx*N, nx*N);
 
-    act_tol = 1e-8; % Tolerance for active constraints.
+    act_tol = 1e-6; % Tolerance for active constraints.
 
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
@@ -93,7 +92,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     alphaMax = 1;
 %     alphaMin = 0;
     
-    alphaScale = 0.5;
+    alphaScale = 0.8;
     while true
         % Calculate candidate objective function value for the current step
         % size.
@@ -108,7 +107,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         % Calculate Newton gradient for current dual variables.
         g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
         
-        sigma = 0.5;
+        sigma = 0.8;
 
         % Terminate line search at the appropriate point.
         if fStar_cand >= (fStar_inc + sigma * transpose(g) * dLambda)
