@@ -7,7 +7,6 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
     nx = size(x, 1);
     nu = size(u, 1);
-    nz = nx + nu;
 
     assert(size(u, 2) == N+1, 'Inconsistent horizon length');
     assert(size(lambda, 2) == N+2, 'Inconsistent horizon length');
@@ -86,47 +85,16 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = reverse_cholesky(nx, N, H, -g, 1e-6, 1e-4);
+    dLambda = reverse_cholesky(nx, N, H, -g, 1e-10, 1e-6);
 
-    % Calculate the step size via backtracking line search followed by
-    % bisection for refinement. Need to look at each stage QP and find the
-    % distance to the closest active set boundary and use that as the minimum
-    % step length.
+    % Calculate the step size via an Armijo backtracking line search. Need
+    % to look at each stage QP and find the distance to the closest active
+    % set boundary and use that as the minimum step length.
     alphaMax = 1;
-    alphaMin = 0;
+%     alphaMin = 0;
     
-%     fDash = zeros(100, 1);
-%     fStar = zeros(100, 1);
-%     for ii = 1:100
-%         alpha = ii/100;
-% 
-%         % Calculate candidate objective function value for the current step
-%         % size.
-%         lambda_cand = reshape(lambda, [], 1);
-%         lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
-%         lambda_cand = reshape(lambda_cand, nx, []);
-% 
-%         [z, dz, p, q, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
-%             E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-%         fStar(ii) = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(dz, [], 1), reshape(p, [], 1)) + sum(q);
-% 
-%         % Calculate Newton gradient for current dual variables.
-%         g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
-% 
-%         % Work out the Newton objective gradient.
-%         fDash(ii) = transpose(dLambda) * -g;
-%     end
-    
-    % Start at maximum step size and backtrack.
-    alpha = alphaMax;
-
-    % Backtracking line search. In each iteration, check whether the
-    % candidate step length is shorter than the active-set boundary of the
-    % initial dual estimate, in which case there's no point trying any
-    % shorter step.
-    nMaxLineSearch = 20;
-    alphaScale = 0.3;
-    for ii = 1:nMaxLineSearch
+    alphaScale = 0.5;
+    while true
         % Calculate candidate objective function value for the current step
         % size.
         lambda_cand = reshape(lambda, [], 1);
@@ -136,71 +104,30 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         [z, dz, p, q, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
             E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
         fStar_cand = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(dz, [], 1), reshape(p, [], 1)) + sum(q);
+        
+        % Calculate Newton gradient for current dual variables.
+        g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
+        
+        sigma = 0.5;
 
         % Terminate line search at the appropriate point.
-        if fStar_cand > fStar_inc
-            alphaMax = min(alphaMax / alphaScale, 1);
+        if fStar_cand >= (fStar_inc + sigma * transpose(g) * dLambda)
             break;
         end
 
         alphaMax = alphaMax * alphaScale;
     end
     
-    % Only do the bisection search if the line search concluded; otherwise
-    % just take the full step.
-    if fStar_cand > fStar_inc
-        % Bisection interval search. If the backtracking line search has found
-        % the interval where the optimal objective lies, this step refines the
-        % step length further within that interval.
-        nMaxIntervalSearch = 100;
-        bisectionTolerance = 1e-6;
-        for ii = 1:nMaxIntervalSearch
-            alpha = 0.5 * (alphaMax + alphaMin);
-
-            % Calculate candidate objective function value for the current step
-            % size.
-            lambda_cand = reshape(lambda, [], 1);
-            lambda_cand(nx+1:end-nx) = lambda_cand(nx+1:end-nx) + alpha * dLambda;
-            lambda_cand = reshape(lambda_cand, nx, []);
-
-            [z, dz, ~, ~, ~] = solve_all_stage_qps(x, u, lambda_cand, H_k, g_k, ...
-                E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-
-            % Calculate Newton gradient for current dual variables.
-            g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
-
-            % Work out the Newton objective gradient.
-            fDash = transpose(dLambda) * -g;
-
-            if abs(fDash) <= bisectionTolerance
-                break;
-            elseif fDash > 0
-                alphaMin = alpha;
-            elseif fDash < 0
-                alphaMax = alpha;
-            end
-        end
-        
-        if abs(fDash) > bisectionTolerance
-            fprintf('Bisection search failed, min fDash: %e\n', abs(fDash));
-        end
-    else
-        fprintf('Line search failed\n');
-        alpha = 1;
-    end
+    alpha = alphaMax;
 
     % Make the step.
     lambda = reshape(lambda, [], 1);
     lambda(nx+1:end-nx) = lambda(nx+1:end-nx) + alpha * dLambda;
     lambda = reshape(lambda, nx, []);
     
-    % Re-solve stage QPs for a final time.
-    [z, dz, p, q, ~] = solve_all_stage_qps(x, u, lambda, H_k, g_k, ...
-        E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-    fStar = cost_fcn(reshape(z, [], 1), 1:N+1) + dot(reshape(dz, [], 1), reshape(p, [], 1)) + sum(q);
+    fStar = fStar_cand;
     
     % Compute the primal infeasibility from the Newton gradient.
-    g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
     epsilon = norm(g);
 
     x = z(1:nx, :);
