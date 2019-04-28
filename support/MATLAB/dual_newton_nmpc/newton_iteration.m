@@ -92,7 +92,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     alphaMax = 1;
 %     alphaMin = 0;
     
-    alphaScale = 0.8;
+    alphaScale = 0.5;
     while true
         % Calculate candidate objective function value for the current step
         % size.
@@ -107,7 +107,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         % Calculate Newton gradient for current dual variables.
         g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
         
-        sigma = 0.8;
+        sigma = 0.9;
 
         % Terminate line search at the appropriate point.
         if fStar_cand >= (fStar_inc + sigma * transpose(g) * dLambda)
