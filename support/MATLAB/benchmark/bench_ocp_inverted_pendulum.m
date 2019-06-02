@@ -2,8 +2,8 @@ function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_
     N = 60;
     dt = 0.05;
     x0 = [0 pi 0 0 0].';
-    x_ref = [0 0 0 0 0].';
-    u_ref = 0;
+    x_ref = repmat([0 0 0 0 0].', 1, N+1);
+    u_ref = zeros(1, N+1);
     x_min = [-1 -inf -inf -inf -15].';
     x_max = [ 1  inf  inf  inf  15].';
     u_min = -30;
@@ -31,7 +31,7 @@ function [state_horizon, control_horizon, process_fcn, cost_fcn, lb, ub, constr_
     ub = reshape(ub, [], 1);
     
     process_fcn = @(z) bench_process(dt, z(1:5, :), z(6, :));
-    cost_fcn = @(z, ii) bench_objective(z - repmat([x_ref; u_ref], N+1, 1));
+    cost_fcn = @(z, ii) bench_objective(z - reshape([x_ref(:, ii); u_ref(:, ii)], [], 1));
     constr_eq_fcn = @(z) bench_eq_constraints(z);
     constr_bound_fcn = @(z) bench_bound_constraints(z);
 end
