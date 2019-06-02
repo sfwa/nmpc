@@ -113,6 +113,10 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
         if fStar_cand >= (fStar_inc + sigma * transpose(g) * dLambda)
             break;
         end
+        
+        if alphaMax < 1e-12
+            break;
+        end
 
         alphaMax = alphaMax * alphaScale;
     end
@@ -187,7 +191,7 @@ function [E_k, C_k, c_k, H_k, g_k, A, b, Aeq, beq, lb, ub] = setup_stage_qp(x_k,
     z_k = [x_k; u_k];
     
     C_k = estimate_jacobian(process_fcn, z_k);
-    c_k = process_fcn(z_k) - x_k_1;
+    c_k = C_k*z_k - x_k_1;
     
     E_k = [eye(size(x_k, 1)) zeros(size(x_k, 1), size(u_k, 1))];
 
