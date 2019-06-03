@@ -113,9 +113,9 @@ function obj_val = bench_objective(z)
     R = 0.001;
     
     W_k = mat2cell(repmat(blkdiag(Q, R), 1, 1, N-1), nx+nu, nx+nu, ones(N-1, 1));
-    W = blkdiag(W_k{:}, blkdiag(P, 0));
+    W = blkdiag(W_k{:}, blkdiag(P, R));
     
-    obj_val = z.' * W * z;
+    obj_val = 0.5 * z.' * W * z;
 end
 
 % Constraints for the optimal control problem.
