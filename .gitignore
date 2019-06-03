@@ -60,3 +60,6 @@ src/*.zip
 Makefile
 test/src/googletest*
 tmp
+
+# Matlab junk
+*.asv
