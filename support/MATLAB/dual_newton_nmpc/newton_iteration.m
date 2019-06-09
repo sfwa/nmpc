@@ -181,15 +181,6 @@ function [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps
 
         [E_k{ii}, C_k{ii}, c_k{ii}, H_k{ii}, g_k{ii}, A{ii}, b{ii}, Aeq{ii}, beq{ii}, lb(:, ii), ub(:, ii)] = setup_stage_qp(...
             x(:, ii), x_k_1, u(:, ii), lb(:, ii), ub(:, ii), process_fcn, @(x) cost_fcn(x, ii), constr_eq_fcn, constr_bound_fcn);
-        
-        % Special cases.
-        if kk == 0
-            E_k{ii} = zeros(nx, nz);
-        end
-        
-        if kk == N
-            C_k{ii} = zeros(nx, nz);
-        end
     end
 end
 
@@ -272,21 +263,21 @@ function [dz_k, p_k, q_k, active_set, D_k] = solve_stage_qp(...
     q_k = transpose([zeros(nx, 1); c_k]) * [lambda_k; lambda_k_1];
     
     % Solve the QP.
-%     dz_k = -pinv(H_k)*(g_k + p_k);
-%     active_bounds = ((lb - z_k) > act_tol) | ((dz_k - ub) > act_tol);
-%     dz_k = max(min(dz_k, ub), lb);
-    warning('off', 'optim:quadprog:WillBeRemoved');
-    opts = optimoptions('quadprog', ...
-        'Algorithm', 'active-set', ...
-        'ConstraintTolerance', act_tol, ...
-        'Display', 'off');
-    [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
-        A, b, Aeq, beq, lb, ub, zeros(nx+nu, 1), opts);
-    warning('on', 'optim:quadprog:WillBeRemoved');
+    dz_k = -pinv(H_k)*(g_k + p_k);
+    active_bounds = ((lb - dz_k) > act_tol) | ((dz_k - ub) > act_tol);
+    dz_k = max(min(dz_k, ub), lb);
+%     warning('off', 'optim:quadprog:WillBeRemoved');
+%     opts = optimoptions('quadprog', ...
+%         'Algorithm', 'active-set', ...
+%         'ConstraintTolerance', act_tol, ...
+%         'Display', 'off');
+%     [dz_k, ~, ~, ~, lagrange] = quadprog(H_k, g_k + p_k, ...
+%         A, b, Aeq, beq, lb, ub, zeros(nx+nu, 1), opts);
+%     warning('on', 'optim:quadprog:WillBeRemoved');
     
     % Calculate mu_k from the Lagrange multipliers so that it is in the same
     % order as the constraints in D_k.
-    active_bounds = (abs(lagrange.lower) > act_tol) | (abs(lagrange.upper) > act_tol);
+%     active_bounds = (abs(lagrange.lower) > act_tol) | (abs(lagrange.upper) > act_tol);
     D_k_bounds = eye(numel(lb));
     active_set = active_bounds;
     D_k = D_k_bounds;
