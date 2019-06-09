@@ -15,7 +15,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Newton Hessian.
     H = zeros(nx*N, nx*N);
 
-    act_tol = 1e-6; % Tolerance for active constraints.
+    act_tol = 1e-8; % Tolerance for active constraints.
 
     [H_k, g_k, A, b, Aeq, beq, E_k, C_k, c_k, lb, ub] = setup_all_stage_qps(x, u, ...
         lb, ub, process_fcn, cost_fcn, constr_eq_fcn, constr_bound_fcn);
@@ -88,7 +88,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % Alternatively, consider using the conjugate gradient method as
     % described in "An Improved Distributed Dual Newton-CG Method for
     % Convex Quadratic Programming Problems" by Kozma et al.
-    dLambda = reverse_cholesky(nx, N, H, -g, 1e-10, 1e-6);
+    dLambda = reverse_cholesky(nx, N, H, -g, 1e-9, 1e-8);
 
     % Calculate the step size via an Armijo backtracking line search. Need
     % to look at each stage QP and find the distance to the closest active
@@ -96,7 +96,7 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     alphaMax = 1;
 %     alphaMin = 0;
     
-    alphaScale = 0.5;
+    alphaScale = 0.9;
     while true
         % Calculate candidate objective function value for the current step
         % size.
