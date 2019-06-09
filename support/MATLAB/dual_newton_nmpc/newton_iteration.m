@@ -26,7 +26,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     % primal estimate.
     [dz, p, q, active_set, D_k] = solve_all_stage_qps(N, nx, nu, lambda, H_k, g_k, ...
         E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-    fStar_inc = cost_fcn(reshape(z + dz, [], 1), 1:N+1) + dot(reshape(dz, [], 1), reshape(p, [], 1)) + sum(q);
+    
+    fStar_inc = linearised_cost_fcn(N, dz, H_k, g_k, p, q);
 
     % Calculate newton gradient.
     g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
@@ -105,7 +106,8 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
 
         [dz, p, q, ~] = solve_all_stage_qps(N, nx, nu, lambda_cand, H_k, g_k, ...
             E_k, C_k, c_k, lb, ub, A, b, Aeq, beq, act_tol);
-        fStar_cand = cost_fcn(reshape(z + dz, [], 1), 1:N+1) + dot(reshape(dz, [], 1), reshape(p, [], 1)) + sum(q);
+        
+        fStar_cand = linearised_cost_fcn(N, dz, H_k, g_k, p, q);
         
         % Calculate Newton gradient for current dual variables.
         g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k);
@@ -131,12 +133,13 @@ function [x, u, lambda, epsilon, fStar, H, alpha] = newton_iteration(x, u, lambd
     lambda(nx+1:end-nx) = lambda(nx+1:end-nx) + alpha * dLambda;
     lambda = reshape(lambda, nx, []);
     
-    fStar = fStar_cand;
-    
     % Compute the primal infeasibility from the Newton gradient.
     epsilon = norm(g);
     
     z = z + dz;
+    
+    % Report back value of exact (primal) cost function.
+    fStar = cost_fcn(reshape(z, [], 1), 1:N+1);
 
     x = z(1:nx, :);
     u = z(nx+1:end, :);
@@ -299,7 +302,7 @@ function [dz_k, p_k, q_k, active_set, D_k] = solve_stage_qp(...
     end
 end
 
-function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
+function g = calculate_newton_gradient(nx, N, dz, E_k, C_k, c_k)
     % Newton Hessian and gradient calculation.
     g = zeros(nx, N);
     
@@ -309,7 +312,7 @@ function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
         % Set up the Newton gradient for this stage. Note that the negative
         % sign in front of the right hand side of equation (6) in the
         % qpDUNES paper is erroneous.
-        grad_block = -([-E_k{ii}; C_k{ii}] * z(:, ii) + [zeros(nx, 1); c_k{ii}]);
+        grad_block = -([-E_k{ii}; C_k{ii}] * dz(:, ii) + [zeros(nx, 1); c_k{ii}]);
 
         if kk > 0
             g(:, kk) = g(:, kk) + grad_block(1:nx);
@@ -321,6 +324,18 @@ function g = calculate_newton_gradient(nx, N, z, E_k, C_k, c_k)
     end
     
     g = reshape(g, [], 1);
+end
+
+function fStar = linearised_cost_fcn(N, dz, H_k, g_k, p, q)
+    fStar = 0;
+    
+    for kk = 0:N
+        ii = kk + 1;
+        
+        fStar = fStar + ...
+            0.5 * transpose(dz(:, ii)) * H_k{ii} * dz(:, ii) + ...
+            transpose(g_k{ii} + p(:, ii)) * dz(:, ii) + q(ii);
+    end
 end
 
 % Solve the Newton system using banded Cholesky factorisation, to yield
