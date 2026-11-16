@@ -9,7 +9,7 @@ It provides:
 
   * A box-constrained Gauss-Newton iLQR solver with analytic derivatives,
     built to run one iteration per control period from the previous plan (a
-    real-time iteration) on a Cortex-M7.
+    real-time iteration) on MCU-class hardware.
   * The plan as a policy: the planned state, command and feedback gain of
     every stage, for an inner loop that runs faster than the solver.
   * Building blocks for that inner loop: an incremental (INDI) correction
@@ -19,15 +19,11 @@ It provides:
 
 A problem is any type that meets the concept in
 [`Problem.h`](include/NMPC/Problem.h): a model step, residuals whose squares
-are the cost, their analytic Jacobians, and bounds on the commands. States may
-live on a manifold, such as one with a quaternion. Vehicle models and the
-controllers built from them live in sfwa/models, which uses NMPC and UKF.
+represent the cost, their analytic Jacobians, and bounds on the commands. States 
+may live on a manifold, such as one with a quaternion.
 
 Every type is a template on its scalar `T`, so one program can hold solvers in
 `float` and in `double`. NMPC never defines `real_t`, which belongs to UKF.
-
-This is version 2, a rewrite. The earlier C, C66x and Python implementation is
-in the history of this repository before the rewrite.
 
 ## Usage
 
@@ -146,9 +142,9 @@ state, command and gain. An inner loop between solves applies
 command = plan.u[k] + plan.K[k] * Problem::difference(x, x_planned);
 ```
 
-which `plan.feedback(k, x, x_planned)` computes. Gains are in the problem's
-own units, and a command held at a bound has no gain. An application that
-solves below its inner loop in priority copies the policy whole into a buffer
+which `plan.feedback(k, x, x_planned)` computes. Gains are specified in terms
+of the problem's units, and a command held at a bound has no gain. An application 
+that solves below its inner loop in priority copies the policy whole into a buffer
 that the inner loop switches to on a tick boundary; `origin`,
 `ticks_per_stage` and `at(tick)` find the stage in force.
 
@@ -180,8 +176,6 @@ counts lookups outside it), and the reference's `Clock`, a sum compensated for
 rounding: a plain single-precision sum at 1 kHz drifts 2 to 5 ms in 20 to 30 s.
 What the columns mean is the vehicle's, so the vehicle's path type turns the
 two rows of a lookup into a state and a command.
-
-sfwa/models builds the multirotor's packaged controller from these.
 
 ### Derivative checks
 
