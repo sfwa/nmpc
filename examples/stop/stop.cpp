@@ -70,7 +70,7 @@ int main() {
 
     Problem::State x(2.0f, 1.0f);
     solver.reset(x, Problem::Control::Zero());
-    for (int stage = 0; stage < 80; stage++) {
+    for (int stage = 0; stage < 100; stage++) {
         if (stage > 0) {
             solver.advance(problem, 1);         /* the plan moves on by the stage just flown */
         }
