@@ -136,6 +136,7 @@ public:
         Dx = detail::state_scale(problem);
         Du = detail::control_scale(problem);
         inverse_Dx = Dx.cwiseInverse();
+        scale_products();
         for (int k = 0; k < N; k++) {
             problem.control_bounds(k, ws.lower[k], ws.upper[k]);
         }
@@ -245,16 +246,8 @@ public:
             MatA& A = ws.A[k];
             MatB& B = ws.B[k];
             problem.step_jacobian(k, ws.plan.x[k], ws.plan.u[k], A, B);
-            for (int j = 0; j < NX; j++) {
-                for (int i = 0; i < NX; i++) {
-                    A(i, j) *= inverse_Dx(i) * Dx(j);
-                }
-            }
-            for (int j = 0; j < NU; j++) {
-                for (int i = 0; i < NX; i++) {
-                    B(i, j) *= inverse_Dx(i) * Du(j);
-                }
-            }
+            A = A.cwiseProduct(scale_A);
+            B = B.cwiseProduct(scale_B);
         }
     }
 
@@ -395,6 +388,34 @@ private:
     Tangent Dx = Tangent::Ones();
     Tangent inverse_Dx = Tangent::Ones();
     Control Du = Control::Ones();
+    /*
+    The products of the scales that normalise the Jacobians and the cost expansion, made once a solve: scale_A(i, j)
+    is inverse_Dx(i) Dx(j), and so on. Each normalised coefficient is the same product as before, in the same order.
+    */
+    MatA scale_A, scale_xx;
+    MatB scale_B;
+    Gain scale_ux;
+    MatU scale_uu;
+
+    void scale_products() {
+        for (int j = 0; j < NX; j++) {
+            for (int i = 0; i < NX; i++) {
+                scale_A(i, j) = inverse_Dx(i) * Dx(j);
+                scale_xx(i, j) = Dx(i) * Dx(j);
+            }
+            for (int i = 0; i < NU; i++) {
+                scale_ux(i, j) = Du(i) * Dx(j);
+            }
+        }
+        for (int j = 0; j < NU; j++) {
+            for (int i = 0; i < NX; i++) {
+                scale_B(i, j) = inverse_Dx(i) * Du(j);
+            }
+            for (int i = 0; i < NU; i++) {
+                scale_uu(i, j) = Du(i) * Du(j);
+            }
+        }
+    }
 
     void accept() {
         for (int k = 0; k < N; k++) {
@@ -417,19 +438,10 @@ private:
             problem.cost_expansion(k, x, u, lx, lu, Lxx, Lux, Luu);
             lx = lx.cwiseProduct(Dx);
             lu = lu.cwiseProduct(Du);
-            for (int j = 0; j < NX; j++) {
-                for (int i = 0; i <= j; i++) {
-                    Lxx(i, j) *= Dx(i) * Dx(j);
-                }
-                for (int i = 0; i < NU; i++) {
-                    Lux(i, j) *= Du(i) * Dx(j);
-                }
-            }
-            for (int j = 0; j < NU; j++) {
-                for (int i = 0; i < NU; i++) {
-                    Luu(i, j) *= Du(i) * Du(j);
-                }
-            }
+            /* Only the upper triangle of Lxx is the problem's to fill, and read. */
+            Lxx.template triangularView<Eigen::Upper>() = Lxx.cwiseProduct(scale_xx);
+            Lux = Lux.cwiseProduct(scale_ux);
+            Luu = Luu.cwiseProduct(scale_uu);
         } else {
             typename Traits::StageResidual r;
             typename Traits::StageJx Jx;
