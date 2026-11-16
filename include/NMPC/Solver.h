@@ -1,0 +1,494 @@
+/*
+Part of NMPC. Distributed under the MIT licence: see LICENSE in the root of
+the repository.
+*/
+
+#ifndef NMPC_SOLVER_H
+#define NMPC_SOLVER_H
+
+#include "NMPC/BoxQP.h"
+#include "NMPC/Options.h"
+#include "NMPC/Problem.h"
+#include "NMPC/Result.h"
+#include "NMPC/Workspace.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+namespace NMPC {
+
+/*
+Box-constrained Gauss-Newton iLQR with a feasible rollout.
+
+A solve linearises the problem about the plan, runs one backward pass that
+solves a box QP at each stage, and one forward pass with a line search on the
+step length. With the default options that is the whole solve: one iteration
+from the previous plan shifted by a stage, which is a real-time iteration.
+
+    solver.reset(x0, u0)                    a first plan: the command u0 at every stage
+    solver.advance(problem, 1)              shift the plan one stage, once per solve period
+    result = solver.solve(problem, x, options)
+    solver.policy()                         the plan's states, commands and gains
+
+The pieces that matter, each learned from a failed flight or a review finding:
+
+  - Analytic step and residual Jacobians. Finite differences belong in tests (Check.h).
+  - The backward pass forms one triangle of each symmetric product. It is the
+    largest single part of a solve on a Cortex-M7.
+  - Bounds through a box QP at each stage. The gain is zero in the direction of a
+    command held at a bound.
+  - Regularisation starts afresh at every solve.
+  - The line search accepts a step against both terms of the predicted decrease.
+  - A solve stops when the predicted decrease is below what the type resolves.
+  - A solve whose rollout is not finite leaves the plan as it was.
+
+Two things that belong to the application are worth stating here. First, the
+plan comes into force one solve period after the solve starts, so solve from
+the state predicted for that moment, not the state measured when it starts.
+At periods longer than about 20 ms that prediction must follow the stored
+gains as well as the plan's commands. Second, if a solve is not usable, the
+plan in force flies on into its next stage and the next solve should start
+from a reset.
+*/
+template <class Problem, int N = Problem::Stages>
+class Solver {
+public:
+    using Traits = ProblemTraits<Problem>;
+    using T = typename Traits::T;
+    using State = typename Traits::State;
+    using Control = typename Traits::Control;
+    using Tangent = typename Traits::Tangent;
+    using MatA = typename Traits::MatA;
+    using MatB = typename Traits::MatB;
+    using Gain = typename Traits::Gain;
+    using MatU = typename Traits::MatU;
+    using Workspace = NMPC::Workspace<Problem, N>;
+    using Policy = NMPC::Policy<Problem, N>;
+
+    enum { NX = Traits::NX, NU = Traits::NU, NR = Traits::NR, NT = Traits::NT, Stages = N };
+
+    static_assert(detail::HasCostExpansion<Problem>::value || NR > 0,
+        "A problem needs stage residuals or its own cost_expansion");
+
+    explicit Solver(Workspace& workspace) : ws(workspace) {}
+
+    /* A first plan: the command u0 at every stage from the state x0, with no gains. */
+    void reset(const State& x0, const Control& u0) {
+        for (int k = 0; k < N; k++) {
+            ws.plan.x[k] = x0;
+            ws.plan.u[k] = u0;
+            ws.plan.K[k].setZero();
+            ws.step[k].setZero();
+        }
+        ws.plan.x[N] = x0;
+        ws.solved = false;
+    }
+
+    /*
+    Move the plan on by a number of whole stages, once per solve period. A stage that enters at the
+    end takes the problem's tail_control with no gain where the problem has one, and repeats the
+    last stage's command and gain where it does not. Only the commands and gains matter to the
+    next solve, which starts with a rollout; the states are shifted so that the plan stays readable.
+    */
+    void advance(const Problem& problem, int stages) {
+        stages = std::min(std::max(stages, 0), N);
+        if (stages == 0) {
+            return;
+        }
+        for (int k = 0; k + stages < N; k++) {
+            ws.plan.x[k] = ws.plan.x[k + stages];
+            ws.plan.u[k] = ws.plan.u[k + stages];
+            ws.plan.K[k] = ws.plan.K[k + stages];
+            ws.step[k] = ws.step[k + stages];
+        }
+        for (int k = N - stages; k < N; k++) {
+            ws.plan.x[k] = ws.plan.x[N];
+            if constexpr (detail::HasTailControl<Problem>::value) {
+                problem.tail_control(k, ws.plan.u[k]);
+                ws.plan.K[k].setZero();
+            } else {
+                (void)problem;
+                if (k > 0) {
+                    ws.plan.u[k] = ws.plan.u[k - 1];
+                    ws.plan.K[k] = ws.plan.K[k - 1];
+                }
+            }
+            ws.step[k].setZero();
+        }
+    }
+
+    Result<T> solve(const Problem& problem, const State& x0, const Options<T>& options) {
+        Result<T> result;
+        Dx = detail::state_scale(problem);
+        Du = detail::control_scale(problem);
+        inverse_Dx = Dx.cwiseInverse();
+        for (int k = 0; k < N; k++) {
+            problem.control_bounds(k, ws.lower[k], ws.upper[k]);
+        }
+        regularisation = options.regularisation_initial;
+
+        /* The previous plan's commands, rolled out from the new state. Nothing changes if that fails. */
+        int bound_stages = 0;
+        T cost = rollout(problem, x0, bound_stages);
+        if (!std::isfinite(cost)) {
+            result.regularisation = regularisation;
+            return result;
+        }
+        accept();
+        ws.solved = true;
+        result.status = Status::IterationLimit;
+        result.cost_before = cost;
+        result.cost_after = cost;
+        result.stages_on_bound = bound_stages;
+
+        for (int iteration = 0; iteration < options.max_iterations; iteration++) {
+            result.iterations = iteration + 1;
+            linearise(problem);
+
+            bool accepted = false;
+            bool converged = false;
+            for (int retry = 0; retry <= options.max_regularisation_retries && !accepted; retry++) {
+                T dV1 = T(0);
+                T dV2 = T(0);
+                result.backward_passes++;
+                if (!backward(problem, options, dV1, dV2, result.box_iterations)) {
+                    regularisation = std::min(regularisation * options.regularisation_factor,
+                        options.regularisation_max);
+                    continue;
+                }
+                result.predicted_decrease = -(dV1 + dV2);
+                if (options.precision_floor > T(0) &&
+                        result.predicted_decrease < options.precision_floor * std::abs(cost)) {
+                    converged = true;
+                    break;
+                }
+                T alpha = T(1);
+                for (int trial = 0; trial < options.max_line_search; trial++, alpha *= T(0.5)) {
+                    result.line_search_trials++;
+                    const T expected = -(alpha * dV1 + alpha * alpha * dV2);
+                    const T trial_cost = forward(problem, x0, alpha, bound_stages);
+                    if (std::isfinite(trial_cost) && expected > T(0) &&
+                            (cost - trial_cost) > options.accept_ratio * expected) {
+                        accept();
+                        cost = trial_cost;
+                        result.stages_on_bound = bound_stages;
+                        accepted = true;
+                        break;
+                    }
+                }
+                if (accepted) {
+                    regularisation = std::max(regularisation / options.regularisation_factor,
+                        options.regularisation_min);
+                } else {
+                    regularisation = std::min(regularisation * options.regularisation_factor,
+                        options.regularisation_max);
+                }
+            }
+            if (converged) {
+                result.status = Status::Converged;
+                break;
+            }
+            if (!accepted) {
+                result.status = Status::NoProgress;
+                break;
+            }
+            result.accepted_steps++;
+            result.cost_after = cost;
+        }
+        result.regularisation = regularisation;
+        return result;
+    }
+
+    const Policy& policy() const { return ws.plan; }
+    const Workspace& workspace() const { return ws; }
+
+    /*
+    The parts of a solve, public so that a benchmark can time each one. They work on the plan in the
+    workspace with the bounds and scales of the last solve.
+    */
+
+    /* Roll the plan's commands, clamped to the bounds, out from x0 into the trial plan. Returns its cost. */
+    T rollout(const Problem& problem, const State& x0, int& bound_stages) {
+        bound_stages = 0;
+        ws.trial_x[0] = x0;
+        T cost = T(0);
+        for (int k = 0; k < N; k++) {
+            const Control u = ws.plan.u[k].cwiseMax(ws.lower[k]).cwiseMin(ws.upper[k]);
+            ws.trial_u[k] = u;
+            bound_stages += on_bound(k, u);
+            cost += detail::stage_cost(problem, k, ws.trial_x[k], u);
+            ws.trial_x[k + 1] = problem.step(k, ws.trial_x[k], u);
+            if (!detail::finite<Problem>(ws.trial_x[k + 1])) {
+                return std::numeric_limits<T>::quiet_NaN();
+            }
+        }
+        return cost + detail::terminal_cost(problem, ws.trial_x[N]);
+    }
+
+    /* The step's Jacobians at every stage of the plan, normalised. */
+    void linearise(const Problem& problem) {
+        for (int k = 0; k < N; k++) {
+            MatA& A = ws.A[k];
+            MatB& B = ws.B[k];
+            problem.step_jacobian(k, ws.plan.x[k], ws.plan.u[k], A, B);
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i < NX; i++) {
+                    A(i, j) *= inverse_Dx(i) * Dx(j);
+                }
+            }
+            for (int j = 0; j < NU; j++) {
+                for (int i = 0; i < NX; i++) {
+                    B(i, j) *= inverse_Dx(i) * Du(j);
+                }
+            }
+        }
+    }
+
+    /*
+    The backward pass, with one triangle of each symmetric product. It stores each stage's step in
+    the workspace and its gain in the plan, and returns false if a stage QP could not be factored.
+    dV1 and dV2 are the linear and quadratic terms of the predicted change of cost for a full step.
+    */
+    bool backward(const Problem& problem, const Options<T>& options, T& dV1, T& dV2, int& box_iterations) {
+        Tangent Vx;
+        MatA Vxx;
+        terminal_expansion(problem, Vx, Vxx);
+        for (int k = N - 1; k >= 0; k--) {
+            const MatA& A = ws.A[k];
+            const MatB& B = ws.B[k];
+            Tangent Qx;
+            Control Qu;
+            MatA Qxx;
+            Gain Qux;
+            MatU Quu;
+            stage_expansion(problem, k, Qx, Qu, Qxx, Qux, Quu);
+
+            MatA VA;
+            MatB VB;
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i < NX; i++) {
+                    VA(i, j) = Vxx.col(i).dot(A.col(j));
+                }
+            }
+            for (int j = 0; j < NU; j++) {
+                for (int i = 0; i < NX; i++) {
+                    VB(i, j) = Vxx.col(i).dot(B.col(j));
+                }
+            }
+            for (int i = 0; i < NX; i++) {
+                Qx(i) += A.col(i).dot(Vx);
+            }
+            for (int i = 0; i < NU; i++) {
+                Qu(i) += B.col(i).dot(Vx);
+            }
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i <= j; i++) {
+                    Qxx(i, j) += A.col(i).dot(VA.col(j));
+                }
+                for (int i = 0; i < NU; i++) {
+                    Qux(i, j) += B.col(i).dot(VA.col(j));
+                }
+            }
+            for (int j = 0; j < NU; j++) {
+                for (int i = 0; i <= j; i++) {
+                    Quu(i, j) += B.col(i).dot(VB.col(j));
+                    Quu(j, i) = Quu(i, j);
+                }
+            }
+
+            MatU H = Quu;
+            H.diagonal().array() += regularisation;
+            const Control lo = (ws.lower[k] - ws.plan.u[k]).cwiseQuotient(Du);
+            const Control hi = (ws.upper[k] - ws.plan.u[k]).cwiseQuotient(Du);
+            Control d = ws.step[k];
+            Eigen::Array<bool, NU, 1> held;
+            Eigen::LLT<MatU> factor;
+            const int passes = solve_box_qp<T, NU>(H, Qu, lo, hi, d, held, factor, options.max_box_iterations);
+            if (passes < 0) {
+                return false;
+            }
+            box_iterations += passes;
+
+            Gain rhs = -Qux;
+            for (int i = 0; i < NU; i++) {
+                if (held(i)) {
+                    rhs.row(i).setZero();
+                }
+            }
+            Gain K = factor.solve(rhs);
+            for (int i = 0; i < NU; i++) {
+                if (held(i)) {
+                    K.row(i).setZero();
+                }
+            }
+            if (!K.allFinite() || !d.allFinite()) {
+                return false;
+            }
+            ws.step[k] = d;
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i < NU; i++) {
+                    ws.plan.K[k](i, j) = Du(i) * K(i, j) * inverse_Dx(j);
+                }
+            }
+
+            const Control Quud(Quu * d);
+            dV1 += d.dot(Qu);
+            dV2 += T(0.5) * d.dot(Quud);
+            const Control t = Qu + Quud;
+            for (int i = 0; i < NX; i++) {
+                Vx(i) = Qx(i) + K.col(i).dot(t) + Qux.col(i).dot(d);
+            }
+            Gain M;
+            for (int j = 0; j < NX; j++) {
+                M.col(j) = Qux.col(j) + Quu * K.col(j);
+            }
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i <= j; i++) {
+                    const T v = Qxx(i, j) + Qux.col(i).dot(K.col(j)) + K.col(i).dot(M.col(j));
+                    Vxx(i, j) = v;
+                    Vxx(j, i) = v;
+                }
+            }
+        }
+        return true;
+    }
+
+    /* A trial plan from x0 with a step of length alpha and the new gains. Returns its cost. */
+    T forward(const Problem& problem, const State& x0, T alpha, int& bound_stages) {
+        bound_stages = 0;
+        ws.trial_x[0] = x0;
+        T cost = T(0);
+        for (int k = 0; k < N; k++) {
+            const Tangent deviation = Problem::difference(ws.trial_x[k], ws.plan.x[k]);
+            const Control u = (ws.plan.u[k] + alpha * Du.cwiseProduct(ws.step[k]) + ws.plan.K[k] * deviation)
+                .cwiseMax(ws.lower[k]).cwiseMin(ws.upper[k]);
+            ws.trial_u[k] = u;
+            bound_stages += on_bound(k, u);
+            cost += detail::stage_cost(problem, k, ws.trial_x[k], u);
+            ws.trial_x[k + 1] = problem.step(k, ws.trial_x[k], u);
+            if (!detail::finite<Problem>(ws.trial_x[k + 1])) {
+                return std::numeric_limits<T>::quiet_NaN();
+            }
+        }
+        return cost + detail::terminal_cost(problem, ws.trial_x[N]);
+    }
+
+    /* The regularisation in force, in normalised units. */
+    T regularisation = T(0);
+
+private:
+    Workspace& ws;
+    Tangent Dx = Tangent::Ones();
+    Tangent inverse_Dx = Tangent::Ones();
+    Control Du = Control::Ones();
+
+    void accept() {
+        for (int k = 0; k < N; k++) {
+            ws.plan.x[k] = ws.trial_x[k];
+            ws.plan.u[k] = ws.trial_u[k];
+        }
+        ws.plan.x[N] = ws.trial_x[N];
+    }
+
+    int on_bound(int k, const Control& u) const {
+        return ((u.array() <= ws.lower[k].array()) || (u.array() >= ws.upper[k].array())).any() ? 1 : 0;
+    }
+
+    /* The Gauss-Newton expansion of stage k's cost about the plan, normalised. Lxx holds its upper triangle. */
+    void stage_expansion(const Problem& problem, int k, Tangent& lx, Control& lu, MatA& Lxx, Gain& Lux,
+            MatU& Luu) const {
+        const State& x = ws.plan.x[k];
+        const Control& u = ws.plan.u[k];
+        if constexpr (detail::HasCostExpansion<Problem>::value) {
+            problem.cost_expansion(k, x, u, lx, lu, Lxx, Lux, Luu);
+            lx = lx.cwiseProduct(Dx);
+            lu = lu.cwiseProduct(Du);
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i <= j; i++) {
+                    Lxx(i, j) *= Dx(i) * Dx(j);
+                }
+                for (int i = 0; i < NU; i++) {
+                    Lux(i, j) *= Du(i) * Dx(j);
+                }
+            }
+            for (int j = 0; j < NU; j++) {
+                for (int i = 0; i < NU; i++) {
+                    Luu(i, j) *= Du(i) * Du(j);
+                }
+            }
+        } else {
+            typename Traits::StageResidual r;
+            typename Traits::StageJx Jx;
+            typename Traits::StageJu Ju;
+            problem.stage_residual(k, x, u, r);
+            problem.residual_jacobians(k, x, u, Jx, Ju);
+            for (int j = 0; j < NX; j++) {
+                Jx.col(j) *= Dx(j);
+            }
+            for (int j = 0; j < NU; j++) {
+                Ju.col(j) *= Du(j);
+            }
+            for (int j = 0; j < NX; j++) {
+                lx(j) = Jx.col(j).dot(r);
+                for (int i = 0; i <= j; i++) {
+                    Lxx(i, j) = Jx.col(i).dot(Jx.col(j));
+                }
+                for (int i = 0; i < NU; i++) {
+                    Lux(i, j) = Ju.col(i).dot(Jx.col(j));
+                }
+            }
+            for (int j = 0; j < NU; j++) {
+                lu(j) = Ju.col(j).dot(r);
+                for (int i = 0; i <= j; i++) {
+                    Luu(i, j) = Ju.col(i).dot(Ju.col(j));
+                    Luu(j, i) = Luu(i, j);
+                }
+            }
+            if constexpr (detail::HasLinearCost<Problem>::value) {
+                Tangent gx;
+                Control gu;
+                problem.linear_cost_gradient(k, x, u, gx, gu);
+                lx += gx.cwiseProduct(Dx);
+                lu += gu.cwiseProduct(Du);
+            }
+        }
+    }
+
+    /* The terminal cost's expansion at the end of the plan, normalised, both triangles. */
+    void terminal_expansion(const Problem& problem, Tangent& Vx, MatA& Vxx) const {
+        const State& x = ws.plan.x[N];
+        if constexpr (detail::HasTerminalExpansion<Problem>::value) {
+            problem.terminal_expansion(x, Vx, Vxx);
+            Vx = Vx.cwiseProduct(Dx);
+            for (int j = 0; j < NX; j++) {
+                for (int i = 0; i <= j; i++) {
+                    Vxx(i, j) *= Dx(i) * Dx(j);
+                    Vxx(j, i) = Vxx(i, j);
+                }
+            }
+        } else if constexpr (NT > 0) {
+            typename Traits::TerminalResidual r;
+            typename Traits::TerminalJx J;
+            problem.terminal_residual(x, r);
+            problem.terminal_jacobian(x, J);
+            for (int j = 0; j < NX; j++) {
+                J.col(j) *= Dx(j);
+            }
+            for (int j = 0; j < NX; j++) {
+                Vx(j) = J.col(j).dot(r);
+                for (int i = 0; i <= j; i++) {
+                    Vxx(i, j) = J.col(i).dot(J.col(j));
+                    Vxx(j, i) = Vxx(i, j);
+                }
+            }
+        } else {
+            (void)problem;
+            Vx.setZero();
+            Vxx.setZero();
+        }
+    }
+};
+
+}
+
+#endif
