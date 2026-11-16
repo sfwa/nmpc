@@ -267,6 +267,28 @@ TYPED_TEST(SolverTest, RegularisationStartsAfreshEverySolve) {
     EXPECT_LE(result.regularisation, options.regularisation_initial);
 }
 
+TYPED_TEST(SolverTest, AdvanceFractionMovesEachCommandTowardTheNext) {
+    typedef TypeParam T;
+    typedef Stop_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    const typename Problem::State x0(T(1), T(0));
+    solver.reset(x0, Problem::Control::Zero());
+    solver.solve(problem, x0, NMPC::Options<T>());
+    const typename Solver::Policy before = solver.policy();
+    solver.advance_fraction(T(0.25));
+    const int N = Solver::Stages;
+    for (int k = 0; k < N; k++) {
+        const typename Problem::Control expected = k + 1 < N ?
+            typename Problem::Control(before.u[k] + T(0.25) * (before.u[k + 1] - before.u[k])) : before.u[k];
+        EXPECT_TRUE(solver.policy().u[k].isApprox(expected, T(1e-5)) || (expected.isZero() && solver.policy().u[k].isZero()));
+        EXPECT_TRUE(solver.policy().K[k] == before.K[k]);
+        EXPECT_TRUE(solver.policy().x[k] == before.x[k]);
+    }
+}
+
 TYPED_TEST(SolverTest, AdvanceShiftsThePlanAndFillsTheTail) {
     typedef TypeParam T;
     {

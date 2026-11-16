@@ -118,6 +118,66 @@ struct NoCorrection {
     void reset() {}
 };
 
+/*
+An attitude and rate cascade, as the error law of a rigid body in place of the
+solver's stored gains: the attitude error to a rate command, and a PID on the
+rate to a moment about each body axis. The attitude error is the NED rotation
+log(q * conj(q_plan)) taken into body axes; the rate's derivative term is
+low-passed; the integral is held within a limit and stops while the command is
+clipped. The defaults are the review prototype's for the F450: attitude 6, 6
+and 3 per second, rate 18, 18 and 6 per second with an integral corner at
+4 rad/s (2 in yaw) and a lead of 0.025 s for the rotor lag in roll and pitch.
+The caller turns the moment into actuator commands through its allocation.
+*/
+template <class T>
+struct AttitudeCascade {
+    Vector<T, 3> k_attitude = Vector<T, 3>(T(6), T(6), T(3));     /* 1/s */
+    Vector<T, 3> kp = Vector<T, 3>(T(18), T(18), T(6));           /* 1/s */
+    Vector<T, 3> ki = Vector<T, 3>(T(72), T(72), T(12));          /* 1/s^2 */
+    Vector<T, 3> kd = Vector<T, 3>(T(0.45), T(0.45), T(0));       /* s */
+    Vector<T, 3> integral_limit = Vector<T, 3>(T(0.6), T(0.6), T(0.1));  /* N m */
+    T h = T(0.001);
+    T derivative_decay = T(0);
+
+    Vector<T, 3> integral = Vector<T, 3>::Zero();   /* N m */
+    Vector<T, 3> error = Vector<T, 3>::Zero();      /* the rate error of the last command, rad/s */
+    Vector<T, 3> error_previous = Vector<T, 3>::Zero();
+    Vector<T, 3> derivative = Vector<T, 3>::Zero();
+
+    /* The tick, s, and the cutoff of the derivative's low-pass, Hz. Clears the state. */
+    void design(T tick, T derivative_cutoff = T(80)) {
+        h = tick;
+        derivative_decay = std::exp(-tick * T(2) * T(3.14159265358979323846) * derivative_cutoff);
+        reset();
+    }
+
+    void reset() {
+        integral.setZero();
+        error.setZero();
+        error_previous.setZero();
+        derivative.setZero();
+    }
+
+    /* The moment about the body axes, N m, toward the planned attitude and rate, for the inertia's diagonal. */
+    Vector<T, 3> moment(const Quaternion<T>& q, const Vector<T, 3>& w, const Quaternion<T>& q_plan,
+            const Vector<T, 3>& w_plan, const Vector<T, 3>& inertia) {
+        const Vector<T, 3> theta = so3_log<T>(q * q_plan.conjugate());
+        const Vector<T, 3> rate_command = w_plan - k_attitude.cwiseProduct(Vector<T, 3>(q.conjugate() * theta));
+        error = rate_command - w;
+        derivative = derivative_decay * derivative + (T(1) - derivative_decay) * (error - error_previous) / h;
+        error_previous = error;
+        return inertia.cwiseProduct(kp.cwiseProduct(error) + kd.cwiseProduct(derivative)) + integral;
+    }
+
+    /* After the command is formed: the integral moves unless the command was clipped. */
+    void integrate(bool clipped, const Vector<T, 3>& inertia) {
+        if (!clipped) {
+            integral += h * inertia.cwiseProduct(ki.cwiseProduct(error));
+            integral = integral.cwiseMax(-integral_limit).cwiseMin(integral_limit);
+        }
+    }
+};
+
 }
 
 #endif

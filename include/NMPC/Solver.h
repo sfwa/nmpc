@@ -121,6 +121,16 @@ public:
         }
     }
 
+    /*
+    For a solve period shorter than a stage: each stage's command moves that fraction of the way to the next
+    stage's, and the states and gains stay. The next rollout makes the states again.
+    */
+    void advance_fraction(T fraction) {
+        for (int k = 0; k + 1 < N; k++) {
+            ws.plan.u[k] += fraction * (ws.plan.u[k + 1] - ws.plan.u[k]);
+        }
+    }
+
     Result<T> solve(const Problem& problem, const State& x0, const Options<T>& options) {
         Result<T> result;
         Dx = detail::state_scale(problem);

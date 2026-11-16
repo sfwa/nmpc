@@ -131,3 +131,39 @@ TYPED_TEST(InnerLoopTest, ClampAndBound) {
     const NMPC::Vector<T, 3> middle = NMPC::Vector<T, 3>::Constant(T(0.5));
     EXPECT_FALSE(NMPC::on_bound(middle, lower, upper));
 }
+
+TYPED_TEST(InnerLoopTest, CascadeTurnsBackTowardThePlan) {
+    typedef TypeParam T;
+    NMPC::AttitudeCascade<T> c;
+    c.design(T(0.001));
+    const NMPC::Vector<T, 3> inertia(T(0.02), T(0.02), T(0.04)), zero = NMPC::Vector<T, 3>::Zero();
+    const NMPC::Quaternion<T> level = NMPC::Quaternion<T>::Identity();
+
+    /* On the plan: no moment, and the integral stays empty. */
+    EXPECT_TRUE(c.moment(level, zero, level, zero, inertia).isZero());
+    c.integrate(false, inertia);
+    EXPECT_TRUE(c.integral.isZero());
+
+    /* Rolled right of the plan: a moment to roll left, and only about x. */
+    const T angle = T(0.1);
+    const NMPC::Quaternion<T> rolled(Eigen::AngleAxis<T>(angle, NMPC::Vector<T, 3>::UnitX()));
+    c.reset();
+    const NMPC::Vector<T, 3> m = c.moment(rolled, zero, level, zero, inertia);
+    EXPECT_LT(m.x(), T(0));
+    EXPECT_NEAR(m.y(), T(0), T(1e-6));
+    EXPECT_NEAR(m.z(), T(0), T(1e-6));
+    /* The rate error is the attitude loop's rate command. */
+    const T error = -c.k_attitude.x() * angle;
+    EXPECT_NEAR(c.error.x(), error, T(1e-5));
+
+    /* The integral grows toward its limit, and stops while the command is clipped. */
+    for (int i = 0; i < 20000; i++) {
+        c.moment(rolled, zero, level, zero, inertia);
+        c.integrate(false, inertia);
+    }
+    EXPECT_EQ(c.integral.x(), -c.integral_limit.x());
+    c.reset();
+    c.moment(rolled, zero, level, zero, inertia);
+    c.integrate(true, inertia);
+    EXPECT_TRUE(c.integral.isZero());
+}

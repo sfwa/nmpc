@@ -114,7 +114,7 @@ NMPC::Options<float> options;                   /* embedded defaults: 1 iteratio
 solver.reset(x0, Problem::Control::Zero());     /* the first plan is a constant command */
 
 /* Once per solve period. */
-solver.advance(problem, 1);                     /* shift the plan one stage */
+solver.advance(problem, 1);                     /* shift the plan one stage; advance_fraction(f) for a period shorter than a stage */
 const NMPC::Result<float> result = solver.solve(problem, x_predicted, options);
 if (result.usable()) {
     const auto& plan = solver.policy();         /* plan.x[k], plan.u[k] and plan.K[k] for every stage */
@@ -164,6 +164,11 @@ holds the pieces that do not depend on the vehicle:
     by a gain, and allocated to NA actuator increments within per-actuator
     limits. The expectation is the application's, from the model it plans
     with. `NoCorrection` holds nothing.
+  * `AttitudeCascade<T>`: an attitude and rate cascade, as the error law of a
+    rigid body in place of the stored gains: the attitude error to a rate
+    command, and a PID on the rate to a moment about each body axis, whose
+    integral stops while the command is clipped. The defaults are the review
+    prototype's for the F450.
   * `Butterworth2`, `clamp` and `on_bound`.
 
 What the correction holds is taken out of the solver's bounds and of the
