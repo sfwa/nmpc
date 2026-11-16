@@ -89,6 +89,12 @@ public:
     end takes the problem's tail_control with no gain where the problem has one, and repeats the
     last stage's command and gain where it does not. Only the commands and gains matter to the
     next solve, which starts with a rollout; the states are shifted so that the plan stays readable.
+
+    The stage QPs' steps, which start the next solve's stage QPs, stay with their stage numbers
+    and are not shifted. That is what the review prototype did, and the reference flights were
+    flown with it. The stage QP stops on an absolute test of its gradient, so where a stage's
+    Hessian is small its result depends on where it starts, by up to 2e-4 N in a rotor command
+    on the multirotor; shifting the steps moved the plans by that much from the prototype's.
     */
     void advance(const Problem& problem, int stages) {
         stages = std::min(std::max(stages, 0), N);
@@ -99,7 +105,6 @@ public:
             ws.plan.x[k] = ws.plan.x[k + stages];
             ws.plan.u[k] = ws.plan.u[k + stages];
             ws.plan.K[k] = ws.plan.K[k + stages];
-            ws.step[k] = ws.step[k + stages];
         }
         for (int k = N - stages; k < N; k++) {
             ws.plan.x[k] = ws.plan.x[N];
@@ -113,7 +118,6 @@ public:
                     ws.plan.K[k] = ws.plan.K[k - 1];
                 }
             }
-            ws.step[k].setZero();
         }
     }
 
