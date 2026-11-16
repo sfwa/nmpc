@@ -1,10 +1,10 @@
 {
   "13.2.1": {
-    "backward pass": 2342584,
-    "first solve": 2877200,
+    "backward pass": 2338352,
+    "first solve": 2851560,
     "line search trial": 123416,
-    "linearise": 153160,
+    "linearise": 126856,
     "rollout": 111496,
-    "solve": 2800832
+    "solve": 2777892
   }
 }
