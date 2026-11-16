@@ -12,6 +12,9 @@ It provides:
     real-time iteration) on a Cortex-M7.
   * The plan as a policy: the planned state, command and feedback gain of
     every stage, for an inner loop that runs faster than the solver.
+  * Building blocks for that inner loop: an incremental (INDI) correction
+    with its low-pass filters, clamping, a reference table, and a reference
+    clock that keeps time in single precision.
   * Derivative checks against central differences, for tests.
 
 A problem is any type that meets the concept in
@@ -148,6 +151,32 @@ own units, and a command held at a bound has no gain. An application that
 solves below its inner loop in priority copies the policy whole into a buffer
 that the inner loop switches to on a tick boundary; `origin`,
 `ticks_per_stage` and `at(tick)` find the stage in force.
+
+### The inner loop
+
+The inner loop is the sum of three terms: the plan's command at this tick,
+an error law on the distance from the plan (the stored gains above), and a
+correction from the measured acceleration. [`InnerLoop.h`](include/NMPC/InnerLoop.h)
+holds the pieces that do not depend on the vehicle:
+
+  * `Incremental<T, NY, NA>`: NY residuals, each the measured value less the
+    model's expectation, low-passed by a second-order Butterworth each, scaled
+    by a gain, and allocated to NA actuator increments within per-actuator
+    limits. The expectation is the application's, from the model it plans
+    with. `NoCorrection` holds nothing.
+  * `Butterworth2`, `clamp` and `on_bound`.
+
+What the correction holds is taken out of the solver's bounds and of the
+actuator state the solver sees, so that the plan is made within what is left.
+
+[`Reference.h`](include/NMPC/Reference.h) holds a reference as a table of rows
+at a fixed spacing (`PathTable`, which may hold a window of a longer table and
+counts lookups outside it), and the reference's `Clock`, a sum compensated for
+rounding: a plain single-precision sum at 1 kHz drifts 2 to 5 ms in 20 to 30 s.
+What the columns mean is the vehicle's, so the vehicle's path type turns the
+two rows of a lookup into a state and a command.
+
+sfwa/models builds the multirotor's packaged controller from these.
 
 ### Derivative checks
 

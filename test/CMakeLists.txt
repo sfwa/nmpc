@@ -33,7 +33,8 @@ endif()
 add_executable(unittest
     TestBoxQP.cpp
     TestSolver.cpp
-    TestCheck.cpp)
+    TestCheck.cpp
+    TestInnerLoop.cpp)
 # The allocation test replaces the global operator new, so it is a program of its own.
 add_executable(unittest_no_heap
     TestNoHeap.cpp)
