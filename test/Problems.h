@@ -11,6 +11,8 @@ one part of the problem concept.
                     the quaternion manifold
   Tail_Problem      the stop problem with a tail_control
   Failing_Problem   the stop problem with a model that can be told to fail
+  Pinned_Problem    a scalar integrator over two stages whose second command is
+                    pinned by equal bounds
 */
 
 #ifndef NMPC_TEST_PROBLEMS_H
@@ -81,6 +83,48 @@ struct Failing_Problem : Stop_Problem<T> {
             next(1) = std::numeric_limits<T>::quiet_NaN();
         }
         return next;
+    }
+};
+
+/*
+x[k+1] = x[k] + u[k], with cost (x^2 + u^2) / 2 at each stage and x^2 / 2 at the end, over two stages.
+The second stage's command has equal bounds, so it cannot move: its gain must be zero, and the first
+stage's gain is then -2/3 (the second stage passes its state on unchanged, so the cost to go there is x^2).
+*/
+template <class T>
+struct Pinned_Problem {
+    using Scalar = T;
+    enum { NX = 1, NU = 1, NR = 2, NT = 1, Stages = 2 };
+    using State = Eigen::Matrix<T, 1, 1>;
+    using Control = Eigen::Matrix<T, 1, 1>;
+
+    T pinned = T(0);
+
+    static State retract(const State& x, const State& d) { return x + d; }
+    static State difference(const State& x, const State& y) { return x - y; }
+    State step(int, const State& x, const Control& u) const { return x + u; }
+    template <class A, class B>
+    void step_jacobian(int, const State&, const Control&, A& a, B& b) const {
+        a(0, 0) = T(1);
+        b(0, 0) = T(1);
+    }
+    template <class R>
+    void stage_residual(int, const State& x, const Control& u, R& r) const { r << x(0), u(0); }
+    template <class JX, class JU>
+    void residual_jacobians(int, const State&, const Control&, JX& jx, JU& ju) const {
+        jx << T(1), T(0);
+        ju << T(0), T(1);
+    }
+    template <class R> void terminal_residual(const State& x, R& r) const { r = x; }
+    template <class JX> void terminal_jacobian(const State&, JX& jx) const { jx(0, 0) = T(1); }
+    void control_bounds(int k, Control& lower, Control& upper) const {
+        if (k == 1) {
+            lower(0) = pinned;
+            upper(0) = pinned;
+        } else {
+            lower(0) = T(-10);
+            upper(0) = T(10);
+        }
     }
 };
 

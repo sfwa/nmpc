@@ -129,7 +129,10 @@ its next stage.
 
 `Options` sets the work a solve may do, in units of work rather than seconds:
 iterations, line-search candidates, regularisation retries and stage QP
-passes. `Result` says whether the plan is usable, why the solve ended, the
+passes, and the tolerances it works to. The stage QP's stop is relative to
+the size of the terms in each gradient (`box_tolerance`), so a problem's
+answer does not depend on how its cost is scaled. A command whose bounds meet
+is held and gets no gain. `Result` says whether the plan is usable, why the solve ended, the
 work done, the costs before and after, the predicted decrease, and how many
 stages have a command on a bound.
 
@@ -163,16 +166,17 @@ holds the pieces that do not depend on the vehicle:
   * `AttitudeCascade<T>`: an attitude and rate cascade, as the error law of a
     rigid body in place of the stored gains: the attitude error to a rate
     command, and a PID on the rate to a moment about each body axis, whose
-    integral stops while the command is clipped. The defaults are the review
-    prototype's for the F450.
+    integral stops while the command is clipped. The planned rate is turned
+    from the plan's body axes into the vehicle's before it is compared with the
+    measured rate. The defaults are the review prototype's for the F450.
   * `Butterworth2`, `clamp` and `on_bound`.
 
 What the correction holds is taken out of the solver's bounds and of the
 actuator state the solver sees, so that the plan is made within what is left.
 
 [`Reference.h`](include/NMPC/Reference.h) holds a reference as a table of rows
-at a fixed spacing (`PathTable`, which may hold a window of a longer table and
-counts lookups outside it), and the reference's `Clock`, a sum compensated for
+at a fixed spacing (`PathTable`, which may hold a window of a longer table;
+a lookup outside the window holds the window's nearest end and is counted), and the reference's `Clock`, a sum compensated for
 rounding: a plain single-precision sum at 1 kHz drifts 2 to 5 ms in 20 to 30 s.
 What the columns mean is the vehicle's, so the vehicle's path type turns the
 two rows of a lookup into a state and a command.
@@ -237,6 +241,13 @@ caller's workspace and the stack. `sizeof(Solver::Workspace)` is the
 solver's memory. In single precision NMPC's own code calls no
 double-precision routine.
 
+By default the workspace keeps every stage's step Jacobians for the
+iteration. `NMPC::Solver<Problem, Problem::Stages, NMPC::Jacobians::PerStage>`
+makes each stage's Jacobians as the backward pass reaches it instead, and
+keeps none: the plans are the same, the workspace is smaller by
+N (NX² + NX NU) scalars, the stack is larger by one stage's Jacobians, and a
+backward pass repeated with more regularisation makes them again.
+
 [`benchmark/cortex-m7`](benchmark/cortex-m7) counts instructions on a
 Cortex-M7 under QEMU for a synthetic problem with the dimensions of the
 multirotor reference controller (17 states, 5 commands, 30 stages). Counts
@@ -249,17 +260,17 @@ than 3 % from the baseline accepted for the same compiler.
 python3 benchmark/cortex-m7/check.py build/src/eigen3
 ```
 
-| Synthetic problem, single precision, `-O2`, arm-none-eabi-gcc 13.2.1 | Instructions |
-| --- | --- |
-| Solve (shift and one iteration) | 2.80 million |
-| First solve, from a reset plan | 2.88 million |
-| Backward pass | 2.34 million |
-| Linearisation | 0.15 million |
-| Line-search trial | 0.12 million |
-| Rollout | 0.11 million |
+| Synthetic problem, single precision, `-O2`, arm-none-eabi-gcc 13.2.1 | Instructions | With per-stage Jacobians |
+| --- | --- | --- |
+| Solve (shift and one iteration) | 2.69 million | 2.70 million |
+| First solve, from a reset plan | 2.79 million | 2.79 million |
+| Backward pass | 2.24 million | 2.38 million (it makes the Jacobians) |
+| Linearisation | 0.13 million | none |
+| Line-search trial | 0.12 million | 0.12 million |
+| Rollout | 0.11 million | 0.11 million |
 
-The workspace for that problem is 62 kB and a solve uses about 8.8 kB of
-stack.
+The workspace for that problem is 62 kB (17 kB with per-stage Jacobians)
+and a solve uses about 8.3 kB of stack (9.8 kB with per-stage Jacobians).
 
 ## Licence
 

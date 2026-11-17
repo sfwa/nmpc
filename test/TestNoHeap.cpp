@@ -55,3 +55,27 @@ TYPED_TEST(NoHeapTest, ASolveAllocatesNothing) {
     const long after = allocations.load();
     EXPECT_EQ(after, before);
 }
+
+TYPED_TEST(NoHeapTest, ASolveWithPerStageJacobiansAllocatesNothing) {
+    typedef TypeParam T;
+    typedef Attitude_Problem<T> Problem;
+    typedef NMPC::Solver<Problem, Problem::Stages, NMPC::Jacobians::PerStage> Solver;
+    typedef Eigen::Matrix<T, 3, 1> V3;
+    static typename Solver::Workspace workspace;
+    Problem problem;
+    typename Problem::State x;
+    x.q = NMPC::so3_exp<T>(V3(T(0.6), T(-0.4), T(1.2)));
+    x.w = V3(T(0.2), T(0), T(-0.3));
+    NMPC::Options<T> options;
+    options.max_iterations = 3;
+
+    const long before = allocations.load();
+    Solver solver(workspace);
+    solver.reset(x, Problem::Control::Zero());
+    for (int i = 0; i < 5; i++) {
+        solver.advance(problem, 1);
+        solver.solve(problem, x, options);
+    }
+    const long after = allocations.load();
+    EXPECT_EQ(after, before);
+}

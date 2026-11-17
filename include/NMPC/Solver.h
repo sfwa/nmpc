@@ -14,6 +14,7 @@ the repository.
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <type_traits>
 
 namespace NMPC {
 
@@ -39,7 +40,10 @@ The pieces that matter, each learned from a failed flight or a review finding:
     command held at a bound.
   - Regularisation starts afresh at every solve.
   - The line search accepts a step against both terms of the predicted decrease.
-  - A solve stops when the predicted decrease is below what the type resolves.
+  - A solve stops when the predicted decrease is below what the type resolves, and at once
+    when it is zero.
+  - Each stage's Jacobians are kept for the iteration by default; Solver<Problem, N,
+    Jacobians::PerStage> makes them in the backward pass instead, for a smaller workspace.
   - A solve whose rollout is not finite leaves the plan as it was.
 
 Two things that belong to the application are worth stating here. First, the
@@ -50,7 +54,7 @@ gains as well as the plan's commands. Second, if a solve is not usable, the
 plan in force flies on into its next stage and the next solve should start
 from a reset.
 */
-template <class Problem, int N = Problem::Stages>
+template <class Problem, int N = Problem::Stages, Jacobians Storage = Jacobians::Stored>
 class Solver {
 public:
     using Traits = ProblemTraits<Problem>;
@@ -62,7 +66,7 @@ public:
     using MatB = typename Traits::MatB;
     using Gain = typename Traits::Gain;
     using MatU = typename Traits::MatU;
-    using Workspace = NMPC::Workspace<Problem, N>;
+    using Workspace = NMPC::Workspace<Problem, N, Storage>;
     using Policy = NMPC::Policy<Problem, N>;
 
     enum { NX = Traits::NX, NU = Traits::NU, NR = Traits::NR, NT = Traits::NT, Stages = N };
@@ -92,15 +96,19 @@ public:
 
     The stage QPs' steps, which start the next solve's stage QPs, stay with their stage numbers
     and are not shifted. That is what the review prototype did, and the reference flights were
-    flown with it. The stage QP stops on an absolute test of its gradient, so where a stage's
-    Hessian is small its result depends on where it starts, by up to 2e-4 N in a rotor command
-    on the multirotor; shifting the steps moved the plans by that much from the prototype's.
+    flown with it. The prototype's stage QP stopped on an absolute test of its gradient, so where
+    a stage's Hessian was small its result depended on where it started, by up to 2e-4 N in a
+    rotor command on the multirotor. The stop is now relative (Options::box_tolerance), which
+    leaves only rounding to depend on the start.
     */
     void advance(const Problem& problem, int stages) {
         stages = std::min(std::max(stages, 0), N);
         if (stages == 0) {
             return;
         }
+        /* The last stage's command and gain, kept before the shift, which overwrites them when every stage moves. */
+        const Control last_u = ws.plan.u[N - 1];
+        const Gain last_K = ws.plan.K[N - 1];
         for (int k = 0; k + stages < N; k++) {
             ws.plan.x[k] = ws.plan.x[k + stages];
             ws.plan.u[k] = ws.plan.u[k + stages];
@@ -113,10 +121,8 @@ public:
                 ws.plan.K[k].setZero();
             } else {
                 (void)problem;
-                if (k > 0) {
-                    ws.plan.u[k] = ws.plan.u[k - 1];
-                    ws.plan.K[k] = ws.plan.K[k - 1];
-                }
+                ws.plan.u[k] = last_u;
+                ws.plan.K[k] = last_K;
             }
         }
     }
@@ -172,8 +178,13 @@ public:
                     continue;
                 }
                 result.predicted_decrease = -(dV1 + dV2);
-                if (options.precision_floor > T(0) &&
-                        result.predicted_decrease < options.precision_floor * std::abs(cost)) {
+                /*
+                A predicted decrease of zero (every stage's step is zero, as at an exact optimum of zero cost)
+                is convergence whatever the floor: no step can be accepted, and retries and a line search
+                would only spend time to report NoProgress.
+                */
+                if (!(result.predicted_decrease > T(0)) || (options.precision_floor > T(0) &&
+                        result.predicted_decrease < options.precision_floor * std::abs(cost))) {
                     converged = true;
                     break;
                 }
@@ -240,15 +251,22 @@ public:
         return cost + detail::terminal_cost(problem, ws.trial_x[N]);
     }
 
-    /* The step's Jacobians at every stage of the plan, normalised. */
+    /* The step's Jacobians at every stage of the plan, normalised. With Jacobians::PerStage the backward pass makes them instead. */
     void linearise(const Problem& problem) {
-        for (int k = 0; k < N; k++) {
-            MatA& A = ws.A[k];
-            MatB& B = ws.B[k];
-            problem.step_jacobian(k, ws.plan.x[k], ws.plan.u[k], A, B);
-            A = A.cwiseProduct(scale_A);
-            B = B.cwiseProduct(scale_B);
+        if constexpr (Storage == Jacobians::Stored) {
+            for (int k = 0; k < N; k++) {
+                linearise_stage(problem, k, ws.jacobians.A[k], ws.jacobians.B[k]);
+            }
+        } else {
+            (void)problem;
         }
+    }
+
+    /* The step's Jacobians at stage k of the plan, normalised. */
+    void linearise_stage(const Problem& problem, int k, MatA& A, MatB& B) const {
+        problem.step_jacobian(k, ws.plan.x[k], ws.plan.u[k], A, B);
+        A = A.cwiseProduct(scale_A);
+        B = B.cwiseProduct(scale_B);
     }
 
     /*
@@ -261,8 +279,12 @@ public:
         MatA Vxx;
         terminal_expansion(problem, Vx, Vxx);
         for (int k = N - 1; k >= 0; k--) {
-            const MatA& A = ws.A[k];
-            const MatB& B = ws.B[k];
+            Linearisation here;
+            if constexpr (Storage == Jacobians::PerStage) {
+                linearise_stage(problem, k, here.A, here.B);
+            }
+            const MatA& A = stage_A(here, k);
+            const MatB& B = stage_B(here, k);
             Tangent Qx;
             Control Qu;
             MatA Qxx;
@@ -310,7 +332,8 @@ public:
             Control d = ws.step[k];
             Eigen::Array<bool, NU, 1> held;
             Eigen::LLT<MatU> factor;
-            const int passes = solve_box_qp<T, NU>(H, Qu, lo, hi, d, held, factor, options.max_box_iterations);
+            const int passes = solve_box_qp<T, NU>(H, Qu, lo, hi, d, held, factor, options.max_box_iterations,
+                options.box_tolerance);
             if (passes < 0) {
                 return false;
             }
@@ -322,7 +345,39 @@ public:
                     rhs.row(i).setZero();
                 }
             }
-            Gain K = factor.solve(rhs);
+            /*
+            The gain, column by column, by forward and back substitution with the stage QP's factor. Eigen 3.2.8's
+            solve with a matrix right-hand side goes through its blocked kernels, which at these sizes cost a
+            Cortex-M7 about 5 % more of the backward pass and 0.7 kB more stack; its own vector solve is slower
+            still. The answer is the same to rounding. A held command's row of the factor is the identity and
+            its right-hand side is zero, so its gain is zero.
+            */
+            Gain K;
+            {
+                const MatU& L = factor.matrixLLT();
+                Control inverse_diagonal;
+                for (int i = 0; i < NU; i++) {
+                    inverse_diagonal(i) = T(1) / L(i, i);
+                }
+                for (int j = 0; j < NX; j++) {
+                    Control c(rhs.col(j));
+                    for (int i = 0; i < NU; i++) {
+                        T v = c(i);
+                        for (int m = 0; m < i; m++) {
+                            v -= L(i, m) * c(m);
+                        }
+                        c(i) = v * inverse_diagonal(i);
+                    }
+                    for (int i = NU - 1; i >= 0; i--) {
+                        T v = c(i);
+                        for (int m = i + 1; m < NU; m++) {
+                            v -= L(m, i) * c(m);
+                        }
+                        c(i) = v * inverse_diagonal(i);
+                    }
+                    K.col(j) = c;
+                }
+            }
             for (int i = 0; i < NU; i++) {
                 if (held(i)) {
                     K.row(i).setZero();
@@ -414,6 +469,33 @@ private:
             for (int i = 0; i < NU; i++) {
                 scale_uu(i, j) = Du(i) * Du(j);
             }
+        }
+    }
+
+    /* A stage's Jacobians, made in the backward pass, with Jacobians::PerStage; nothing with Jacobians::Stored. */
+    struct Empty {};
+    struct Made {
+        MatA A;
+        MatB B;
+    };
+    using Linearisation = typename std::conditional<Storage == Jacobians::PerStage, Made, Empty>::type;
+
+    const MatA& stage_A(const Linearisation& here, int k) const {
+        if constexpr (Storage == Jacobians::PerStage) {
+            (void)k;
+            return here.A;
+        } else {
+            (void)here;
+            return ws.jacobians.A[k];
+        }
+    }
+    const MatB& stage_B(const Linearisation& here, int k) const {
+        if constexpr (Storage == Jacobians::PerStage) {
+            (void)k;
+            return here.B;
+        } else {
+            (void)here;
+            return ws.jacobians.B[k];
         }
     }
 
