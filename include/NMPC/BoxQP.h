@@ -6,10 +6,11 @@ the repository.
 #ifndef NMPC_BOXQP_H
 #define NMPC_BOXQP_H
 
-#include "NMPC/Types.h"
 #include <Eigen/Cholesky>
 #include <cmath>
 #include <limits>
+
+#include "NMPC/Types.h"
 
 namespace NMPC {
 
@@ -64,163 +65,175 @@ objective.
 */
 template <class T, int M>
 int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
-        const Vector<T, M>& lower, const Vector<T, M>& upper,
-        Vector<T, M>& d, Eigen::Array<bool, M, 1>& held,
-        Eigen::LLT<Matrix<T, M, M>>& factor, int max_passes,
-        T tolerance = T(16) * std::numeric_limits<T>::epsilon(), bool* finished = nullptr) {
-    if (finished) {
-        *finished = false;
-    }
-    d = d.cwiseMax(lower).cwiseMin(upper);
-    Vector<T, M> gradient = g + H * d;
-    /* The size of the terms that make each gradient, against which it is compared. */
-    Vector<T, M> size;
-    auto measure = [&]() {
-        for (int i = 0; i < M; i++) {
-            T s = std::abs(g(i));
-            for (int j = 0; j < M; j++) {
-                s += std::abs(H(i, j) * d(j));
-            }
-            size(i) = tolerance * s;
-        }
-    };
-    measure();
+                 const Vector<T, M>& lower, const Vector<T, M>& upper,
+                 Vector<T, M>& d, Eigen::Array<bool, M, 1>& held,
+                 Eigen::LLT<Matrix<T, M, M>>& factor, int max_passes,
+                 T tolerance = T(16) * std::numeric_limits<T>::epsilon(),
+                 bool* finished = nullptr) {
+  if (finished) {
+    *finished = false;
+  }
+  d = d.cwiseMax(lower).cwiseMin(upper);
+  Vector<T, M> gradient = g + H * d;
+  /* The size of the terms that make each gradient, against which it is
+     compared. */
+  Vector<T, M> size;
+  auto measure = [&]() {
     for (int i = 0; i < M; i++) {
-        held(i) = !(upper(i) > lower(i)) ||
-            (d(i) <= lower(i) && gradient(i) > size(i)) || (d(i) >= upper(i) && gradient(i) < -size(i));
+      T s = std::abs(g(i));
+      for (int j = 0; j < M; j++) {
+        s += std::abs(H(i, j) * d(j));
+      }
+      size(i) = tolerance * s;
+    }
+  };
+  measure();
+  for (int i = 0; i < M; i++) {
+    held(i) = !(upper(i) > lower(i)) ||
+              (d(i) <= lower(i) && gradient(i) > size(i)) ||
+              (d(i) >= upper(i) && gradient(i) < -size(i));
+  }
+
+  Eigen::Array<bool, M, 1> factored_for = held;
+  bool factored = false;
+  /* The factorisation with the rows and columns of the held variables made the
+     identity. */
+  auto refactor = [&]() {
+    Matrix<T, M, M> masked = H;
+    for (int i = 0; i < M; i++) {
+      if (held(i)) {
+        masked.row(i).setZero();
+        masked.col(i).setZero();
+        masked(i, i) = T(1);
+      }
+    }
+    factor.compute(masked);
+    factored_for = held;
+    factored = true;
+    return factor.info() == Eigen::Success;
+  };
+
+  bool at_minimiser = false;
+  for (int pass = 0; pass < max_passes; pass++) {
+    if ((!factored || (held != factored_for).any()) && !refactor()) {
+      return -1;
+    }
+    if (!at_minimiser) {
+      at_minimiser = true;
+      for (int i = 0; i < M; i++) {
+        if (!held(i) && std::abs(gradient(i)) > size(i)) {
+          at_minimiser = false;
+          break;
+        }
+      }
+    }
+    if (at_minimiser || held.all()) {
+      /* At the minimiser over the free variables: let go of the held one pulled
+         hardest inward. */
+      int release = -1;
+      T strongest = T(0);
+      for (int i = 0; i < M; i++) {
+        if (!held(i) || !(upper(i) > lower(i))) {
+          continue;
+        }
+        const T inward = d(i) <= lower(i) ? -gradient(i) : gradient(i);
+        if (inward > size(i) && inward > strongest) {
+          strongest = inward;
+          release = i;
+        }
+      }
+      if (release < 0) {
+        if (finished) {
+          *finished = true;
+        }
+        return pass + 1;
+      }
+      held(release) = false;
+      at_minimiser = false;
+      continue;
     }
 
-    Eigen::Array<bool, M, 1> factored_for = held;
-    bool factored = false;
-    /* The factorisation with the rows and columns of the held variables made the identity. */
-    auto refactor = [&]() {
-        Matrix<T, M, M> masked = H;
-        for (int i = 0; i < M; i++) {
-            if (held(i)) {
-                masked.row(i).setZero();
-                masked.col(i).setZero();
-                masked(i, i) = T(1);
-            }
-        }
-        factor.compute(masked);
-        factored_for = held;
-        factored = true;
-        return factor.info() == Eigen::Success;
-    };
-
-    bool at_minimiser = false;
-    for (int pass = 0; pass < max_passes; pass++) {
-        if ((!factored || (held != factored_for).any()) && !refactor()) {
-            return -1;
-        }
-        if (!at_minimiser) {
-            at_minimiser = true;
-            for (int i = 0; i < M; i++) {
-                if (!held(i) && std::abs(gradient(i)) > size(i)) {
-                    at_minimiser = false;
-                    break;
-                }
-            }
-        }
-        if (at_minimiser || held.all()) {
-            /* At the minimiser over the free variables: let go of the held one pulled hardest inward. */
-            int release = -1;
-            T strongest = T(0);
-            for (int i = 0; i < M; i++) {
-                if (!held(i) || !(upper(i) > lower(i))) {
-                    continue;
-                }
-                const T inward = d(i) <= lower(i) ? -gradient(i) : gradient(i);
-                if (inward > size(i) && inward > strongest) {
-                    strongest = inward;
-                    release = i;
-                }
-            }
-            if (release < 0) {
-                if (finished) {
-                    *finished = true;
-                }
-                return pass + 1;
-            }
-            held(release) = false;
-            at_minimiser = false;
-            continue;
-        }
-
-        /* Newton step on the free variables with the held ones where they are, as far as the first bound. */
-        Vector<T, M> fixed = d;
-        for (int i = 0; i < M; i++) {
-            if (!held(i)) {
-                fixed(i) = T(0);
-            }
-        }
-        Vector<T, M> rhs = -(g + H * fixed);
-        for (int i = 0; i < M; i++) {
-            if (held(i)) {
-                rhs(i) = T(0);
-            }
-        }
-        const Vector<T, M> target = factor.solve(rhs);
-        Vector<T, M> search = target - d;
-        for (int i = 0; i < M; i++) {
-            if (held(i)) {
-                search(i) = T(0);
-            }
-        }
-        /*
-        Which bound is met first is decided on the target itself, not on d + (target - d), which can lose it.
-        A target past a bound always limits the step, even when the fraction of the step to that bound
-        rounds to one or more (from -1e8 to a bound of 0 with a target of 1 it is 1 in single precision):
-        the step then stops on the bound and holds it rather than taking the target outside the bounds.
-        */
-        T nearest = T(0);
-        int limit = -1;
-        for (int i = 0; i < M; i++) {
-            if (held(i)) {
-                continue;
-            }
-            const bool above = target(i) > upper(i);
-            if (above || target(i) < lower(i)) {
-                const T reach = ((above ? upper(i) : lower(i)) - d(i)) / search(i);
-                if (limit < 0 || reach < nearest) {
-                    nearest = reach;
-                    limit = i;
-                }
-            }
-        }
-        if (limit < 0) {
-            /*
-            The whole Newton step: the free variables take the target's values themselves, which is the
-            minimiser over them to rounding. Adding the step to d instead could lose the target to
-            cancellation when d is far from it (from 1e8 to 1 in single precision gives 0).
-            */
-            for (int i = 0; i < M; i++) {
-                if (!held(i)) {
-                    d(i) = target(i);
-                }
-            }
-            at_minimiser = true;
-        } else {
-            if (nearest < T(1)) {
-                d = (d + nearest * search).cwiseMax(lower).cwiseMin(upper);
-            } else {
-                /* The bound is reached at the whole step to rounding: take the target, as above, within the bounds. */
-                for (int i = 0; i < M; i++) {
-                    if (!held(i)) {
-                        d(i) = target(i) > upper(i) ? upper(i) : (target(i) < lower(i) ? lower(i) : target(i));
-                    }
-                }
-            }
-            d(limit) = target(limit) > upper(limit) ? upper(limit) : lower(limit);
-            held(limit) = true;
-            at_minimiser = false;
-        }
-        gradient = g + H * d;
-        measure();
+    /* Newton step on the free variables with the held ones where they are, as
+       far as the first bound. */
+    Vector<T, M> fixed = d;
+    for (int i = 0; i < M; i++) {
+      if (!held(i)) {
+        fixed(i) = T(0);
+      }
     }
-    return refactor() ? max_passes : -1;
+    Vector<T, M> rhs = -(g + H * fixed);
+    for (int i = 0; i < M; i++) {
+      if (held(i)) {
+        rhs(i) = T(0);
+      }
+    }
+    const Vector<T, M> target = factor.solve(rhs);
+    Vector<T, M> search = target - d;
+    for (int i = 0; i < M; i++) {
+      if (held(i)) {
+        search(i) = T(0);
+      }
+    }
+    /*
+    Which bound is met first is decided on the target itself, not on d + (target
+    - d), which can lose it. A target past a bound always limits the step, even
+    when the fraction of the step to that bound rounds to one or more (from -1e8
+    to a bound of 0 with a target of 1 it is 1 in single precision): the step
+    then stops on the bound and holds it rather than taking the target outside
+    the bounds.
+    */
+    T nearest = T(0);
+    int limit = -1;
+    for (int i = 0; i < M; i++) {
+      if (held(i)) {
+        continue;
+      }
+      const bool above = target(i) > upper(i);
+      if (above || target(i) < lower(i)) {
+        const T reach = ((above ? upper(i) : lower(i)) - d(i)) / search(i);
+        if (limit < 0 || reach < nearest) {
+          nearest = reach;
+          limit = i;
+        }
+      }
+    }
+    if (limit < 0) {
+      /*
+      The whole Newton step: the free variables take the target's values
+      themselves, which is the minimiser over them to rounding. Adding the step
+      to d instead could lose the target to cancellation when d is far from it
+      (from 1e8 to 1 in single precision gives 0).
+      */
+      for (int i = 0; i < M; i++) {
+        if (!held(i)) {
+          d(i) = target(i);
+        }
+      }
+      at_minimiser = true;
+    } else {
+      if (nearest < T(1)) {
+        d = (d + nearest * search).cwiseMax(lower).cwiseMin(upper);
+      } else {
+        /* The bound is reached at the whole step to rounding: take the target,
+           as above, within the bounds. */
+        for (int i = 0; i < M; i++) {
+          if (!held(i)) {
+            d(i) = target(i) > upper(i)
+                       ? upper(i)
+                       : (target(i) < lower(i) ? lower(i) : target(i));
+          }
+        }
+      }
+      d(limit) = target(limit) > upper(limit) ? upper(limit) : lower(limit);
+      held(limit) = true;
+      at_minimiser = false;
+    }
+    gradient = g + H * d;
+    measure();
+  }
+  return refactor() ? max_passes : -1;
 }
 
-}
+}  // namespace NMPC
 
 #endif

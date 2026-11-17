@@ -18,8 +18,11 @@ else()
             -DCMAKE_BUILD_TYPE:STRING=Release
             -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.10
             -DBENCHMARK_ENABLE_TESTING:BOOL=OFF
-            # This old dependency enables -Werror in Release independently of NMPC.
+            # This old dependency enables -Werror in Release and -pedantic-errors
+            # independently of NMPC; Clang 22 reports its __COUNTER__ as an extension.
+            # Keep strict warnings on our benchmark, not the vendored library (as UKF does).
             -DHAVE_CXX_FLAG_WERROR:BOOL=OFF
+            -DHAVE_CXX_FLAG_PEDANTIC_ERRORS:BOOL=OFF
         INSTALL_COMMAND ""
         LOG_DOWNLOAD ON
         LOG_CONFIGURE ON
