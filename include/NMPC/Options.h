@@ -56,6 +56,17 @@ struct Options {
     default is a few units of the last place of the scalar type. Zero turns the test off.
     */
     T precision_floor = T(8) * std::numeric_limits<T>::epsilon();
+
+    /*
+    An optional deadline, for a solve that must publish within its period whatever the work it meets. When
+    out_of_time is set, it is asked (with time_context) before each backward pass and each line-search trial;
+    when it answers true the solve stops there with what it has: the last accepted step's plan, or, if no step
+    was accepted, the previous plan rolled out from the new state (NoProgress). Result::out_of_time says it
+    happened. Null, the default, leaves the solve to its work budgets alone, so a solve does the same arithmetic
+    wherever it runs.
+    */
+    bool (*out_of_time)(void* context) = nullptr;
+    void* time_context = nullptr;
 };
 
 }

@@ -243,6 +243,76 @@ TYPED_TEST(SolverTest, StopsAtThePrecisionFloor) {
     EXPECT_EQ(again.accepted_steps, 0);
 }
 
+/* A deadline that counts the times it is asked, as a work clock, and is out of time from the given count on. */
+struct Countdown {
+    int asked = 0, allowed = 0;
+    static bool check(void* c) {
+        Countdown& d = *static_cast<Countdown*>(c);
+        return ++d.asked > d.allowed;
+    }
+};
+
+TYPED_TEST(SolverTest, OutOfTimeKeepsTheLastAcceptedStep) {
+    typedef TypeParam T;
+    typedef Stop_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    NMPC::Options<T> options;
+    options.precision_floor = T(0);
+    const typename Problem::State x0(T(0.5), T(0));
+    Countdown d;
+    d.allowed = 1000;
+    options.out_of_time = &Countdown::check;
+    options.time_context = &d;
+
+    /* One iteration with time to spare: the work it asks for, and the step it takes. */
+    solver.reset(x0, Problem::Control::Zero());
+    const NMPC::Result<T> one = solver.solve(problem, x0, options);
+    EXPECT_FALSE(one.out_of_time);
+    ASSERT_EQ(one.accepted_steps, 1);
+    const int work = d.asked;
+
+    /* Ten iterations with only that much time: the first iteration's step, and its plan stands. */
+    options.max_iterations = 10;
+    d.asked = 0;
+    d.allowed = work;
+    solver.reset(x0, Problem::Control::Zero());
+    const NMPC::Result<T> cut = solver.solve(problem, x0, options);
+    EXPECT_TRUE(cut.out_of_time);
+    EXPECT_TRUE(cut.usable());
+    EXPECT_EQ(cut.status, NMPC::Status::IterationLimit);
+    EXPECT_EQ(cut.iterations, 1);
+    EXPECT_EQ(cut.accepted_steps, 1);
+    EXPECT_EQ(cut.cost_after, one.cost_after);
+    EXPECT_LT(cut.cost_after, cut.cost_before);
+}
+
+TYPED_TEST(SolverTest, OutOfTimeBeforeAnyStepLeavesThePlanRolledOut) {
+    typedef TypeParam T;
+    typedef Stop_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    NMPC::Options<T> options;
+    Countdown d;
+    d.allowed = 0;
+    options.out_of_time = &Countdown::check;
+    options.time_context = &d;
+    const typename Problem::State x0(T(0.5), T(0));
+    solver.reset(x0, Problem::Control::Zero());
+    const NMPC::Result<T> result = solver.solve(problem, x0, options);
+    EXPECT_TRUE(result.out_of_time);
+    EXPECT_TRUE(result.usable());
+    EXPECT_EQ(result.status, NMPC::Status::NoProgress);
+    EXPECT_EQ(result.backward_passes, 0);
+    EXPECT_EQ(result.accepted_steps, 0);
+    EXPECT_EQ(result.cost_after, result.cost_before);
+    EXPECT_EQ(d.asked, 1);
+}
+
 TYPED_TEST(SolverTest, RegularisationStartsAfreshEverySolve) {
     typedef TypeParam T;
     typedef Stop_Problem<T> Problem;

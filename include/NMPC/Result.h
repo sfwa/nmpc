@@ -56,6 +56,9 @@ struct Result {
     /* Stages of the returned plan with at least one command on a bound. */
     int stages_on_bound = 0;
 
+    /* Options::out_of_time stopped the solve before its work budgets were spent. */
+    bool out_of_time = false;
+
     bool usable() const { return status != Status::NumericalFailure; }
 };
 

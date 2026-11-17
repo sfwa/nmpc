@@ -156,13 +156,27 @@ public:
         result.cost_after = cost;
         result.stages_on_bound = bound_stages;
 
+        /* Options::out_of_time, asked before each backward pass and each trial; once it answers true, it stays so. */
+        auto out_of_time = [&]() {
+            if (!result.out_of_time && options.out_of_time && options.out_of_time(options.time_context)) {
+                result.out_of_time = true;
+            }
+            return result.out_of_time;
+        };
+
         for (int iteration = 0; iteration < options.max_iterations; iteration++) {
+            if (iteration > 0 && out_of_time()) {
+                break;
+            }
             result.iterations = iteration + 1;
             linearise(problem);
 
             bool accepted = false;
             bool converged = false;
             for (int retry = 0; retry <= options.max_regularisation_retries && !accepted; retry++) {
+                if (out_of_time()) {
+                    break;
+                }
                 T dV1 = T(0);
                 T dV2 = T(0);
                 result.backward_passes++;
@@ -179,6 +193,9 @@ public:
                 }
                 T alpha = T(1);
                 for (int trial = 0; trial < options.max_line_search; trial++, alpha *= T(0.5)) {
+                    if (out_of_time()) {
+                        break;
+                    }
                     result.line_search_trials++;
                     const T expected = -(alpha * dV1 + alpha * alpha * dV2);
                     const T trial_cost = forward(problem, x0, alpha, bound_stages);
@@ -204,7 +221,8 @@ public:
                 break;
             }
             if (!accepted) {
-                result.status = Status::NoProgress;
+                /* Out of time with an earlier iteration's step accepted: that plan stands, as at the iteration limit. */
+                result.status = result.out_of_time && result.accepted_steps > 0 ? Status::IterationLimit : Status::NoProgress;
                 break;
             }
             result.accepted_steps++;
