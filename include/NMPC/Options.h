@@ -35,6 +35,19 @@ struct Options {
      its step is refused. */
   int max_regularisation_retries = 1;
 
+  /*
+  Stop the retries once one predicts the decrease of the pass whose step the
+  line search refused, to within 1 %: the regularisation is still too small to
+  change the step, and its line search would refuse the same steps again. Where
+  a step's decrease is below what the rollout's rounding resolves, as in single
+  precision on a long plan near its optimum, every retry is of this kind, and
+  the option turns a solve that spends all of them into one of two backward
+  passes. Off by default, so that the retries climb the whole regularisation
+  ladder: with it on, a step that only a much larger regularisation makes
+  acceptable is given up.
+  */
+  bool stop_unchanged_retries = false;
+
   /* Passes of the active-set method in each stage's box QP. */
   int max_box_iterations = 32;
 

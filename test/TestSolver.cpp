@@ -336,6 +336,63 @@ TYPED_TEST(SolverTest, OutOfTimeBeforeAnyStepLeavesThePlanRolledOut) {
   EXPECT_EQ(d.asked, 1);
 }
 
+/*
+Every step refused (a step must achieve a million times its predicted
+decrease): without Options::stop_unchanged_retries the solve spends every
+retry. With it, the first retry predicts the same decrease, as a
+regularisation of 1e-5 does not change the step, and the solve stops there
+with the plan rolled out.
+*/
+TYPED_TEST(SolverTest, UnchangedRetriesStop) {
+  typedef TypeParam T;
+  typedef Stop_Problem<T> Problem;
+  typedef NMPC::Solver<Problem> Solver;
+  static typename Solver::Workspace workspace;
+  Solver solver(workspace);
+  Problem problem;
+  NMPC::Options<T> options;
+  options.precision_floor = T(0);
+  options.max_regularisation_retries = 4;
+  options.accept_ratio = T(1e6);
+  const typename Problem::State x0(T(0.5), T(0));
+
+  solver.reset(x0, Problem::Control::Zero());
+  const NMPC::Result<T> all = solver.solve(problem, x0, options);
+  EXPECT_EQ(all.status, NMPC::Status::NoProgress);
+  EXPECT_EQ(all.backward_passes, 5);
+  EXPECT_EQ(all.line_search_trials, 25);
+
+  options.stop_unchanged_retries = true;
+  solver.reset(x0, Problem::Control::Zero());
+  const NMPC::Result<T> two = solver.solve(problem, x0, options);
+  EXPECT_EQ(two.status, NMPC::Status::NoProgress);
+  EXPECT_EQ(two.backward_passes, 2);
+  EXPECT_EQ(two.line_search_trials, 5);
+  EXPECT_EQ(two.cost_after, two.cost_before);
+  EXPECT_EQ(two.cost_before, all.cost_before);
+}
+
+/* A retry whose larger regularisation changes the step is still tried. */
+TYPED_TEST(SolverTest, RetriesThatChangeTheStepGoOn) {
+  typedef TypeParam T;
+  typedef Stop_Problem<T> Problem;
+  typedef NMPC::Solver<Problem> Solver;
+  static typename Solver::Workspace workspace;
+  Solver solver(workspace);
+  Problem problem;
+  NMPC::Options<T> options;
+  options.precision_floor = T(0);
+  options.max_regularisation_retries = 4;
+  options.accept_ratio = T(1e6);
+  options.regularisation_initial = T(1);
+  options.stop_unchanged_retries = true;
+  const typename Problem::State x0(T(0.5), T(0));
+  solver.reset(x0, Problem::Control::Zero());
+  const NMPC::Result<T> result = solver.solve(problem, x0, options);
+  EXPECT_EQ(result.status, NMPC::Status::NoProgress);
+  EXPECT_EQ(result.backward_passes, 5);
+}
+
 TYPED_TEST(SolverTest, RegularisationStartsAfreshEverySolve) {
   typedef TypeParam T;
   typedef Stop_Problem<T> Problem;

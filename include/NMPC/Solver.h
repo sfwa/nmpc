@@ -201,6 +201,8 @@ class Solver {
 
       bool accepted = false;
       bool converged = false;
+      /* The predicted decrease of the last pass whose step was refused. */
+      T refused = std::numeric_limits<T>::quiet_NaN();
       for (int retry = 0;
            retry <= options.max_regularisation_retries && !accepted; retry++) {
         if (out_of_time()) {
@@ -238,6 +240,11 @@ class Solver {
                          options.regularisation_max);
           }
           continue;
+        }
+        /* Options::stop_unchanged_retries: the same step would be refused. */
+        if (options.stop_unchanged_retries && std::isfinite(refused) &&
+            std::abs(predicted - refused) <= T(0.01) * refused) {
+          break;
         }
         commit_gains();
         /*
@@ -282,6 +289,7 @@ class Solver {
               std::max(regularisation / options.regularisation_factor,
                        options.regularisation_min);
         } else {
+          refused = predicted;
           regularisation =
               std::min(regularisation * options.regularisation_factor,
                        options.regularisation_max);
