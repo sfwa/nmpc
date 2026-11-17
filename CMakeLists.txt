@@ -178,11 +178,18 @@ if(NMPC_INSTALL)
     if(NOT CMAKE_VERSION VERSION_LESS 3.14)
         list(APPEND nmpc_version_file_options ARCH_INDEPENDENT)
     endif()
-    write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/nmpcConfigVersion.cmake
+    write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/nmpcBasicConfigVersion.cmake
         VERSION ${PROJECT_VERSION} ${nmpc_version_file_options})
+    # A pre-release does not pass for its release (cmake/ConfigVersion.cmake.in).
+    set(package_name nmpc)
+    set(package_version ${PROJECT_VERSION})
+    set(package_prerelease "${nmpc_version_prerelease}")
+    configure_file(cmake/ConfigVersion.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/nmpcConfigVersion.cmake @ONLY)
     install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/nmpcConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/nmpcConfigVersion.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/nmpcBasicConfigVersion.cmake
         DESTINATION ${nmpc_cmake_dir})
 endif()
 

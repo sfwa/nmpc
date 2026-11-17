@@ -277,6 +277,11 @@ the package accepts any later release with the same major version:
 find_package(nmpc 2.0 REQUIRED CONFIG)
 ```
 
+As in SemVer, a pre-release comes before its release: `2.0.0-rc.1` does not
+meet a request for `2.0` or `2.0.0`, even with `EXACT`. To try a release
+candidate, or master, find the package without a version and check
+`nmpc_VERSION_PRERELEASE`.
+
 In code, `NMPC_VERSION` is `MAJOR * 10000 + MINOR * 100 + PATCH`, and
 `NMPC_VERSION_STRING` includes any pre-release:
 

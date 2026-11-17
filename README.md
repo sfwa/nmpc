@@ -242,7 +242,9 @@ target_link_libraries(controller PRIVATE nmpc::nmpc)
 The package gives the same `nmpc::nmpc` target, carrying the unrolling limit
 the installed copy was configured with, and sets `nmpc_VERSION` and
 `nmpc_VERSION_PRERELEASE`. It accepts a request for any earlier version with
-the same major version. With the downloaded Eigen, its headers (patched, for
+the same major version. A pre-release, such as master's `2.0.0-dev` or
+`2.0.0-rc.1`, comes before `2.0.0`, so it does not meet a request for `2.0`:
+find it with `find_package(nmpc REQUIRED CONFIG)`. With the downloaded Eigen, its headers (patched, for
 3.2.8) are installed under `include/nmpc/eigen3`; with
 `NMPC_USE_SYSTEM_EIGEN`, the package finds Eigen again when it is loaded.
 Install rules are generated when NMPC is built on its own, or with

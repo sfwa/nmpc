@@ -31,7 +31,8 @@ interface with it.
   *Experimental in 2.0: see [RELEASING.md](RELEASING.md#experimental-interfaces).*
 - `NMPC/Version.h`, with `NMPC_VERSION_MAJOR`, `_MINOR`, `_PATCH`,
   `_PRERELEASE`, `_STRING` and `NMPC_VERSION`. The CMake package carries the
-  same version, and `find_package(nmpc 2.0)` accepts any later 2.x.
+  same version, and `find_package(nmpc 2.0)` accepts any later 2.x
+  release (a pre-release such as `2.0.0-rc.1` comes before `2.0.0`).
 - Install rules and a CMake package: `find_package(nmpc)` gives `nmpc::nmpc`.
 - CMake options matching UKF's: `NMPC_EIGEN_VERSION` and `NMPC_EIGEN_URL` to
   download another Eigen (3.3 or newer, unpatched), `NMPC_USE_SYSTEM_EIGEN`
