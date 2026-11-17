@@ -25,6 +25,24 @@ may live on a manifold, such as one with a quaternion.
 Every type is a template on its scalar `T`, so one program can hold solvers in
 `float` and in `double`. NMPC never defines `real_t`, which belongs to UKF.
 
+## Releases
+
+[![Latest release](https://img.shields.io/github/v/release/sfwa/nmpc?include_prereleases&sort=semver)](https://github.com/sfwa/nmpc/releases)
+
+NMPC uses [Semantic Versioning](https://semver.org), with the same release
+process as UKF. Its version numbers start at 2, since the earlier
+implementation (tag `legacy`) counts as version 1. The first release will be
+`2.0.0`, after a release candidate `2.0.0-rc.1`; until then master is the
+only version. Use the [latest release](https://github.com/sfwa/nmpc/releases/latest)
+and [pin it by its tag](RELEASING.md#using-a-release).
+
+- [RELEASING.md](RELEASING.md): the compatibility contract (which interfaces,
+  conventions, build options and configurations a release supports, and
+  which are experimental), what patch, minor and major releases may change,
+  how numerical changes are reported, and how releases are made.
+- [CHANGELOG.md](CHANGELOG.md): what has changed in each release.
+- [CONTRIBUTING.md](CONTRIBUTING.md): what a pull request needs.
+
 ## Usage
 
 ### A problem
@@ -129,7 +147,10 @@ its next stage.
 
 `Options` sets the work a solve may do, in units of work rather than seconds:
 iterations, line-search candidates, regularisation retries and stage QP
-passes. `Result` says whether the plan is usable, why the solve ended, the
+passes, and the tolerances it works to. The stage QP's stop is relative to
+the size of the terms in each gradient (`box_tolerance`), so a problem's
+answer does not depend on how its cost is scaled. A command whose bounds meet
+is held and gets no gain. `Result` says whether the plan is usable, why the solve ended, the
 work done, the costs before and after, the predicted decrease, and how many
 stages have a command on a bound.
 
@@ -150,6 +171,9 @@ that the inner loop switches to on a tick boundary; `origin`,
 
 ### The inner loop
 
+The inner-loop and reference headers are experimental in 2.0: they may change
+in a minor release ([RELEASING.md](RELEASING.md#experimental-interfaces)).
+
 The inner loop is the sum of three terms: the plan's command at this tick,
 an error law on the distance from the plan (the stored gains above), and a
 correction from the measured acceleration. [`InnerLoop.h`](include/NMPC/InnerLoop.h)
@@ -163,16 +187,17 @@ holds the pieces that do not depend on the vehicle:
   * `AttitudeCascade<T>`: an attitude and rate cascade, as the error law of a
     rigid body in place of the stored gains: the attitude error to a rate
     command, and a PID on the rate to a moment about each body axis, whose
-    integral stops while the command is clipped. The defaults are the review
-    prototype's for the F450.
+    integral stops while the command is clipped. The planned rate is turned
+    from the plan's body axes into the vehicle's before it is compared with the
+    measured rate. The defaults are the review prototype's for the F450.
   * `Butterworth2`, `clamp` and `on_bound`.
 
 What the correction holds is taken out of the solver's bounds and of the
 actuator state the solver sees, so that the plan is made within what is left.
 
 [`Reference.h`](include/NMPC/Reference.h) holds a reference as a table of rows
-at a fixed spacing (`PathTable`, which may hold a window of a longer table and
-counts lookups outside it), and the reference's `Clock`, a sum compensated for
+at a fixed spacing (`PathTable`, which may hold a window of a longer table;
+a lookup outside the window holds the window's nearest end and is counted), and the reference's `Clock`, a sum compensated for
 rounding: a plain single-precision sum at 1 kHz drifts 2 to 5 ms in 20 to 30 s.
 What the columns mean is the vehicle's, so the vehicle's path type turns the
 two rows of a lookup into a state and a command.
@@ -191,7 +216,8 @@ EXPECT_TRUE(check.passed) << "worst " << check.error << " at " << check.row << "
 
 ## Building
 
-NMPC is header-only. Add it as a subdirectory and link `nmpc::nmpc`:
+NMPC is header-only. Add it as a subdirectory, after UKF if the program uses
+both, and link `nmpc::nmpc`:
 
 ```cmake
 add_subdirectory(ukf)
@@ -199,18 +225,64 @@ add_subdirectory(nmpc)
 target_link_libraries(controller PRIVATE nmpc::nmpc ukf::single)
 ```
 
-NMPC and UKF must see one Eigen. By default NMPC uses the patched Eigen 3.2.8
-that UKF uses: when UKF is configured first, NMPC takes UKF's copy, and
-otherwise it fetches its own. Set `NMPC_USE_SYSTEM_EIGEN` (and
-`UKF_USE_SYSTEM_EIGEN`) to use an installed Eigen 3.4 instead. Both are
-tested.
+To use an installed copy instead, build and install NMPC, then find its
+package:
 
-Options, all of which default to on only when NMPC is the top-level project:
+```sh
+cmake -S path/to/nmpc -B build-nmpc -DCMAKE_INSTALL_PREFIX=/opt/nmpc
+cmake --build build-nmpc
+cmake --install build-nmpc
+```
 
-  * `NMPC_BUILD_TESTS`: the unit tests (`unittest`, `unittest_no_heap`, and
-    `check` to run them).
-  * `NMPC_BUILD_BENCHMARKS`: the host benchmark (`benchmark`).
-  * `NMPC_BUILD_EXAMPLES`: the examples (`stop`, `pendulum`, `attitude`).
+```cmake
+find_package(nmpc 2.0 REQUIRED CONFIG) # With CMAKE_PREFIX_PATH including /opt/nmpc.
+target_link_libraries(controller PRIVATE nmpc::nmpc)
+```
+
+The package gives the same `nmpc::nmpc` target, carrying the unrolling limit
+the installed copy was configured with, and sets `nmpc_VERSION` and
+`nmpc_VERSION_PRERELEASE`. It accepts a request for any earlier version with
+the same major version. A pre-release, such as master's `2.0.0-dev` or
+`2.0.0-rc.1`, comes before `2.0.0`, so it does not meet a request for `2.0`:
+find it with `find_package(nmpc REQUIRED CONFIG)`. With the downloaded Eigen, its headers (patched, for
+3.2.8) are installed under `include/nmpc/eigen3`; with
+`NMPC_USE_SYSTEM_EIGEN`, the package finds Eigen again when it is loaded.
+Install rules are generated when NMPC is built on its own, or with
+`NMPC_INSTALL=ON` as a subdirectory. A program that finds installed copies of
+both NMPC and UKF should have installed both with the same Eigen.
+
+The options are UKF's, with `NMPC_` for `UKF_`:
+
+| CMake option | Default | Purpose |
+| --- | --- | --- |
+| `NMPC_USE_SYSTEM_EIGEN` | UKF's choice beside UKF, else `OFF` | Use an installed Eigen 3.3 or newer (`Eigen3::Eigen`) instead of downloading one |
+| `NMPC_EIGEN_VERSION` | UKF's beside UKF, else `3.2.8` | Eigen release to download when not using an installed one: 3.2.8 (patched) or 3.3 and newer (unpatched) |
+| `NMPC_EIGEN_URL` | UKF's beside UKF, else empty (GitLab release) | Eigen source archive, as a URL or local file, to download instead; set `NMPC_EIGEN_VERSION` to its version |
+| `NMPC_EIGEN_UNROLLING_LIMIT` | UKF's beside UKF, else empty (Eigen's 100) | Set `EIGEN_UNROLLING_LIMIT` for every target that links `nmpc` |
+| `NMPC_WARNINGS_AS_ERRORS` | `ON` | Treat warnings in NMPC's own targets as errors |
+| `NMPC_BUILD_TESTS` | `ON` standalone, `OFF` as a subdirectory | The unit tests (`unittest`, `unittest_no_heap`, and `check` to run them) |
+| `NMPC_BUILD_BENCHMARKS` | `ON` standalone, `OFF` as a subdirectory | The host benchmark (`benchmark`) |
+| `NMPC_BUILD_EXAMPLES` | `ON` standalone, `OFF` as a subdirectory | The examples (`stop`, `pendulum`, `attitude`) |
+| `NMPC_INSTALL` | `ON` standalone, `OFF` as a subdirectory | Generate install rules and the `nmpc` CMake package |
+
+NMPC and UKF must see one Eigen. By default both download Eigen 3.2.8 and
+apply the patches in [`patch/`](patch), which keep its LLT free of heap
+allocation and let it compile as C++17; the Cortex-M7 figures below use it,
+and on an STM32H735 it ran these kernels 11 to 15 % faster than 3.4.0. When
+UKF is configured first, NMPC takes UKF's download rather than fetch its own,
+its Eigen options default to UKF's, and a configure that sets them
+differently fails rather than build a program with two Eigens. To use another
+Eigen, set the same choice for both libraries:
+
+- download another release with `-DUKF_EIGEN_VERSION=3.4.0` (or `5.0.0`, or
+  any release from 3.3), used unpatched, and `-DUKF_EIGEN_URL=` to build
+  offline or from a mirror; or
+- use an installed Eigen 3.3 or newer, including Eigen 5, with
+  `-DUKF_USE_SYSTEM_EIGEN=ON`, choosing between installations with
+  `-DEigen3_DIR=` or `CMAKE_PREFIX_PATH`.
+
+Use the `NMPC_` names when NMPC stands alone. A solve stays free of heap
+allocation with every supported Eigen.
 
 `NMPC_WARNINGS_AS_ERRORS` (on) applies to NMPC's own targets, which build
 with `-Wall -Wextra -Wshadow -Wconversion -Wdouble-promotion`, without
@@ -224,18 +296,37 @@ ctest --test-dir build
 
 The tests use an installed GoogleTest where there is one and fetch
 GoogleTest 1.7.0 otherwise, as UKF's do; the benchmark does the same with
-Google Benchmark 1.3.0. Every test runs in `float` and in `double`.
-[`test/cmake`](test/cmake) holds the consumer fixtures: NMPC's tools stay
-opt-in as a subdirectory, it builds without exceptions, a sibling keeps the
-parent's language and flags, and beside UKF it shares UKF's Eigen
-(`-DNMPC_TEST_UKF_DIR=<ukf checkout>`).
+Google Benchmark 1.3.0. Every test runs in `float` and in `double`. CI runs
+them with GCC 13 and 15, Clang 18 and 22 on Linux and Clang on macOS, in
+Debug and Release, with Eigen 3.2.8, 3.4.0 and 5.0.0: the same
+configurations as UKF's. [`test/cmake`](test/cmake) holds the consumer
+fixtures: NMPC's tools stay opt-in as a subdirectory, it builds without
+exceptions, a sibling keeps the parent's language and flags, beside UKF it
+shares UKF's Eigen (`-DNMPC_TEST_UKF_DIR=<ukf checkout>`), and the installed
+package works alone and beside an installed UKF
+([`test/cmake/installed`](test/cmake/installed)).
 
 ## Embedded use
 
-A solve allocates nothing (a test counts allocations) and uses only the
-caller's workspace and the stack. `sizeof(Solver::Workspace)` is the
-solver's memory. In single precision NMPC's own code calls no
-double-precision routine.
+A solve allocates nothing (a test counts allocations). Its memory is in
+three parts, each of which an application provisions:
+
+  * the workspace, `sizeof(Solver::Workspace)`, which the caller owns: the
+    plan, the trial plan, the stage QPs' steps, the candidate gains of the
+    backward pass (which become the plan's only when a whole pass succeeds)
+    and, by default, every stage's Jacobians;
+  * the solver object, `sizeof(Solver)`, which holds the scales of the last
+    solve and their products and lives as long as the workspace;
+  * the call stack of a solve.
+
+In single precision NMPC's own code calls no double-precision routine.
+
+By default the workspace keeps every stage's step Jacobians for the
+iteration. `NMPC::Solver<Problem, Problem::Stages, NMPC::Jacobians::PerStage>`
+makes each stage's Jacobians as the backward pass reaches it instead, and
+keeps none: the plans are the same, the workspace is smaller by
+N (NX² + NX NU) scalars, the stack is larger by one stage's Jacobians, and a
+backward pass repeated with more regularisation makes them again.
 
 [`benchmark/cortex-m7`](benchmark/cortex-m7) counts instructions on a
 Cortex-M7 under QEMU for a synthetic problem with the dimensions of the
@@ -249,17 +340,25 @@ than 3 % from the baseline accepted for the same compiler.
 python3 benchmark/cortex-m7/check.py build/src/eigen3
 ```
 
-| Synthetic problem, single precision, `-O2`, arm-none-eabi-gcc 13.2.1 | Instructions |
-| --- | --- |
-| Solve (shift and one iteration) | 2.80 million |
-| First solve, from a reset plan | 2.88 million |
-| Backward pass | 2.34 million |
-| Linearisation | 0.15 million |
-| Line-search trial | 0.12 million |
-| Rollout | 0.11 million |
+| Synthetic problem, single precision, `-O2`, arm-none-eabi-gcc 13.2.1 | Instructions | With per-stage Jacobians |
+| --- | --- | --- |
+| Solve (shift and one iteration) | 2.69 million | 2.65 million |
+| First solve, from a reset plan | 2.79 million | 2.75 million |
+| Backward pass | 2.24 million | 2.32 million (it makes the Jacobians) |
+| Linearisation | 0.13 million | none |
+| Line-search trial | 0.12 million | 0.12 million |
+| Rollout | 0.11 million | 0.11 million |
 
-The workspace for that problem is 62 kB and a solve uses about 8.8 kB of
-stack.
+| Memory for that problem, single precision | Default | With per-stage Jacobians |
+| --- | --- | --- |
+| Workspace | 72.5 kB | 27.6 kB |
+| Solver object | 3.3 kB | 3.3 kB |
+| Call stack of a solve, from the stack's top | 8.7 kB | 10.2 kB |
+
+The benchmark keeps the workspace and the solver object in static storage,
+and measures the stack from its original top, so the three add up to what
+the solver needs. Of the workspace, 10.2 kB is the backward pass's candidate
+gains.
 
 ## Licence
 

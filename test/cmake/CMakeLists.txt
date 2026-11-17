@@ -12,7 +12,13 @@ enable_testing()
 # a second copy.
 set(NMPC_TEST_UKF_DIR "" CACHE PATH "A UKF checkout to configure beside NMPC")
 if(NMPC_TEST_UKF_DIR)
+    # UKF takes the Eigen choice given for NMPC, and NMPC's then follow UKF's.
     set(UKF_USE_SYSTEM_EIGEN ${NMPC_USE_SYSTEM_EIGEN} CACHE BOOL "" FORCE)
+    foreach(option EIGEN_VERSION EIGEN_URL EIGEN_UNROLLING_LIMIT)
+        if(DEFINED NMPC_${option})
+            set(UKF_${option} "${NMPC_${option}}" CACHE STRING "" FORCE)
+        endif()
+    endforeach()
     add_subdirectory(${NMPC_TEST_UKF_DIR} ukf)
 endif()
 add_subdirectory(../.. nmpc)
@@ -24,12 +30,16 @@ if(NMPC_USE_SYSTEM_EIGEN AND TARGET eigen3)
     message(FATAL_ERROR "System Eigen must not configure the bundled download")
 endif()
 if(NMPC_TEST_UKF_DIR AND NOT NMPC_USE_SYSTEM_EIGEN)
+    # The one eigen3 download in the build must be UKF's, and NMPC must include it. Both wrap their
+    # include directories in $<BUILD_INTERFACE:...>, so the lists are searched as text.
+    include(ExternalProject)
+    ExternalProject_Get_Property(eigen3 source_dir)
     get_target_property(nmpc_includes nmpc INTERFACE_INCLUDE_DIRECTORIES)
     get_target_property(ukf_includes ukf INTERFACE_INCLUDE_DIRECTORIES)
-    list(GET ukf_includes 1 ukf_eigen)
-    list(FIND nmpc_includes ${ukf_eigen} shared)
-    if(shared LESS 0)
-        message(FATAL_ERROR "NMPC must use UKF's Eigen (${ukf_eigen}), not ${nmpc_includes}")
+    string(FIND "${ukf_includes}" "${source_dir}" from_ukf)
+    string(FIND "${nmpc_includes}" "$<BUILD_INTERFACE:${source_dir}>" shared)
+    if(from_ukf LESS 0 OR shared LESS 0)
+        message(FATAL_ERROR "NMPC must use UKF's Eigen (${ukf_includes}), not ${nmpc_includes}")
     endif()
 endif()
 
@@ -38,6 +48,13 @@ target_link_libraries(consumer_double PRIVATE nmpc::nmpc)
 target_compile_definitions(consumer_double PRIVATE EXPECT_DOUBLE)
 add_executable(consumer_single main.cpp)
 target_link_libraries(consumer_single PRIVATE nmpc::nmpc)
+
+# The unrolling limit, when given, must reach every consumer.
+if(NOT NMPC_EIGEN_UNROLLING_LIMIT STREQUAL "")
+    foreach(target consumer_double consumer_single)
+        target_compile_definitions(${target} PRIVATE EXPECT_EIGEN_UNROLLING_LIMIT=${NMPC_EIGEN_UNROLLING_LIMIT})
+    endforeach()
+endif()
 
 # Consumers may build the solver with exceptions disabled.
 add_executable(consumer_no_exceptions no_exceptions.cpp)

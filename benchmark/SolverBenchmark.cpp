@@ -7,88 +7,90 @@ cortex-m7/.
 */
 
 #include <benchmark/benchmark.h>
+
 #include "Synthetic.h"
 
 namespace {
 
 template <class T>
 struct Fixture {
-    using Problem = Synthetic_Problem<T>;
-    using Solver = NMPC::Solver<Problem>;
-    typename Solver::Workspace workspace;
-    Solver solver;
-    Problem problem;
-    NMPC::Options<T> options;
-    typename Problem::State x;
+  using Problem = Synthetic_Problem<T>;
+  using Solver = NMPC::Solver<Problem>;
+  typename Solver::Workspace workspace;
+  Solver solver;
+  Problem problem;
+  NMPC::Options<T> options;
+  typename Problem::State x;
 
-    Fixture() : solver(workspace) {
-        x = problem.start();
-        solver.reset(x, problem.hover());
-        /* Settle into the steady pattern of a running controller. */
-        for (int i = 0; i < 20; i++) {
-            next();
-        }
+  Fixture() : solver(workspace) {
+    x = problem.start();
+    solver.reset(x, problem.hover());
+    /* Settle into the steady pattern of a running controller. */
+    for (int i = 0; i < 20; i++) {
+      next();
     }
+  }
 
-    void next() {
-        solver.advance(problem, 1);
-        problem.phase += T(0.1);
-        solver.solve(problem, x, options);
-        x = problem.step(0, x, solver.policy().u[0]);
-    }
+  void next() {
+    solver.advance(problem, 1);
+    problem.phase += T(0.1);
+    solver.solve(problem, x, options);
+    x = problem.step(0, x, solver.policy().u[0]);
+  }
 };
 
 template <class T>
 Fixture<T>& fixture() {
-    static Fixture<T>* f = new Fixture<T>();
-    return *f;
+  static Fixture<T>* f = new Fixture<T>();
+  return *f;
 }
 
-}
+}  // namespace
 
 template <class T>
 void Solver_Solve(benchmark::State& state) {
-    Fixture<T>& f = fixture<T>();
-    while (state.KeepRunning()) {
-        f.next();
-    }
+  Fixture<T>& f = fixture<T>();
+  while (state.KeepRunning()) {
+    f.next();
+  }
 }
 
 template <class T>
 void Solver_Linearise(benchmark::State& state) {
-    Fixture<T>& f = fixture<T>();
-    while (state.KeepRunning()) {
-        f.solver.linearise(f.problem);
-    }
+  Fixture<T>& f = fixture<T>();
+  while (state.KeepRunning()) {
+    f.solver.linearise(f.problem);
+  }
 }
 
 template <class T>
 void Solver_Backward(benchmark::State& state) {
-    Fixture<T>& f = fixture<T>();
-    f.solver.linearise(f.problem);
-    while (state.KeepRunning()) {
-        T dV1 = T(0), dV2 = T(0);
-        int passes = 0;
-        benchmark::DoNotOptimize(f.solver.backward(f.problem, f.options, dV1, dV2, passes));
-    }
+  Fixture<T>& f = fixture<T>();
+  f.solver.linearise(f.problem);
+  while (state.KeepRunning()) {
+    T dV1 = T(0), dV2 = T(0);
+    int passes = 0;
+    benchmark::DoNotOptimize(
+        f.solver.backward(f.problem, f.options, dV1, dV2, passes));
+  }
 }
 
 template <class T>
 void Solver_LineSearchTrial(benchmark::State& state) {
-    Fixture<T>& f = fixture<T>();
-    while (state.KeepRunning()) {
-        int bound = 0;
-        benchmark::DoNotOptimize(f.solver.forward(f.problem, f.x, T(1), bound));
-    }
+  Fixture<T>& f = fixture<T>();
+  while (state.KeepRunning()) {
+    int bound = 0;
+    benchmark::DoNotOptimize(f.solver.forward(f.problem, f.x, T(1), bound));
+  }
 }
 
 template <class T>
 void Solver_Rollout(benchmark::State& state) {
-    Fixture<T>& f = fixture<T>();
-    while (state.KeepRunning()) {
-        int bound = 0;
-        benchmark::DoNotOptimize(f.solver.rollout(f.problem, f.x, bound));
-    }
+  Fixture<T>& f = fixture<T>();
+  while (state.KeepRunning()) {
+    int bound = 0;
+    benchmark::DoNotOptimize(f.solver.rollout(f.problem, f.x, bound));
+  }
 }
 
 BENCHMARK_TEMPLATE(Solver_Solve, float);

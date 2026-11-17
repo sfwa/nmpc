@@ -4,5 +4,6 @@ static_assert(_MSVC_LANG == 201402L, "NMPC changed the parent's C++ standard");
 static_assert(__cplusplus == 201402L, "NMPC changed the parent's C++ standard");
 #endif
 
-// This should compile even when NMPC's own targets enable -Wall -Wextra -Werror.
+// This should compile even when NMPC's own targets enable -Wall -Wextra
+// -Werror.
 int main(int argc, char**) { return 0; }

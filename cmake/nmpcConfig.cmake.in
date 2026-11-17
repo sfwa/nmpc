@@ -1,0 +1,24 @@
+# CMake package for an installed NMPC. It provides the target nmpc::nmpc, as
+# add_subdirectory does. nmpc_VERSION is MAJOR.MINOR.PATCH, and
+# nmpc_VERSION_PRERELEASE names the pre-release ("rc.1", or "dev" for a build
+# of master between releases) and is empty for a release.
+@PACKAGE_INIT@
+
+set(nmpc_VERSION_PRERELEASE "@nmpc_version_prerelease@")
+
+# NMPC was installed against an installed Eigen, which the target links;
+# otherwise the Eigen headers it was built with were installed alongside it.
+if(@NMPC_USE_SYSTEM_EIGEN@)
+    include(CMakeFindDependencyMacro)
+    find_dependency(Eigen3 NO_MODULE)
+    # As when NMPC itself is configured: only the bundled 3.2.8 is patched.
+    if(Eigen3_VERSION VERSION_LESS 3.3)
+        set(nmpc_FOUND FALSE)
+        set(nmpc_NOT_FOUND_MESSAGE
+            "NMPC needs Eigen 3.3 or newer, but found Eigen ${Eigen3_VERSION} at ${Eigen3_DIR}")
+        return()
+    endif()
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/nmpcTargets.cmake")
+check_required_components(nmpc)
