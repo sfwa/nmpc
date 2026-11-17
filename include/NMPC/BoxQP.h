@@ -167,23 +167,23 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
                 search(i) = T(0);
             }
         }
-        /* Which bound is met first is decided on the target itself, not on d + (target - d), which can lose it. */
-        T step = T(1);
+        /*
+        Which bound is met first is decided on the target itself, not on d + (target - d), which can lose it.
+        A target past a bound always limits the step, even when the fraction of the step to that bound
+        rounds to one or more (from -1e8 to a bound of 0 with a target of 1 it is 1 in single precision):
+        the step then stops on the bound and holds it rather than taking the target outside the bounds.
+        */
+        T nearest = T(0);
         int limit = -1;
         for (int i = 0; i < M; i++) {
             if (held(i)) {
                 continue;
             }
-            if (target(i) > upper(i)) {
-                const T reach = (upper(i) - d(i)) / search(i);
-                if (reach < step) {
-                    step = reach;
-                    limit = i;
-                }
-            } else if (target(i) < lower(i)) {
-                const T reach = (lower(i) - d(i)) / search(i);
-                if (reach < step) {
-                    step = reach;
+            const bool above = target(i) > upper(i);
+            if (above || target(i) < lower(i)) {
+                const T reach = ((above ? upper(i) : lower(i)) - d(i)) / search(i);
+                if (limit < 0 || reach < nearest) {
+                    nearest = reach;
                     limit = i;
                 }
             }
@@ -201,7 +201,16 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
             }
             at_minimiser = true;
         } else {
-            d = (d + step * search).cwiseMax(lower).cwiseMin(upper);
+            if (nearest < T(1)) {
+                d = (d + nearest * search).cwiseMax(lower).cwiseMin(upper);
+            } else {
+                /* The bound is reached at the whole step to rounding: take the target, as above, within the bounds. */
+                for (int i = 0; i < M; i++) {
+                    if (!held(i)) {
+                        d(i) = target(i) > upper(i) ? upper(i) : (target(i) < lower(i) ? lower(i) : target(i));
+                    }
+                }
+            }
             d(limit) = target(limit) > upper(limit) ? upper(limit) : lower(limit);
             held(limit) = true;
             at_minimiser = false;

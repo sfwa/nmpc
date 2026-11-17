@@ -304,6 +304,50 @@ TYPED_TEST(BoxQPTest, AWholeStepFromFarAwayReachesItsTarget) {
     EXPECT_NEAR(double(d(0)), (1.0 + 0.5) / 2.0, 1e-6);
 }
 
+TYPED_TEST(BoxQPTest, AFarBoundCrossedByTheTargetIsHeld) {
+    /*
+    A target past a bound always stops the step on that bound and holds it, even when the fraction of the
+    step to the bound rounds to one. From -1e8 to the bound 0 with a target of 1, (0 - -1e8) / (1 - -1e8)
+    is 1 in single precision: the step was taken as whole, d came out 1, outside the bounds, and the
+    variable was left free. Double precision does the same from -1e17.
+    */
+    typedef TypeParam T;
+    for (const double start : {-1e8, -1e12, -1e17, -1e30}) {
+        NMPC::Matrix<T, 1, 1> H;
+        H << T(1);
+        NMPC::Vector<T, 1> g, lower, upper, d;
+        g << T(-1);
+        lower << T(start);
+        upper << T(0);
+        d << T(start);
+        Eigen::Array<bool, 1, 1> held;
+        Eigen::LLT<NMPC::Matrix<T, 1, 1>> factor;
+        bool finished = false;
+        ASSERT_GT((NMPC::solve_box_qp<T, 1>(H, g, lower, upper, d, held, factor, 32,
+            T(16) * std::numeric_limits<T>::epsilon(), &finished)), 0) << start;
+        EXPECT_EQ(d(0), T(0)) << start;
+        EXPECT_TRUE(held(0)) << start;
+        EXPECT_TRUE(finished) << start;
+    }
+    /* The same at the lower bound, and with a second variable that ends free. */
+    for (const double start : {1e8, 1e17}) {
+        NMPC::Matrix<T, 2, 2> H;
+        H << T(1), T(0), T(0), T(2);
+        const NMPC::Vector<T, 2> g(T(1), T(-1)), lower(T(0), T(-10)), upper(T(start), T(10));
+        NMPC::Vector<T, 2> d(T(start), T(0));
+        Eigen::Array<bool, 2, 1> held;
+        Eigen::LLT<NMPC::Matrix<T, 2, 2>> factor;
+        bool finished = false;
+        ASSERT_GT((NMPC::solve_box_qp<T, 2>(H, g, lower, upper, d, held, factor, 32,
+            T(16) * std::numeric_limits<T>::epsilon(), &finished)), 0) << start;
+        EXPECT_EQ(d(0), T(0)) << start;
+        EXPECT_TRUE(held(0)) << start;
+        EXPECT_FALSE(held(1)) << start;
+        EXPECT_NEAR(double(d(1)), 0.5, 1e-6) << start;
+        EXPECT_TRUE(finished) << start;
+    }
+}
+
 TYPED_TEST(BoxQPTest, ReportsWhetherItFinished) {
     typedef TypeParam T;
     Sequence random;
