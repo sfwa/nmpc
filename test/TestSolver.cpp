@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstddef>
 #include <limits>
 
 #include "NMPC/Solver.h"
@@ -36,7 +37,7 @@ struct Condensed {
         Eigen::Matrix<double, NX, NX>::Identity();
     Eigen::Matrix<double, NX, Vars> map =
         Eigen::Matrix<double, NX, Vars>::Zero();
-    for (int k = 0; k <= N; k++) {
+    for (std::ptrdiff_t k = 0; k <= N; k++) {
       const Eigen::Matrix<double, NX, 1> free_state(power * x0);
       if (k < N) {
         G.block<5, Vars>(5 * k, 0) = p.Wx * map;
@@ -46,8 +47,8 @@ struct Condensed {
         map.block<NX, NU>(0, NU * k) += p.B;
         power = (p.A * power).eval();
       } else {
-        G.block<3, Vars>(5 * N, 0) = p.Wt * map;
-        h.segment<3>(5 * N) = p.Wt * (free_state - p.x_target);
+        G.block<3, Vars>(Rows - 3, 0) = p.Wt * map;
+        h.segment<3>(Rows - 3) = p.Wt * (free_state - p.x_target);
       }
     }
   }
@@ -64,7 +65,7 @@ struct Condensed {
     const Eigen::Matrix<double, Vars, 1> g(G.transpose() * h);
     Eigen::Matrix<double, Vars, 1> lo, hi,
         d = Eigen::Matrix<double, Vars, 1>::Zero();
-    for (int k = 0; k < N; k++) {
+    for (std::ptrdiff_t k = 0; k < N; k++) {
       lo.segment<NU>(NU * k) = lower;
       hi.segment<NU>(NU * k) = upper;
     }

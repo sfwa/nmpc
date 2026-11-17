@@ -43,6 +43,7 @@ TYPED_TEST(InnerLoopTest, TableInterpolatesAndHoldsItsEnds) {
 TYPED_TEST(InnerLoopTest, WindowCountsLookupsOutsideIt) {
   typedef TypeParam T;
   std::vector<T> all;
+  all.reserve(10);
   for (int i = 0; i < 10; i++) {
     all.push_back(T(i));
   }
@@ -72,6 +73,7 @@ TYPED_TEST(InnerLoopTest, WindowMissHoldsTheWindowsEnd) {
   */
   typedef TypeParam T;
   std::vector<T> all;
+  all.reserve(10);
   for (int i = 0; i < 10; i++) {
     all.push_back(T(i));
   }
