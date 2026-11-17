@@ -13,6 +13,9 @@ one part of the problem concept.
   Failing_Problem   the stop problem with a model that can be told to fail
   Pinned_Problem    a scalar integrator over two stages whose second command is
                     pinned by equal bounds
+  Indefinite_Problem the stop problem with its own cost expansion, which can be
+                    told to give the first stage a command Hessian that no
+                    regularisation in budget makes positive definite
 */
 
 #ifndef NMPC_TEST_PROBLEMS_H
@@ -83,6 +86,35 @@ struct Failing_Problem : Stop_Problem<T> {
             next(1) = std::numeric_limits<T>::quiet_NaN();
         }
         return next;
+    }
+};
+
+/*
+The stop problem's own Gauss-Newton expansion. With `indefinite`, every stage after the first weighs its
+command four times as much (so that its gains change), and the first stage's command Hessian is -1000, so
+that a backward pass completes every stage but the first and then fails.
+*/
+template <class T>
+struct Indefinite_Problem : Stop_Problem<T> {
+    using typename Stop_Problem<T>::State;
+    using typename Stop_Problem<T>::Control;
+    bool indefinite = false;
+
+    template <class R>
+    void stage_residual(int k, const State& x, const Control& u, R& r) const {
+        Stop_Problem<T>::stage_residual(k, x, u, r);
+        if (indefinite && k > 0) {
+            r(2) *= T(2);
+        }
+    }
+    template <class TX, class TU, class XX, class UX, class UU>
+    void cost_expansion(int k, const State& x, const Control& u, TX& lx, TU& lu, XX& Lxx, UX& Lux, UU& Luu) const {
+        const T h = this->dt, w = indefinite && k > 0 ? T(0.04) : T(0.01);
+        lx << h * x(0), h * T(0.25) * x(1);
+        lu << h * w * u(0);
+        Lxx << h, T(0), T(0), h * T(0.25);
+        Lux.setZero();
+        Luu << (indefinite && k == 0 ? T(-1000) : h * w);
     }
 };
 

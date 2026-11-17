@@ -512,3 +512,94 @@ TYPED_TEST(SolverTest, PerStageJacobiansGiveTheSamePlans) {
         x = problem.step(0, x, stored.policy().u[0]);
     }
 }
+
+TYPED_TEST(SolverTest, AnUphillPredictionIsNotConvergence) {
+    /*
+    With a stage QP budget too small for its warm start (none at all, or one pass), a backward pass can
+    predict that its step makes the plan worse. That is not convergence: the stage QPs start again from
+    zero, from which they cannot end uphill, and the solve goes on. It reported Converged with a negative
+    predicted decrease and left the cost where it was.
+    */
+    typedef TypeParam T;
+    typedef Linear_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    problem.lower_bound << T(-1), T(-1.2);
+    problem.upper_bound << T(1.3), T(0.9);
+    unsigned seed = 7u;
+    auto next = [&seed]() {
+        seed = seed * 1103515245u + 12345u;
+        return T(double((seed >> 8) & 0xFFFFu) / 65535.0 * 2.0 - 1.0);
+    };
+    int invalid = 0;
+    for (int n = 0; n < 200; n++) {
+        const typename Problem::State x0(T(5) * next(), T(5) * next(), T(5) * next());
+        for (const int budget : {0, 1}) {
+            solver.reset(x0, Problem::Control::Zero());
+            for (int k = 0; k < Problem::Stages; k++) {
+                workspace.step[k] << T(3) * next(), T(3) * next();
+            }
+            NMPC::Options<T> options;
+            options.max_box_iterations = budget;
+            options.max_regularisation_retries = 3;
+            const NMPC::Result<T> result = solver.solve(problem, x0, options);
+            ASSERT_TRUE(result.usable());
+            invalid += result.invalid_predictions;
+            if (result.status == NMPC::Status::Converged) {
+                EXPECT_GE(result.predicted_decrease, T(0)) << n << ", budget " << budget;
+            }
+            EXPECT_LE(result.cost_after, result.cost_before) << n << ", budget " << budget;
+            if (budget == 1) {
+                /* One pass a stage QP, from zero, still finds a step that the line search accepts. */
+                EXPECT_EQ(result.status, NMPC::Status::IterationLimit) << n;
+                EXPECT_LT(result.cost_after, result.cost_before) << n;
+            } else {
+                /* With no passes the warm start is the step: taken if it is downhill, and otherwise nothing is. */
+                EXPECT_NE(result.status, NMPC::Status::Converged) << n;
+                if (result.status == NMPC::Status::IterationLimit) {
+                    EXPECT_LT(result.cost_after, result.cost_before) << n;
+                }
+            }
+        }
+    }
+    EXPECT_GT(invalid, 0);
+}
+
+TYPED_TEST(SolverTest, AFailedBackwardPassLeavesTheGains) {
+    /*
+    A backward pass that completes its later stages and then fails at an earlier one publishes none of its
+    gains: with every retry failing, the plan keeps the gains it had. It used to keep the new gains of the
+    later stages beside the old gains of the earlier ones.
+    */
+    typedef TypeParam T;
+    typedef Indefinite_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    /* Near enough to rest that no command is on its bound, so that every stage has a gain. */
+    const typename Problem::State x0(T(0.05), T(0));
+    solver.reset(x0, Problem::Control::Zero());
+    ASSERT_EQ(solver.solve(problem, x0, NMPC::Options<T>()).status, NMPC::Status::IterationLimit);
+    const typename Solver::Policy before = solver.policy();
+    for (int k = 0; k < Solver::Stages; k++) {
+        ASSERT_NE(before.K[k](0, 0), T(0)) << k;
+    }
+
+    problem.indefinite = true;
+    NMPC::Options<T> options;
+    options.max_regularisation_retries = 2;
+    options.regularisation_max = T(1);
+    const NMPC::Result<T> result = solver.solve(problem, x0, options);
+    EXPECT_EQ(result.status, NMPC::Status::NoProgress);
+    EXPECT_EQ(result.backward_passes, 3);
+    for (int k = 0; k < Solver::Stages; k++) {
+        EXPECT_EQ(solver.policy().K[k], before.K[k]) << k;
+    }
+    /* The pass did reach the later stages, whose gains would have changed. */
+    for (int k = 1; k < Solver::Stages; k++) {
+        EXPECT_NE(workspace.gain[k], before.K[k]) << k;
+    }
+}

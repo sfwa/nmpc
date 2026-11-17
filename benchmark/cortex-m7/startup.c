@@ -55,11 +55,15 @@ __attribute__((noinline)) void stack_paint(void) {
     paint_top = top;
 }
 
-/* Bytes of stack used below the point where stack_paint was called. */
+/*
+Bytes of stack in use at the deepest point since stack_paint was called, counted from the stack's
+original top (the reset value of the stack pointer), so that it includes start-up's and main's own
+frames as well as everything called below them.
+*/
 uint32_t stack_used(void) {
     uint32_t* p = &_sstack;
     while (p < paint_top && *p == 0xA5A5A5A5u) p++;
-    return (uint32_t)((uint8_t*)paint_top - (uint8_t*)p);
+    return (uint32_t)((uint8_t*)&_estack - (uint8_t*)p);
 }
 
 void _init(void) {}

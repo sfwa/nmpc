@@ -20,7 +20,11 @@ enum class Status {
     Converged,
     /* The iteration budget was spent. With one iteration a solve this is the normal outcome. */
     IterationLimit,
-    /* No step was accepted within the line search and regularisation budgets. The plan is the rollout of the previous one. */
+    /*
+    No step was accepted within the line search and regularisation budgets. The plan is the rollout of the
+    previous one, with the gains of the last backward pass that completed with a usable prediction, or
+    the previous plan's gains if none did.
+    */
     NoProgress,
     /* The rollout from the given state was not finite. The workspace still holds the previous plan. */
     NumericalFailure
@@ -55,6 +59,13 @@ struct Result {
     int backward_passes = 0;
     int line_search_trials = 0;
     int box_iterations = 0;
+
+    /*
+    Backward passes whose predicted change of cost was an increase or was not finite, which were repeated
+    from zero stage QP steps (see Solver.h). Above zero says the box iteration budget is too small for
+    the warm starts it is given.
+    */
+    int invalid_predictions = 0;
 
     /* Stages of the returned plan with at least one command on a bound. */
     int stages_on_bound = 0;

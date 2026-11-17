@@ -236,10 +236,18 @@ parent's language and flags, and beside UKF it shares UKF's Eigen
 
 ## Embedded use
 
-A solve allocates nothing (a test counts allocations) and uses only the
-caller's workspace and the stack. `sizeof(Solver::Workspace)` is the
-solver's memory. In single precision NMPC's own code calls no
-double-precision routine.
+A solve allocates nothing (a test counts allocations). Its memory is in
+three parts, each of which an application provisions:
+
+  * the workspace, `sizeof(Solver::Workspace)`, which the caller owns: the
+    plan, the trial plan, the stage QPs' steps, the candidate gains of the
+    backward pass (which become the plan's only when a whole pass succeeds)
+    and, by default, every stage's Jacobians;
+  * the solver object, `sizeof(Solver)`, which holds the scales of the last
+    solve and their products and lives as long as the workspace;
+  * the call stack of a solve.
+
+In single precision NMPC's own code calls no double-precision routine.
 
 By default the workspace keeps every stage's step Jacobians for the
 iteration. `NMPC::Solver<Problem, Problem::Stages, NMPC::Jacobians::PerStage>`
@@ -262,15 +270,23 @@ python3 benchmark/cortex-m7/check.py build/src/eigen3
 
 | Synthetic problem, single precision, `-O2`, arm-none-eabi-gcc 13.2.1 | Instructions | With per-stage Jacobians |
 | --- | --- | --- |
-| Solve (shift and one iteration) | 2.69 million | 2.70 million |
-| First solve, from a reset plan | 2.79 million | 2.79 million |
-| Backward pass | 2.24 million | 2.38 million (it makes the Jacobians) |
+| Solve (shift and one iteration) | 2.69 million | 2.65 million |
+| First solve, from a reset plan | 2.79 million | 2.75 million |
+| Backward pass | 2.24 million | 2.32 million (it makes the Jacobians) |
 | Linearisation | 0.13 million | none |
 | Line-search trial | 0.12 million | 0.12 million |
 | Rollout | 0.11 million | 0.11 million |
 
-The workspace for that problem is 62 kB (17 kB with per-stage Jacobians)
-and a solve uses about 8.3 kB of stack (9.8 kB with per-stage Jacobians).
+| Memory for that problem, single precision | Default | With per-stage Jacobians |
+| --- | --- | --- |
+| Workspace | 72.5 kB | 27.6 kB |
+| Solver object | 3.3 kB | 3.3 kB |
+| Call stack of a solve, from the stack's top | 8.7 kB | 10.2 kB |
+
+The benchmark keeps the workspace and the solver object in static storage,
+and measures the stack from its original top, so the three add up to what
+the solver needs. Of the workspace, 10.2 kB is the backward pass's candidate
+gains.
 
 ## Licence
 
