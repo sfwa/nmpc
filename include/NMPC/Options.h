@@ -36,6 +36,13 @@ struct Options {
     int max_box_iterations = 32;
 
     /*
+    How close to zero, relative to the terms that make it, a free gradient of a stage's box QP must be for
+    the QP to be at its minimiser, and how far beyond that a held command's gradient must pull it inward
+    to be let go (see BoxQP.h). It is relative, so a problem's answer does not depend on its scale.
+    */
+    T box_tolerance = T(16) * std::numeric_limits<T>::epsilon();
+
+    /*
     Levenberg-Marquardt regularisation on each stage's command Hessian. It starts at
     regularisation_initial at every solve: a value carried from one solve to the next rose to its
     maximum in a quiet stretch where no step could be verified, after which the controller stopped

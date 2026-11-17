@@ -333,6 +333,87 @@ TYPED_TEST(SolverTest, AdvanceShiftsThePlanAndFillsTheTail) {
     }
 }
 
+TYPED_TEST(SolverTest, AdvanceByTheWholeHorizonRepeatsTheLastCommand) {
+    /* Every stage enters at the end: each takes the old last command and gain, not the old first. */
+    typedef TypeParam T;
+    typedef Stop_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    const typename Problem::State x0(T(1), T(0));
+    solver.reset(x0, Problem::Control::Zero());
+    solver.solve(problem, x0, NMPC::Options<T>());
+    const int N = Solver::Stages;
+    for (int k = 0; k < N; k++) {
+        workspace.plan.u[k](0) = T(k + 1);
+    }
+    const typename Solver::Policy before = solver.policy();
+    ASSERT_NE(before.K[0], before.K[N - 1]);
+    for (const int stages : {N, N + 5}) {
+        solver.advance(problem, stages);
+        for (int k = 0; k < N; k++) {
+            EXPECT_EQ(solver.policy().u[k](0), T(N)) << stages << ", stage " << k;
+            EXPECT_EQ(solver.policy().K[k], before.K[N - 1]) << stages << ", stage " << k;
+            EXPECT_EQ(solver.policy().x[k], before.x[N]) << stages << ", stage " << k;
+        }
+    }
+}
+
+TYPED_TEST(SolverTest, PinnedCommandGetsNoGainAndLeavesTheEarlierGainsAlone) {
+    /*
+    A command with equal bounds gets a zero gain, and the stages before it see a cost to go that it does
+    not act on. At the zero state its gradient is zero, which used to leave it free: the gains were
+    -0.6 and -0.5 in place of -2/3 and 0.
+    */
+    typedef TypeParam T;
+    typedef Pinned_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    NMPC::Options<T> options;
+    options.regularisation_initial = T(0);
+    options.regularisation_min = T(0);
+    for (const T x : {T(0), T(1)}) {
+        const typename Problem::State x0 = Problem::State::Constant(x);
+        solver.reset(x0, Problem::Control::Zero());
+        const NMPC::Result<T> result = solver.solve(problem, x0, options);
+        ASSERT_TRUE(result.usable());
+        EXPECT_NEAR(double(solver.policy().K[0](0, 0)), -2.0 / 3.0, 1e-6) << x;
+        EXPECT_EQ(solver.policy().K[1](0, 0), T(0)) << x;
+        EXPECT_EQ(solver.policy().u[1](0), problem.pinned) << x;
+        EXPECT_NEAR(double(solver.policy().u[0](0)), -2.0 / 3.0 * double(x), 1e-6) << x;
+    }
+}
+
+TYPED_TEST(SolverTest, AnExactOptimumOfZeroCostStopsAtOnce) {
+    /*
+    At rest at the target the cost and its predicted decrease are both zero. The solve stops after one
+    backward pass as converged, whatever the precision floor, and does not spend a retry and a line search
+    to report NoProgress.
+    */
+    typedef TypeParam T;
+    typedef Stop_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Solver;
+    static typename Solver::Workspace workspace;
+    Solver solver(workspace);
+    Problem problem;
+    for (const T floor : {T(0), NMPC::Options<T>().precision_floor}) {
+        NMPC::Options<T> options;
+        options.precision_floor = floor;
+        solver.reset(Problem::State::Zero(), Problem::Control::Zero());
+        const NMPC::Result<T> result = solver.solve(problem, Problem::State::Zero(), options);
+        EXPECT_EQ(result.status, NMPC::Status::Converged);
+        EXPECT_EQ(result.backward_passes, 1);
+        EXPECT_EQ(result.line_search_trials, 0);
+        EXPECT_EQ(result.cost_after, T(0));
+        EXPECT_EQ(result.regularisation, options.regularisation_initial);
+        /* The gains are those of the problem, for the next tick. */
+        EXPECT_LT(solver.policy().K[0](0, 0), T(0));
+    }
+}
+
 TYPED_TEST(SolverTest, PolicyFeedbackIsWhatTheForwardPassApplies) {
     typedef TypeParam T;
     typedef Attitude_Problem<T> Problem;
@@ -376,4 +457,58 @@ TYPED_TEST(SolverTest, PolicyLooksUpTheStageInForce) {
     EXPECT_EQ(plan.stage_index(100 + 20 * 19), 19);
     EXPECT_EQ(plan.stage_index(100000), 19);
     EXPECT_EQ(plan.at(145).index, 2);
+}
+
+TYPED_TEST(SolverTest, PerStageJacobiansGiveTheSamePlans) {
+    /*
+    Jacobians made stage by stage in the backward pass, and not kept, give the plans of the stored ones
+    with a smaller workspace, including when a backward pass is repeated and must make them again. The
+    arithmetic is the same; only a compiler that fuses multiply-adds differently where it inlines
+    differently could move the last bit, so the plans are compared to a few units of it.
+    */
+    typedef TypeParam T;
+    typedef Attitude_Problem<T> Problem;
+    typedef NMPC::Solver<Problem> Stored;
+    typedef NMPC::Solver<Problem, Problem::Stages, NMPC::Jacobians::PerStage> PerStage;
+    typedef Eigen::Matrix<T, 3, 1> V3;
+    static_assert(sizeof(typename PerStage::Workspace) < sizeof(typename Stored::Workspace),
+        "per-stage Jacobians keep a smaller workspace");
+    /* Smaller by the Jacobians, less the few bytes of padding that the empty store may take. */
+    EXPECT_GE(sizeof(typename Stored::Workspace) - sizeof(typename PerStage::Workspace) + 16,
+        sizeof(typename Stored::MatA[Problem::Stages]) + sizeof(typename Stored::MatB[Problem::Stages]));
+    static typename Stored::Workspace stored_workspace;
+    static typename PerStage::Workspace per_stage_workspace;
+    Stored stored(stored_workspace);
+    PerStage per_stage(per_stage_workspace);
+    Problem problem;
+    const T tolerance = std::is_same<T, float>::value ? T(1e-5) : T(1e-13);
+
+    typename Problem::State x;
+    x.q = NMPC::so3_exp<T>(V3(T(0.6), T(-0.4), T(1.2)));
+    x.w = V3(T(0.2), T(0), T(-0.3));
+    stored.reset(x, Problem::Control::Zero());
+    per_stage.reset(x, Problem::Control::Zero());
+    for (int tick = 0; tick < 40; tick++) {
+        NMPC::Options<T> options;
+        /* Every fourth solve has no line search, so every backward pass is repeated with more regularisation. */
+        if (tick % 4 == 3) {
+            options.max_line_search = 0;
+            options.max_regularisation_retries = 2;
+        }
+        if (tick > 0) {
+            stored.advance(problem, 1);
+            per_stage.advance(problem, 1);
+        }
+        const NMPC::Result<T> a = stored.solve(problem, x, options);
+        const NMPC::Result<T> b = per_stage.solve(problem, x, options);
+        ASSERT_EQ(a.status, b.status) << tick;
+        ASSERT_EQ(a.backward_passes, b.backward_passes) << tick;
+        EXPECT_EQ(a.box_iterations, b.box_iterations) << tick;
+        for (int k = 0; k < Problem::Stages; k++) {
+            EXPECT_LE((stored.policy().u[k] - per_stage.policy().u[k]).cwiseAbs().maxCoeff(), tolerance) << tick;
+            EXPECT_LE((stored.policy().K[k] - per_stage.policy().K[k]).cwiseAbs().maxCoeff(),
+                tolerance * (T(1) + stored.policy().K[k].cwiseAbs().maxCoeff())) << tick;
+        }
+        x = problem.step(0, x, stored.policy().u[0]);
+    }
 }

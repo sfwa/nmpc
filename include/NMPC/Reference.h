@@ -15,7 +15,7 @@ namespace NMPC {
 A reference as a table: rows of a fixed number of columns at a fixed spacing
 in time, with no heap. The table may hold only part of a flight's rows (a
 window), in which case `first` and `held` say which; a lookup outside the
-window uses its nearest rows and is counted in `misses`, so that an
+window holds the window's nearest end and is counted in `misses`, so that an
 application can tell a window that was moved too late.
 
 The table knows nothing of what the columns mean. span() finds the two rows
@@ -52,16 +52,22 @@ struct PathTable {
 
     T duration() const { return T(count - 1) * dt; }
 
+    /*
+    A lookup outside the window is moved to the nearest end of the window, the time and not only the rows,
+    so that the reference holds there as it does at the ends of the table instead of jumping back and
+    ramping through the last rows again.
+    */
     Span span(T t) const {
-        NMPC_ASSERT(count >= 2 && held >= 2);
-        const T f = std::min(std::max(t / dt, T(0)), T(count - 1));
-        const int i = std::min(int(f), count - 2);
-        const T a = f - T(i);
-        int local = i - first;
-        if (local < 0 || local + 1 >= held) {
+        NMPC_ASSERT(count >= 2 && held >= 2 && first >= 0 && first + held <= count);
+        T f = std::min(std::max(t / dt, T(0)), T(count - 1));
+        const T start = T(first), end = T(first + held - 1);
+        if (f < start || f > end) {
             misses++;
-            local = std::min(std::max(local, 0), held - 2);
+            f = std::min(std::max(f, start), end);
         }
+        const int i = std::min(int(f), first + held - 2);
+        const T a = f - T(i);
+        const int local = i - first;
         return Span{Eigen::Map<const Row>(rows + Columns * local), Eigen::Map<const Row>(rows + Columns * (local + 1)), a};
     }
 };

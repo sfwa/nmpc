@@ -122,7 +122,10 @@ struct NoCorrection {
 An attitude and rate cascade, as the error law of a rigid body in place of the
 solver's stored gains: the attitude error to a rate command, and a PID on the
 rate to a moment about each body axis. The attitude error is the NED rotation
-log(q * conj(q_plan)) taken into body axes; the rate's derivative term is
+log(q * conj(q_plan)) taken into body axes. The planned rate is in the planned
+attitude's body axes, so it is turned into the vehicle's own body axes,
+conj(q) q_plan w_plan, before it is compared with the measured rate; the two
+frames part whenever the attitude is off the plan. The rate's derivative term is
 low-passed; the integral is held within a limit and stops while the command is
 clipped. The defaults are the review prototype's for the F450: attitude 6, 6
 and 3 per second, rate 18, 18 and 6 per second with an integral corner at
@@ -158,11 +161,16 @@ struct AttitudeCascade {
         derivative.setZero();
     }
 
-    /* The moment about the body axes, N m, toward the planned attitude and rate, for the inertia's diagonal. */
+    /*
+    The moment about the body axes, N m, toward the planned attitude and rate, for the inertia's diagonal.
+    w is the measured rate in the body axes of q, and w_plan the planned rate in the body axes of q_plan.
+    */
     Vector<T, 3> moment(const Quaternion<T>& q, const Vector<T, 3>& w, const Quaternion<T>& q_plan,
             const Vector<T, 3>& w_plan, const Vector<T, 3>& inertia) {
         const Vector<T, 3> theta = so3_log<T>(q * q_plan.conjugate());
-        const Vector<T, 3> rate_command = w_plan - k_attitude.cwiseProduct(Vector<T, 3>(q.conjugate() * theta));
+        const Quaternion<T> q_body = q.conjugate();
+        const Vector<T, 3> planned(q_body * (q_plan * w_plan));
+        const Vector<T, 3> rate_command = planned - k_attitude.cwiseProduct(Vector<T, 3>(q_body * theta));
         error = rate_command - w;
         derivative = derivative_decay * derivative + (T(1) - derivative_decay) * (error - error_previous) / h;
         error_previous = error;

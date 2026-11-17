@@ -3,7 +3,8 @@
 The Cortex-M7 gate: build the benchmark, run it under QEMU, and check that
 
   1. NMPC's own code links no double-precision support routine (__aeabi_d*,
-     __aeabi_*2d) in this single-precision build, and
+     __aeabi_*2d) in this single-precision build, with the default solver or
+     with per-stage Jacobians, and
   2. each instruction count is within a tolerance of the accepted baseline
      for the same compiler version.
 
@@ -70,13 +71,14 @@ def main():
         sys.stderr.write(run.stderr)
         print("FAIL: the benchmark did not build or run")
         return 1
-    if "all solves usable" not in run.stdout:
+    if run.stdout.count("all solves usable") != 2:
         print("FAIL: a solve was not usable")
         return 1
 
     output = pathlib.Path(args.output)
-    undefined = subprocess.run(["arm-none-eabi-nm", "-u", str(output / "main.o")], check=True,
-                               capture_output=True, text=True).stdout
+    undefined = "".join(subprocess.run(["arm-none-eabi-nm", "-u", str(output / name)], check=True,
+                                       capture_output=True, text=True).stdout
+                        for name in ("main.o", "main_per_stage.o"))
     own = sorted(set(DOUBLE.findall(undefined)))
     if own:
         print("FAIL: NMPC's code calls double-precision routines: " + ", ".join("__aeabi_" + s for s in own))

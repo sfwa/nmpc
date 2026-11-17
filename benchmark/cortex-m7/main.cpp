@@ -35,7 +35,18 @@ static uint32_t stack_used() { return 0; }
 #endif
 
 using Problem = Synthetic_Problem<float>;
+/*
+Built twice by build.sh: as the default solver, and with NMPC_BENCHMARK_PER_STAGE as the solver that
+makes each stage's Jacobians in the backward pass and does not keep them (Workspace.h). Each is a
+program of its own, so that neither changes how the other is compiled.
+*/
+#ifdef NMPC_BENCHMARK_PER_STAGE
+using Solver = NMPC::Solver<Problem, Problem::Stages, NMPC::Jacobians::PerStage>;
+#define NAME(name) name ", per-stage Jacobians"
+#else
 using Solver = NMPC::Solver<Problem>;
+#define NAME(name) name
+#endif
 
 static Solver::Workspace workspace;
 static Problem problem;
@@ -64,6 +75,9 @@ int main() {
     timer_start();
     print("sizeof: workspace ");
     print_u(sizeof(Solver::Workspace));
+#ifdef NMPC_BENCHMARK_PER_STAGE
+    print(" with per-stage Jacobians");
+#endif
     print(", problem ");
     print_u(sizeof(Problem));
     print(" bytes\n");
@@ -74,7 +88,7 @@ int main() {
     solver.reset(x, problem.hover());
 
     /* The first solve, from a reset plan, is the longest repeatable solve of a flight. */
-    measure("first solve", 1, [&]() { solver.solve(problem, x, options); });
+    measure(NAME("first solve"), 1, [&]() { solver.solve(problem, x, options); });
     x = problem.step(0, x, solver.policy().u[0]);
 
     /* The steady pattern of a running controller: shift, solve once, step the plant. */
@@ -85,24 +99,27 @@ int main() {
         x = problem.step(0, x, solver.policy().u[0]);
     }
     int usable = 0;
-    measure("solve", 10, [&]() {
+    measure(NAME("solve"), 10, [&]() {
         solver.advance(problem, 1);
         problem.phase += 0.1f;
         usable += solver.solve(problem, x, options).usable() ? 1 : 0;
         x = problem.step(0, x, solver.policy().u[0]);
     });
 
-    measure("linearise", 5, [&]() { solver.linearise(problem); });
-    measure("backward pass", 5, [&]() {
+#ifndef NMPC_BENCHMARK_PER_STAGE
+    /* With per-stage Jacobians the backward pass makes them, and linearise does nothing. */
+    measure(NAME("linearise"), 5, [&]() { solver.linearise(problem); });
+#endif
+    measure(NAME("backward pass"), 5, [&]() {
         float dV1 = 0.0f, dV2 = 0.0f;
         int passes = 0;
         solver.backward(problem, options, dV1, dV2, passes);
     });
-    measure("line search trial", 5, [&]() {
+    measure(NAME("line search trial"), 5, [&]() {
         int bound = 0;
         solver.forward(problem, x, 1.0f, bound);
     });
-    measure("rollout", 5, [&]() {
+    measure(NAME("rollout"), 5, [&]() {
         int bound = 0;
         solver.rollout(problem, x, bound);
     });

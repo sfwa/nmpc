@@ -8,6 +8,8 @@ the repository.
 
 #include "NMPC/Types.h"
 #include <Eigen/Cholesky>
+#include <cmath>
+#include <limits>
 
 namespace NMPC {
 
@@ -38,6 +40,20 @@ step, the same stage then does it again at every solve. The contouring
 problem's clock rate, which sits on its bound nearly all the time, met this
 and the plan stopped improving. This method does not have that failure.
 
+A variable whose bounds meet (lower == upper) is held from the start and never
+let go, whatever its gradient: it cannot move, so it must get no feedback, and
+its gain would otherwise reach into the stages before it through the cost to go.
+
+When it is at the minimiser over the free variables is decided without an
+absolute threshold, so that it does not depend on the scale of the problem:
+either the last pass took the whole Newton step, which ends at that minimiser,
+or every free gradient is within `tolerance` of the size of the terms that make
+it, |g(i)| + sum_j |H(i, j) d(j)|, which is where rounding leaves it. A held
+variable is let go only if its gradient pulls it inward by more than the same
+share of its terms, so that rounding cannot let go of a variable and hold it
+again for ever. The tolerance is relative; Options::box_tolerance is a few
+units of the last place of the type.
+
 Returns the passes used, or -1 if a factorisation failed. If the pass budget
 runs out, d is inside the bounds and the factor matches what is held.
 */
@@ -45,11 +61,25 @@ template <class T, int M>
 int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
         const Vector<T, M>& lower, const Vector<T, M>& upper,
         Vector<T, M>& d, Eigen::Array<bool, M, 1>& held,
-        Eigen::LLT<Matrix<T, M, M>>& factor, int max_passes) {
+        Eigen::LLT<Matrix<T, M, M>>& factor, int max_passes,
+        T tolerance = T(16) * std::numeric_limits<T>::epsilon()) {
     d = d.cwiseMax(lower).cwiseMin(upper);
     Vector<T, M> gradient = g + H * d;
+    /* The size of the terms that make each gradient, against which it is compared. */
+    Vector<T, M> size;
+    auto measure = [&]() {
+        for (int i = 0; i < M; i++) {
+            T s = std::abs(g(i));
+            for (int j = 0; j < M; j++) {
+                s += std::abs(H(i, j) * d(j));
+            }
+            size(i) = tolerance * s;
+        }
+    };
+    measure();
     for (int i = 0; i < M; i++) {
-        held(i) = (d(i) <= lower(i) && gradient(i) > T(0)) || (d(i) >= upper(i) && gradient(i) < T(0));
+        held(i) = !(upper(i) > lower(i)) ||
+            (d(i) <= lower(i) && gradient(i) > size(i)) || (d(i) >= upper(i) && gradient(i) < -size(i));
     }
 
     Eigen::Array<bool, M, 1> factored_for = held;
@@ -70,17 +100,21 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
         return factor.info() == Eigen::Success;
     };
 
+    bool at_minimiser = false;
     for (int pass = 0; pass < max_passes; pass++) {
         if ((!factored || (held != factored_for).any()) && !refactor()) {
             return -1;
         }
-        T free_gradient = T(0);
-        for (int i = 0; i < M; i++) {
-            if (!held(i)) {
-                free_gradient += gradient(i) * gradient(i);
+        if (!at_minimiser) {
+            at_minimiser = true;
+            for (int i = 0; i < M; i++) {
+                if (!held(i) && std::abs(gradient(i)) > size(i)) {
+                    at_minimiser = false;
+                    break;
+                }
             }
         }
-        if (free_gradient < T(1e-12) || held.all()) {
+        if (at_minimiser || held.all()) {
             /* At the minimiser over the free variables: let go of the held one pulled hardest inward. */
             int release = -1;
             T strongest = T(0);
@@ -89,7 +123,7 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
                     continue;
                 }
                 const T inward = d(i) <= lower(i) ? -gradient(i) : gradient(i);
-                if (inward > strongest) {
+                if (inward > size(i) && inward > strongest) {
                     strongest = inward;
                     release = i;
                 }
@@ -98,6 +132,7 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
                 return pass + 1;
             }
             held(release) = false;
+            at_minimiser = false;
             continue;
         }
 
@@ -146,7 +181,10 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
             d(limit) = search(limit) > T(0) ? upper(limit) : lower(limit);
             held(limit) = true;
         }
+        /* The whole Newton step ends at the minimiser over the free variables, to rounding. */
+        at_minimiser = limit < 0;
         gradient = g + H * d;
+        measure();
     }
     return refactor() ? max_passes : -1;
 }

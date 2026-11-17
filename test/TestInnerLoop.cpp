@@ -1,6 +1,7 @@
 #include "Typed.h"
 #include "NMPC/InnerLoop.h"
 #include "NMPC/Reference.h"
+#include <cmath>
 #include <vector>
 
 /*
@@ -56,9 +57,52 @@ TYPED_TEST(InnerLoopTest, WindowCountsLookupsOutsideIt) {
     EXPECT_EQ(table.misses, 0);
     const auto outside = table.span(T(8.5));
     EXPECT_EQ(table.misses, 1);
-    /* The nearest rows held stand in. */
+    /* The window's end holds. */
     EXPECT_EQ(outside.r0(0), T(5));
     EXPECT_EQ(outside.r1(0), T(6));
+    EXPECT_EQ(outside.a, T(1));
+}
+
+TYPED_TEST(InnerLoopTest, WindowMissHoldsTheWindowsEnd) {
+    /*
+    Rows 4 to 6 of a table of t at 1 s. Past the window the reference holds 6 and before it 4, as at the
+    ends of a table, and is continuous: it used to jump from 5.99 back to 5 at t = 6 and ramp again.
+    */
+    typedef TypeParam T;
+    std::vector<T> all;
+    for (int i = 0; i < 10; i++) {
+        all.push_back(T(i));
+    }
+    NMPC::PathTable<T, 1> table;
+    table.rows = all.data() + 4;
+    table.count = 10;
+    table.first = 4;
+    table.held = 3;
+    table.dt = T(1);
+    auto value = [&](T t) {
+        const auto s = table.span(t);
+        return s.r0(0) + s.a * (s.r1(0) - s.r0(0));
+    };
+    EXPECT_NEAR(value(T(5.99)), T(5.99), T(1e-5));
+    EXPECT_EQ(value(T(6)), T(6));
+    EXPECT_EQ(table.misses, 0);     /* the last row held covers its own time */
+    for (const T t : {T(6.01), T(6.5), T(7), T(7.5), T(9), T(20)}) {
+        EXPECT_EQ(value(t), T(6)) << t;
+    }
+    EXPECT_EQ(table.misses, 6);
+    for (const T t : {T(-1), T(0), T(2.5), T(3.99)}) {
+        EXPECT_EQ(value(t), T(4)) << t;
+    }
+    EXPECT_EQ(table.misses, 10);
+    EXPECT_EQ(value(T(4)), T(4));
+    EXPECT_EQ(table.misses, 10);
+    /* Continuous across the window's ends, sampled finely. */
+    T previous = value(T(3));
+    for (int i = 1; i <= 800; i++) {
+        const T now = value(T(3) + T(0.01) * T(i));
+        EXPECT_LE(std::abs(now - previous), T(0.0101)) << i;
+        previous = now;
+    }
 }
 
 TYPED_TEST(InnerLoopTest, ClockKeepsTimeOverAFlight) {
@@ -166,4 +210,33 @@ TYPED_TEST(InnerLoopTest, CascadeTurnsBackTowardThePlan) {
     c.moment(rolled, zero, level, zero, inertia);
     c.integrate(true, inertia);
     EXPECT_TRUE(c.integral.isZero());
+}
+
+TYPED_TEST(InnerLoopTest, CascadeComparesRatesInOneFrame) {
+    /*
+    The planned rate is in the plan's body axes and the measured rate in the vehicle's. With the attitude
+    and derivative terms off, a vehicle turning exactly as planned in the world, at another attitude,
+    gets no moment. Comparing the two body-axis rates directly gave one.
+    */
+    typedef TypeParam T;
+    typedef NMPC::Vector<T, 3> V3;
+    NMPC::AttitudeCascade<T> c;
+    c.design(T(0.001));
+    c.k_attitude.setZero();
+    c.kd.setZero();
+    const V3 inertia(T(0.02), T(0.02), T(0.04));
+    const NMPC::Quaternion<T> q(Eigen::AngleAxis<T>(T(0.5), V3(T(0.2), T(0.3), T(1)).normalized()));
+    const NMPC::Quaternion<T> q_plan(Eigen::AngleAxis<T>(T(-0.3), V3(T(1), T(-0.4), T(0.1)).normalized()));
+    const V3 world(T(1), T(-0.5), T(0.25));
+    const V3 w(q.conjugate() * world), w_plan(q_plan.conjugate() * world);
+    const V3 m = c.moment(q, w, q_plan, w_plan, inertia);
+    EXPECT_LT(m.norm(), T(1e-5));
+    EXPECT_LT(c.error.norm(), T(1e-5));
+
+    /* A rate error measured in the vehicle's axes comes out in them. */
+    const V3 extra(T(0.1), T(0), T(0));
+    const V3 m2 = c.moment(q, V3(w + extra), q_plan, w_plan, inertia);
+    EXPECT_NEAR(m2.x(), -c.kp.x() * inertia.x() * T(0.1), T(1e-5));
+    EXPECT_NEAR(m2.y(), T(0), T(1e-5));
+    EXPECT_NEAR(m2.z(), T(0), T(1e-5));
 }

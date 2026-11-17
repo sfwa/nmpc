@@ -1,10 +1,15 @@
 {
   "13.2.1": {
-    "backward pass": 2338352,
-    "first solve": 2851560,
+    "backward pass": 2242032,
+    "backward pass, per-stage Jacobians": 2376912,
+    "first solve": 2785240,
+    "first solve, per-stage Jacobians": 2793280,
     "line search trial": 123416,
-    "linearise": 126856,
+    "line search trial, per-stage Jacobians": 123376,
+    "linearise": 126848,
     "rollout": 111496,
-    "solve": 2777892
+    "rollout, per-stage Jacobians": 111496,
+    "solve": 2689552,
+    "solve, per-stage Jacobians": 2697508
   }
 }

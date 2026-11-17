@@ -171,3 +171,99 @@ TYPED_TEST(BoxQPTest, ReportsAFailedFactorisation) {
     Eigen::LLT<NMPC::Matrix<T, 2, 2>> factor;
     EXPECT_EQ((NMPC::solve_box_qp<T, 2>(H, g, lower, upper, d, held, factor, 32)), -1);
 }
+
+TYPED_TEST(BoxQPTest, EqualBoundsAreAlwaysHeld) {
+    /*
+    A variable whose bounds meet cannot move, so it is held and gets no feedback even where its gradient
+    is zero. It was left free when its gradient was zero, and the gain solved with it was not zero.
+    */
+    typedef TypeParam T;
+    NMPC::Matrix<T, 2, 2> H;
+    H << T(2), T(0.5), T(0.5), T(1);
+    const NMPC::Vector<T, 2> g = NMPC::Vector<T, 2>::Zero();
+    const NMPC::Vector<T, 2> lower(T(0), T(-1)), upper(T(0), T(1));
+    NMPC::Vector<T, 2> d = NMPC::Vector<T, 2>::Zero();
+    Eigen::Array<bool, 2, 1> held;
+    Eigen::LLT<NMPC::Matrix<T, 2, 2>> factor;
+    ASSERT_GT((NMPC::solve_box_qp<T, 2>(H, g, lower, upper, d, held, factor, 32)), 0);
+    EXPECT_TRUE(held(0));
+    EXPECT_FALSE(held(1));
+    EXPECT_EQ(d(0), T(0));
+    /* The factor has the held variable's row and column replaced by the identity. */
+    const NMPC::Vector<T, 2> rhs(T(0), T(1));
+    const NMPC::Vector<T, 2> solved = factor.solve(rhs);
+    EXPECT_EQ(solved(0), T(0));
+    EXPECT_NEAR(double(solved(1)), 1.0, 1e-6);
+
+    /* Also from a start with a gradient that would let it go. */
+    const NMPC::Vector<T, 2> pulling(T(-3), T(0.5));
+    d = NMPC::Vector<T, 2>::Zero();
+    ASSERT_GT((NMPC::solve_box_qp<T, 2>(H, pulling, lower, upper, d, held, factor, 32)), 0);
+    EXPECT_TRUE(held(0));
+    EXPECT_EQ(d(0), T(0));
+}
+
+TYPED_TEST(BoxQPTest, AnswerDoesNotDependOnTheScale) {
+    /*
+    The stop is relative: the same problem multiplied through by a small or a large number has the same
+    answer. With an absolute test on the gradient, 0.5 (1e-4 (u - 1))^2 stopped at its start, u = 0.
+    */
+    typedef TypeParam T;
+    for (const double scale : {1e-12, 1e-8, 1e-4, 1.0, 1e4, 1e8}) {
+        NMPC::Matrix<T, 1, 1> H;
+        H << T(scale);
+        NMPC::Vector<T, 1> g, lower, upper, d;
+        g << T(-scale);
+        lower << T(-10);
+        upper << T(10);
+        d << T(0);
+        Eigen::Array<bool, 1, 1> held;
+        Eigen::LLT<NMPC::Matrix<T, 1, 1>> factor;
+        ASSERT_GT((NMPC::solve_box_qp<T, 1>(H, g, lower, upper, d, held, factor, 32)), 0) << scale;
+        EXPECT_NEAR(double(d(0)), 1.0, 1e-5) << scale;
+        EXPECT_FALSE(held(0)) << scale;
+    }
+    /* The random cases multiplied through: the same answers as unscaled. */
+    Sequence random;
+    for (int n = 0; n < 50; n++) {
+        const Case<T, 4> c = make_case<T, 4>(random);
+        NMPC::Vector<T, 4> reference = NMPC::Vector<T, 4>::Zero();
+        Eigen::Array<bool, 4, 1> held_reference;
+        Eigen::LLT<NMPC::Matrix<T, 4, 4>> factor;
+        ASSERT_GT((NMPC::solve_box_qp<T, 4>(c.H, c.g, c.lower, c.upper, reference, held_reference, factor, 64)), 0);
+        for (const double scale : {1e-6, 1e6}) {
+            const NMPC::Matrix<T, 4, 4> H(c.H * T(scale));
+            const NMPC::Vector<T, 4> g(c.g * T(scale));
+            NMPC::Vector<T, 4> d = NMPC::Vector<T, 4>::Zero();
+            Eigen::Array<bool, 4, 1> held;
+            ASSERT_GT((NMPC::solve_box_qp<T, 4>(H, g, c.lower, c.upper, d, held, factor, 64)), 0);
+            const double tolerance = std::is_same<T, float>::value ? 1e-4 : 1e-10;
+            for (int i = 0; i < 4; i++) {
+                EXPECT_NEAR(double(d(i)), double(reference(i)), tolerance) << "case " << n << ", scale " << scale;
+                EXPECT_EQ(held(i), held_reference(i)) << "case " << n << ", scale " << scale;
+            }
+        }
+    }
+}
+
+TYPED_TEST(BoxQPTest, WarmStartDoesNotChangeTheAnswer) {
+    /* From the answer, from zero and from a corner, the same answer to rounding. */
+    typedef TypeParam T;
+    Sequence random;
+    for (int n = 0; n < 50; n++) {
+        const Case<T, 5> c = make_case<T, 5>(random);
+        Eigen::Array<bool, 5, 1> held;
+        Eigen::LLT<NMPC::Matrix<T, 5, 5>> factor;
+        NMPC::Vector<T, 5> from_zero = NMPC::Vector<T, 5>::Zero();
+        ASSERT_GT((NMPC::solve_box_qp<T, 5>(c.H, c.g, c.lower, c.upper, from_zero, held, factor, 64)), 0);
+        NMPC::Vector<T, 5> from_corner = c.upper;
+        ASSERT_GT((NMPC::solve_box_qp<T, 5>(c.H, c.g, c.lower, c.upper, from_corner, held, factor, 64)), 0);
+        NMPC::Vector<T, 5> again = from_zero;
+        ASSERT_GT((NMPC::solve_box_qp<T, 5>(c.H, c.g, c.lower, c.upper, again, held, factor, 64)), 0);
+        const double tolerance = std::is_same<T, float>::value ? 1e-5 : 1e-13;
+        for (int i = 0; i < 5; i++) {
+            EXPECT_NEAR(double(from_corner(i)), double(from_zero(i)), tolerance) << "case " << n;
+            EXPECT_NEAR(double(again(i)), double(from_zero(i)), tolerance) << "case " << n;
+        }
+    }
+}

@@ -13,7 +13,10 @@ namespace NMPC {
 
 /* Why a solve ended. */
 enum class Status {
-    /* The predicted decrease fell below the precision floor. The plan is the best this precision can verify. */
+    /*
+    The predicted decrease fell below the precision floor, or was zero (every stage's step was zero, as at an
+    exact optimum). The plan is the best this precision can verify.
+    */
     Converged,
     /* The iteration budget was spent. With one iteration a solve this is the normal outcome. */
     IterationLimit,
