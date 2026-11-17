@@ -11,6 +11,22 @@ static_assert(_MSVC_LANG >= 201703L, "NMPC must propagate C++17 to consumers");
 static_assert(__cplusplus >= 201703L, "NMPC must propagate C++17 to consumers");
 #endif
 
+#ifdef EXPECT_EIGEN_UNROLLING_LIMIT
+static_assert(EIGEN_UNROLLING_LIMIT == EXPECT_EIGEN_UNROLLING_LIMIT,
+    "NMPC_EIGEN_UNROLLING_LIMIT must reach consumers");
+#endif
+
+/* The header's version must be the CMake package's. */
+constexpr bool same_string(const char* a, const char* b) {
+    return *a == *b && (*a == '\0' || same_string(a + 1, b + 1));
+}
+static_assert(NMPC_VERSION == NMPC_VERSION_MAJOR * 10000 + NMPC_VERSION_MINOR * 100 + NMPC_VERSION_PATCH,
+    "NMPC_VERSION must be made from its parts");
+#ifdef EXPECT_VERSION_STRING
+static_assert(same_string(NMPC_VERSION_STRING, EXPECT_VERSION_STRING),
+    "NMPC_VERSION_STRING must match the version of the nmpc CMake package");
+#endif
+
 #ifdef EXPECT_DOUBLE
 typedef double Scalar;
 #else

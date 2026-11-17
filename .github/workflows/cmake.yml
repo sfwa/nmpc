@@ -3,6 +3,8 @@ name: CMake
 on:
   push:
     branches: [master]
+    # A release tag runs the whole matrix again, and checks the tag against the version header.
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -16,37 +18,64 @@ jobs:
   build:
     name: ${{ matrix.config.name }} / ${{ matrix.build_type }}
     runs-on: ${{ matrix.config.os }}
-    timeout-minutes: 20
+    # Empty for most configurations, which run directly on the runner.
+    container: ${{ matrix.config.container }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         build_type: [Debug, Release]
+        # The same configurations as UKF's CI, so that every tested Eigen and
+        # compiler is tested for both libraries.
         config:
-          - { name: Linux GCC (bundled Eigen 3.2.8), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'OFF' }
-          - { name: Linux Clang (bundled Eigen 3.2.8), os: ubuntu-24.04, CC: clang, CXX: clang++, eigen: 'OFF' }
-          - { name: macOS Clang (bundled Eigen 3.2.8), os: macos-latest, CC: clang, CXX: clang++, eigen: 'OFF' }
-          - { name: Linux GCC (system Eigen 3.4.0), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'ON' }
+          - { name: Linux GCC (bundled Eigen), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'OFF' }
+          - { name: Linux Clang (bundled Eigen), os: ubuntu-24.04, CC: clang, CXX: clang++, eigen: 'OFF' }
+          - { name: macOS Clang (bundled Eigen), os: macos-latest, CC: clang, CXX: clang++, eigen: 'OFF' }
+          - { name: Linux GCC (system Eigen), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'ON' }
+          # Newer Eigen releases, downloaded and used unpatched.
+          - { name: Linux GCC (Eigen 3.4.0), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'OFF', eigen_version: '3.4.0' }
+          - { name: Linux Clang (Eigen 5.0.0), os: ubuntu-24.04, CC: clang, CXX: clang++, eigen: 'OFF', eigen_version: '5.0.0' }
+          # The newest compilers, which diagnose more than the runner's defaults.
+          - { name: Linux GCC 15 (bundled Eigen), os: ubuntu-24.04, container: 'gcc:15', CC: gcc, CXX: g++, eigen: 'OFF' }
+          - { name: Linux Clang 22 (bundled Eigen), os: ubuntu-24.04, CC: clang-22, CXX: clang++-22, eigen: 'OFF', llvm: '22' }
     env:
       CC: ${{ matrix.config.CC }}
       CXX: ${{ matrix.config.CXX }}
+      EIGEN_ARGS: -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }} -DNMPC_EIGEN_VERSION=${{ matrix.config.eigen_version || '3.2.8' }}
+      UKF_EIGEN_ARGS: -DUKF_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }} -DUKF_EIGEN_VERSION=${{ matrix.config.eigen_version || '3.2.8' }}
     steps:
+      - name: Install build tools in the container
+        if: matrix.config.container != ''
+        run: apt-get update && apt-get install -y --no-install-recommends cmake patch
+
       - uses: actions/checkout@v5
 
-      - name: Check out UKF beside NMPC, for the consumer fixture
+      - name: Check out UKF beside NMPC, for the consumer fixtures
         uses: actions/checkout@v5
         with:
           repository: sfwa/ukf
           path: ukf
+
+      - name: Install LLVM
+        if: matrix.config.llvm != ''
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          sudo bash llvm.sh ${{ matrix.config.llvm }}
+          ${{ matrix.config.CXX }} --version
 
       - name: Install system Eigen
         if: matrix.config.eigen == 'ON'
         run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} $EIGEN_ARGS -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
 
       - name: Build tests, benchmarks and examples with warnings as errors
         run: cmake --build build --target unittest unittest_no_heap benchmark stop pendulum attitude --config ${{ matrix.build_type }} --parallel 2
+
+      - name: Show dependency build logs
+        if: failure()
+        run: find build -path '*-stamp/*.log' -exec sh -c 'echo "== $1"; tail -n 80 "$1"' _ {} \;
 
       - name: Test in float and double
         working-directory: build
@@ -58,17 +87,67 @@ jobs:
           build/examples/pendulum/pendulum
           build/examples/attitude/attitude
 
+      - name: Test with Eigen unrolling disabled
+        if: matrix.config.name == 'Linux GCC (bundled Eigen)'
+        run: |
+          cmake -S . -B build-unroll -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_EIGEN_UNROLLING_LIMIT=0
+          cmake --build build-unroll --target unittest unittest_no_heap --parallel 2
+          ctest --test-dir build-unroll --output-on-failure
+
       - name: Downstream consumer, alone
         run: |
-          cmake -S test/cmake -B build-consumer -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }}
+          cmake -S test/cmake -B build-consumer -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} $EIGEN_ARGS
           cmake --build build-consumer --config ${{ matrix.build_type }} --parallel 2
           ctest --test-dir build-consumer --build-config ${{ matrix.build_type }} --output-on-failure
 
       - name: Downstream consumer, beside UKF and sharing its Eigen
         run: |
-          cmake -S test/cmake -B build-consumer-ukf -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }} -DNMPC_TEST_UKF_DIR=${{ github.workspace }}/ukf
+          cmake -S test/cmake -B build-consumer-ukf -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} $EIGEN_ARGS -DNMPC_TEST_UKF_DIR=$GITHUB_WORKSPACE/ukf
           cmake --build build-consumer-ukf --config ${{ matrix.build_type }} --parallel 2
           ctest --test-dir build-consumer-ukf --build-config ${{ matrix.build_type }} --output-on-failure
+
+      - name: Check the unrolling limit reaches consumers, and that NMPC refuses a second Eigen beside UKF
+        if: matrix.config.name == 'Linux GCC (bundled Eigen)'
+        run: |
+          cmake -S test/cmake -B build-consumer-unroll -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_EIGEN_UNROLLING_LIMIT=0 -DNMPC_TEST_UKF_DIR=$GITHUB_WORKSPACE/ukf
+          cmake --build build-consumer-unroll --target consumer_double consumer_single consumer_with_ukf --parallel 2
+          if cmake -S test/cmake/mismatch -B build-mismatch -DNMPC_TEST_UKF_DIR=$GITHUB_WORKSPACE/ukf > mismatch.log 2>&1; then
+            cat mismatch.log; echo "A different Eigen for NMPC than UKF's must fail the configure"; exit 1
+          fi
+          grep -q "must match UKF_EIGEN_VERSION" mismatch.log || { cat mismatch.log; exit 1; }
+
+      - name: Install and use the CMake package, alone and beside an installed UKF
+        run: |
+          cmake --install build --config ${{ matrix.build_type }}
+          cmake -S test/cmake/installed -B build-installed -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/install
+          cmake --build build-installed --config ${{ matrix.build_type }} --parallel 2
+          ctest --test-dir build-installed --build-config ${{ matrix.build_type }} --output-on-failure
+          cmake -S ukf -B build-ukf -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} $UKF_EIGEN_ARGS -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install-ukf
+          cmake --build build-ukf --config ${{ matrix.build_type }}
+          cmake --install build-ukf --config ${{ matrix.build_type }}
+          cmake -S test/cmake/installed -B build-installed-ukf -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_TEST_INSTALLED_UKF=ON "-DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/install;$GITHUB_WORKSPACE/install-ukf"
+          cmake --build build-installed-ukf --config ${{ matrix.build_type }} --parallel 2
+          ctest --test-dir build-installed-ukf --build-config ${{ matrix.build_type }} --output-on-failure
+
+  version:
+    name: Version header, CMake package and release tag agree
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the version as CMake does, and check a release tag against it
+        run: |
+          cmake -S . -B build -DNMPC_BUILD_TESTS=OFF -DNMPC_BUILD_BENCHMARKS=OFF -DNMPC_BUILD_EXAMPLES=OFF
+          version=$(sed -n 's/^#define NMPC_VERSION_STRING "\(.*\)"$/\1/p' include/NMPC/Version.h)
+          echo "Version header: $version"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match NMPC_VERSION_STRING ${version}"
+              exit 1
+            fi
+            grep -q "^## \[${version}\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no section for ${version}"; exit 1; }
+          fi
 
   cortex-m7:
     name: Cortex-M7 single precision under QEMU

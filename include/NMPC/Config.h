@@ -6,13 +6,8 @@ the repository.
 #ifndef NMPC_CONFIG_H
 #define NMPC_CONFIG_H
 
-/*
-The library version, as major, minor and patch numbers. The rewrite starts at
-2: the earlier C, C66x and Python implementation is version 1.
-*/
-#define NMPC_VERSION_MAJOR 2
-#define NMPC_VERSION_MINOR 0
-#define NMPC_VERSION_PATCH 0
+/* The library version. */
+#include "NMPC/Version.h"
 
 /*
 Assertions on the caller's use of the library, such as a stage index out of

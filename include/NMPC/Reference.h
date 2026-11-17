@@ -23,6 +23,8 @@ either side of a time and the fraction between them; the vehicle's path type
 (for the multirotor, SFWA::Guidance::MultirotorPath) turns them into a state
 and a command, interpolating each part in its own way. Before the first row
 and after the last, the ends hold.
+Experimental: everything in this header may change in a minor release while
+the controllers that use it settle (see RELEASING.md).
 */
 template <class T, int Columns>
 struct PathTable {

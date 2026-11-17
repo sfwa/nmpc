@@ -17,6 +17,9 @@ Building blocks of an inner loop that runs between solves. The loop is the sum
 of three terms: the plan's command at this tick (the feedforward), an error law
 on the distance between the state and the plan, and a correction from the
 measured acceleration. These are the pieces they share.
+
+Experimental: everything in this header may change in a minor release while
+the controllers that use it settle (see RELEASING.md).
 */
 
 /* A second-order Butterworth low-pass, by the bilinear transform. */
