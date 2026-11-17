@@ -46,7 +46,8 @@ its gain would otherwise reach into the stages before it through the cost to go.
 
 When it is at the minimiser over the free variables is decided without an
 absolute threshold, so that it does not depend on the scale of the problem:
-either the last pass took the whole Newton step, which ends at that minimiser,
+either the last pass took the whole Newton step, whose free variables then take
+the Newton target's values (the minimiser, to the accuracy of the solve),
 or every free gradient is within `tolerance` of the size of the terms that make
 it, |g(i)| + sum_j |H(i, j) d(j)|, which is where rounding leaves it. A held
 variable is let go only if its gradient pulls it inward by more than the same
@@ -54,15 +55,22 @@ share of its terms, so that rounding cannot let go of a variable and hold it
 again for ever. The tolerance is relative; Options::box_tolerance is a few
 units of the last place of the type.
 
-Returns the passes used, or -1 if a factorisation failed. If the pass budget
-runs out, d is inside the bounds and the factor matches what is held.
+Returns the passes used, or -1 if a factorisation failed. `finished`, if given,
+says whether the method reached the solution within the budget. If the pass
+budget runs out, d is inside the bounds and the factor matches what is held,
+but d need not be the solution and, from a poor start, can be worse than d = 0.
+From d = 0, where 0 is inside the bounds, it never is, since no pass raises the
+objective.
 */
 template <class T, int M>
 int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
         const Vector<T, M>& lower, const Vector<T, M>& upper,
         Vector<T, M>& d, Eigen::Array<bool, M, 1>& held,
         Eigen::LLT<Matrix<T, M, M>>& factor, int max_passes,
-        T tolerance = T(16) * std::numeric_limits<T>::epsilon()) {
+        T tolerance = T(16) * std::numeric_limits<T>::epsilon(), bool* finished = nullptr) {
+    if (finished) {
+        *finished = false;
+    }
     d = d.cwiseMax(lower).cwiseMin(upper);
     Vector<T, M> gradient = g + H * d;
     /* The size of the terms that make each gradient, against which it is compared. */
@@ -129,6 +137,9 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
                 }
             }
             if (release < 0) {
+                if (finished) {
+                    *finished = true;
+                }
                 return pass + 1;
             }
             held(release) = false;
@@ -156,19 +167,20 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
                 search(i) = T(0);
             }
         }
+        /* Which bound is met first is decided on the target itself, not on d + (target - d), which can lose it. */
         T step = T(1);
         int limit = -1;
         for (int i = 0; i < M; i++) {
             if (held(i)) {
                 continue;
             }
-            if (search(i) > T(0) && d(i) + search(i) > upper(i)) {
+            if (target(i) > upper(i)) {
                 const T reach = (upper(i) - d(i)) / search(i);
                 if (reach < step) {
                     step = reach;
                     limit = i;
                 }
-            } else if (search(i) < T(0) && d(i) + search(i) < lower(i)) {
+            } else if (target(i) < lower(i)) {
                 const T reach = (lower(i) - d(i)) / search(i);
                 if (reach < step) {
                     step = reach;
@@ -176,13 +188,24 @@ int solve_box_qp(const Matrix<T, M, M>& H, const Vector<T, M>& g,
                 }
             }
         }
-        d = d + step * search;
-        if (limit >= 0) {
-            d(limit) = search(limit) > T(0) ? upper(limit) : lower(limit);
+        if (limit < 0) {
+            /*
+            The whole Newton step: the free variables take the target's values themselves, which is the
+            minimiser over them to rounding. Adding the step to d instead could lose the target to
+            cancellation when d is far from it (from 1e8 to 1 in single precision gives 0).
+            */
+            for (int i = 0; i < M; i++) {
+                if (!held(i)) {
+                    d(i) = target(i);
+                }
+            }
+            at_minimiser = true;
+        } else {
+            d = (d + step * search).cwiseMax(lower).cwiseMin(upper);
+            d(limit) = target(limit) > upper(limit) ? upper(limit) : lower(limit);
             held(limit) = true;
+            at_minimiser = false;
         }
-        /* The whole Newton step ends at the minimiser over the free variables, to rounding. */
-        at_minimiser = limit < 0;
         gradient = g + H * d;
         measure();
     }

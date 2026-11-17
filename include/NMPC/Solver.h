@@ -82,6 +82,7 @@ public:
             ws.plan.x[k] = x0;
             ws.plan.u[k] = u0;
             ws.plan.K[k].setZero();
+            ws.gain[k].setZero();
             ws.step[k].setZero();
         }
         ws.plan.x[N] = x0;
@@ -177,16 +178,43 @@ public:
                         options.regularisation_max);
                     continue;
                 }
-                result.predicted_decrease = -(dV1 + dV2);
+                const T predicted = -(dV1 + dV2);
+                result.predicted_decrease = predicted;
+                const T resolution = options.precision_floor * std::abs(cost);
                 /*
-                A predicted decrease of zero (every stage's step is zero, as at an exact optimum of zero cost)
-                is convergence whatever the floor: no step can be accepted, and retries and a line search
-                would only spend time to report NoProgress.
+                A step that the model says makes the plan worse, by more than the type resolves, or that is not
+                finite, is not a solution: a stage QP whose pass budget ran out from a poor warm start can
+                return one. Its gains are not used. The stage QPs start again from zero, from which they
+                cannot end uphill, and the pass is repeated; a pass that is not finite also raises the
+                regularisation. If the retries run out the solve makes no progress.
                 */
-                if (!(result.predicted_decrease > T(0)) || (options.precision_floor > T(0) &&
-                        result.predicted_decrease < options.precision_floor * std::abs(cost))) {
+                if (!std::isfinite(predicted) || predicted < -resolution) {
+                    result.invalid_predictions++;
+                    for (int k = 0; k < N; k++) {
+                        ws.step[k].setZero();
+                    }
+                    if (!std::isfinite(predicted)) {
+                        regularisation = std::min(regularisation * options.regularisation_factor,
+                            options.regularisation_max);
+                    }
+                    continue;
+                }
+                commit_gains();
+                /*
+                A predicted decrease of exactly zero (every stage's step is zero, as at an exact optimum of zero
+                cost) is convergence whatever the floor: no step can be accepted, and retries and a line search
+                would only spend time to report NoProgress. Below the floor is convergence too. Either is
+                convergence only if every stage QP reached its solution: a zero step from a QP that ran out of
+                passes says nothing about the plan.
+                */
+                if (stage_qps_finished &&
+                        (predicted == T(0) || (options.precision_floor > T(0) && predicted < resolution))) {
                     converged = true;
                     break;
+                }
+                if (!(predicted > T(0))) {
+                    /* Nothing to gain from a line search. A repeated pass carries the stage QPs on from where they stopped. */
+                    continue;
                 }
                 T alpha = T(1);
                 for (int trial = 0; trial < options.max_line_search; trial++, alpha *= T(0.5)) {
@@ -270,13 +298,15 @@ public:
     }
 
     /*
-    The backward pass, with one triangle of each symmetric product. It stores each stage's step in
-    the workspace and its gain in the plan, and returns false if a stage QP could not be factored.
+    The backward pass, with one triangle of each symmetric product. It stores each stage's step and gain
+    in the workspace, and returns false if a stage QP could not be factored. The gains become the plan's
+    only when solve() commits them after a whole pass with a usable prediction.
     dV1 and dV2 are the linear and quadratic terms of the predicted change of cost for a full step.
     */
     bool backward(const Problem& problem, const Options<T>& options, T& dV1, T& dV2, int& box_iterations) {
         Tangent Vx;
         MatA Vxx;
+        stage_qps_finished = true;
         terminal_expansion(problem, Vx, Vxx);
         for (int k = N - 1; k >= 0; k--) {
             Linearisation here;
@@ -332,11 +362,13 @@ public:
             Control d = ws.step[k];
             Eigen::Array<bool, NU, 1> held;
             Eigen::LLT<MatU> factor;
+            bool finished = false;
             const int passes = solve_box_qp<T, NU>(H, Qu, lo, hi, d, held, factor, options.max_box_iterations,
-                options.box_tolerance);
+                options.box_tolerance, &finished);
             if (passes < 0) {
                 return false;
             }
+            stage_qps_finished = stage_qps_finished && finished;
             box_iterations += passes;
 
             Gain rhs = -Qux;
@@ -389,7 +421,7 @@ public:
             ws.step[k] = d;
             for (int j = 0; j < NX; j++) {
                 for (int i = 0; i < NU; i++) {
-                    ws.plan.K[k](i, j) = Du(i) * K(i, j) * inverse_Dx(j);
+                    ws.gain[k](i, j) = Du(i) * K(i, j) * inverse_Dx(j);
                 }
             }
 
@@ -415,14 +447,14 @@ public:
         return true;
     }
 
-    /* A trial plan from x0 with a step of length alpha and the new gains. Returns its cost. */
+    /* A trial plan from x0 with a step of length alpha and the last backward pass's gains. Returns its cost. */
     T forward(const Problem& problem, const State& x0, T alpha, int& bound_stages) {
         bound_stages = 0;
         ws.trial_x[0] = x0;
         T cost = T(0);
         for (int k = 0; k < N; k++) {
             const Tangent deviation = Problem::difference(ws.trial_x[k], ws.plan.x[k]);
-            const Control u = (ws.plan.u[k] + alpha * Du.cwiseProduct(ws.step[k]) + ws.plan.K[k] * deviation)
+            const Control u = (ws.plan.u[k] + alpha * Du.cwiseProduct(ws.step[k]) + ws.gain[k] * deviation)
                 .cwiseMax(ws.lower[k]).cwiseMin(ws.upper[k]);
             ws.trial_u[k] = u;
             bound_stages += on_bound(k, u);
@@ -437,6 +469,9 @@ public:
 
     /* The regularisation in force, in normalised units. */
     T regularisation = T(0);
+
+    /* Whether every stage QP of the last backward pass reached its solution within its pass budget. */
+    bool stage_qps_finished = false;
 
 private:
     Workspace& ws;
@@ -496,6 +531,13 @@ private:
         } else {
             (void)here;
             return ws.jacobians.B[k];
+        }
+    }
+
+    /* The last backward pass's gains become the plan's. */
+    void commit_gains() {
+        for (int k = 0; k < N; k++) {
+            ws.plan.K[k] = ws.gain[k];
         }
     }
 

@@ -267,3 +267,55 @@ TYPED_TEST(BoxQPTest, WarmStartDoesNotChangeTheAnswer) {
         }
     }
 }
+
+TYPED_TEST(BoxQPTest, AWholeStepFromFarAwayReachesItsTarget) {
+    /*
+    The whole Newton step sets the free variables to the target. Adding the step to a start far from it
+    lost it to cancellation: in single precision, from 1e8 the answer to H = 1, g = -1 came out 0, with a
+    gradient of -1 left, and the method stopped there. Double precision loses it from 1e17.
+    */
+    typedef TypeParam T;
+    for (const double start : {1e8, -1e8, 1e12, 1e17}) {
+        NMPC::Matrix<T, 1, 1> H;
+        H << T(1);
+        NMPC::Vector<T, 1> g, lower, upper, d;
+        g << T(-1);
+        lower << T(-1e30);
+        upper << T(1e30);
+        d << T(start);
+        Eigen::Array<bool, 1, 1> held;
+        Eigen::LLT<NMPC::Matrix<T, 1, 1>> factor;
+        bool finished = false;
+        ASSERT_GT((NMPC::solve_box_qp<T, 1>(H, g, lower, upper, d, held, factor, 32,
+            T(16) * std::numeric_limits<T>::epsilon(), &finished)), 0) << start;
+        EXPECT_EQ(d(0), T(1)) << start;
+        EXPECT_TRUE(finished) << start;
+    }
+    /* Two variables, one ending on a bound, from far away. */
+    NMPC::Matrix<T, 2, 2> H;
+    H << T(2), T(0.5), T(0.5), T(1);
+    const NMPC::Vector<T, 2> g(T(-1), T(4)), lower(T(-1e9), T(-1)), upper(T(1e9), T(1));
+    NMPC::Vector<T, 2> d(T(1e8), T(0));
+    Eigen::Array<bool, 2, 1> held;
+    Eigen::LLT<NMPC::Matrix<T, 2, 2>> factor;
+    ASSERT_GT((NMPC::solve_box_qp<T, 2>(H, g, lower, upper, d, held, factor, 32)), 0);
+    EXPECT_EQ(d(1), T(-1));
+    EXPECT_TRUE(held(1));
+    EXPECT_NEAR(double(d(0)), (1.0 + 0.5) / 2.0, 1e-6);
+}
+
+TYPED_TEST(BoxQPTest, ReportsWhetherItFinished) {
+    typedef TypeParam T;
+    Sequence random;
+    const Case<T, 5> c = make_case<T, 5>(random);
+    Eigen::Array<bool, 5, 1> held;
+    Eigen::LLT<NMPC::Matrix<T, 5, 5>> factor;
+    const T tolerance = T(16) * std::numeric_limits<T>::epsilon();
+    bool finished = true;
+    NMPC::Vector<T, 5> d = c.upper;
+    EXPECT_EQ((NMPC::solve_box_qp<T, 5>(c.H, c.g, c.lower, c.upper, d, held, factor, 0, tolerance, &finished)), 0);
+    EXPECT_FALSE(finished);
+    d = c.upper;
+    ASSERT_GT((NMPC::solve_box_qp<T, 5>(c.H, c.g, c.lower, c.upper, d, held, factor, 64, tolerance, &finished)), 0);
+    EXPECT_TRUE(finished);
+}

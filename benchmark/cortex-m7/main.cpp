@@ -50,6 +50,12 @@ using Solver = NMPC::Solver<Problem>;
 
 static Solver::Workspace workspace;
 static Problem problem;
+/*
+The solver object holds the scales of the last solve and their products, which persist between solves:
+sizeof(Solver), printed beside the workspace. It is static here, as the workspace is, so that the stack
+figures are the call stack alone, counted from the stack's original top.
+*/
+static Solver solver(workspace);
 
 static void report(const char* name, uint64_t count, uint32_t stack) {
     print(name);
@@ -78,11 +84,12 @@ int main() {
 #ifdef NMPC_BENCHMARK_PER_STAGE
     print(" with per-stage Jacobians");
 #endif
+    print(", solver ");
+    print_u(sizeof(Solver));
     print(", problem ");
     print_u(sizeof(Problem));
     print(" bytes\n");
 
-    Solver solver(workspace);
     NMPC::Options<float> options;
     Problem::State x = problem.start();
     solver.reset(x, problem.hover());
