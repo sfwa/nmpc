@@ -24,7 +24,9 @@ master carries the next planned version with the pre-release "dev".
 #define NMPC_VERSION_PRERELEASE "dev"
 #define NMPC_VERSION_STRING "2.0.0-dev"
 
-/* One number for comparisons in the preprocessor: 20000 for 2.0.0, 20103 for 2.1.3. */
-#define NMPC_VERSION (NMPC_VERSION_MAJOR * 10000 + NMPC_VERSION_MINOR * 100 + NMPC_VERSION_PATCH)
+/* One number for comparisons in the preprocessor: 20000 for 2.0.0, 20103 for
+   2.1.3. */
+#define NMPC_VERSION \
+  (NMPC_VERSION_MAJOR * 10000 + NMPC_VERSION_MINOR * 100 + NMPC_VERSION_PATCH)
 
 #endif

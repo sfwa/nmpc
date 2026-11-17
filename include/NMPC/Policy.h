@@ -6,8 +6,9 @@ the repository.
 #ifndef NMPC_POLICY_H
 #define NMPC_POLICY_H
 
-#include "NMPC/Problem.h"
 #include <algorithm>
+
+#include "NMPC/Problem.h"
 
 namespace NMPC {
 
@@ -34,52 +35,52 @@ last stage once the plan has run out.
 */
 template <class Problem, int N = Problem::Stages>
 struct Policy {
-    using Traits = ProblemTraits<Problem>;
-    using T = typename Traits::T;
-    using State = typename Traits::State;
-    using Control = typename Traits::Control;
-    using Gain = typename Traits::Gain;
+  using Traits = ProblemTraits<Problem>;
+  using T = typename Traits::T;
+  using State = typename Traits::State;
+  using Control = typename Traits::Control;
+  using Gain = typename Traits::Gain;
 
-    enum { Stages = N };
-    static_assert(N > 0, "A plan needs at least one stage");
+  enum { Stages = N };
+  static_assert(N > 0, "A plan needs at least one stage");
 
-    /* x[k] is the state at the start of stage k; x[N] is where the plan ends. */
-    State x[N + 1];
-    Control u[N];
-    Gain K[N];
+  /* x[k] is the state at the start of stage k; x[N] is where the plan ends. */
+  State x[N + 1];
+  Control u[N];
+  Gain K[N];
 
-    long origin = 0;
-    long ticks_per_stage = 1;
+  long origin = 0;
+  long ticks_per_stage = 1;
 
-    /* A view of one stage. */
-    struct Stage {
-        int index;
-        const State& x;
-        const Control& u;
-        const Gain& K;
-    };
+  /* A view of one stage. */
+  struct Stage {
+    int index;
+    const State& x;
+    const Control& u;
+    const Gain& K;
+  };
 
-    int stage_index(long tick) const {
-        const long elapsed = std::max(0L, tick - origin);
-        return int(std::min(elapsed / std::max(1L, ticks_per_stage), long(N - 1)));
-    }
+  int stage_index(long tick) const {
+    const long elapsed = std::max(0L, tick - origin);
+    return int(std::min(elapsed / std::max(1L, ticks_per_stage), long(N - 1)));
+  }
 
-    Stage at(long tick) const {
-        const int k = stage_index(tick);
-        return Stage{k, x[k], u[k], K[k]};
-    }
+  Stage at(long tick) const {
+    const int k = stage_index(tick);
+    return Stage{k, x[k], u[k], K[k]};
+  }
 
-    /* The command of stage k for the state x, before any bound. */
-    Control feedback(int k, const State& state, const State& planned) const {
-        NMPC_ASSERT(k >= 0 && k < N);
-        return u[k] + K[k] * Problem::difference(state, planned);
-    }
+  /* The command of stage k for the state x, before any bound. */
+  Control feedback(int k, const State& state, const State& planned) const {
+    NMPC_ASSERT(k >= 0 && k < N);
+    return u[k] + K[k] * Problem::difference(state, planned);
+  }
 
-    Control feedback(int k, const State& state) const {
-        return feedback(k, state, x[k]);
-    }
+  Control feedback(int k, const State& state) const {
+    return feedback(k, state, x[k]);
+  }
 };
 
-}
+}  // namespace NMPC
 
 #endif
