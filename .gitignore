@@ -1,60 +1,18 @@
-*.py[cod]
-.DS_Store
-
-# C extensions
-*.so
-*.dylib
-*.a
-a.out
-
-# Packages
-*.egg
-*.egg-info
-dist
-build
-eggs
-parts
-var
-sdist
-develop-eggs
-.installed.cfg
-lib64
-Debug
-Release
-
-# Installer logs
-pip-log.txt
-
-# Unit test / coverage reports
-.coverage
-.tox
-nosetests.xml
-
-# Translations
-*.mo
-
-# Mr Developer
-.mr.developer.cfg
-.pydevproject
-
-# LaTeX
-*.synctex.gz
-*.aux
-*.log
-
-# Symlink to dynamic library for development
-python/nmpc/c
-python/nmpc/ccs-c66x
-
-# Cmake junk
+# Build trees
+build*/
+/build-*/
 CMakeFiles
-*.cmake
 CMakeCache.txt
-src/googletest
-src/qpDUNES*
-src/eigen3*
-src/*.gz
-src/*.zip
+*.cmake
+!cmake/*.cmake
 Makefile
-test/src/googletest*
-tmp
+
+# Embedded benchmark outputs
+benchmark/cortex-m7/out/
+
+# Editors and tools
+.DS_Store
+.vscode/
+.idea/
+*.py[cod]
+.venv/

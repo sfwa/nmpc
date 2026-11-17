@@ -1,0 +1,89 @@
+name: CMake
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmake-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }} / ${{ matrix.build_type }}
+    runs-on: ${{ matrix.config.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+        config:
+          - { name: Linux GCC (bundled Eigen 3.2.8), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'OFF' }
+          - { name: Linux Clang (bundled Eigen 3.2.8), os: ubuntu-24.04, CC: clang, CXX: clang++, eigen: 'OFF' }
+          - { name: macOS Clang (bundled Eigen 3.2.8), os: macos-latest, CC: clang, CXX: clang++, eigen: 'OFF' }
+          - { name: Linux GCC (system Eigen 3.4.0), os: ubuntu-24.04, CC: gcc, CXX: g++, eigen: 'ON' }
+    env:
+      CC: ${{ matrix.config.CC }}
+      CXX: ${{ matrix.config.CXX }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out UKF beside NMPC, for the consumer fixture
+        uses: actions/checkout@v5
+        with:
+          repository: sfwa/ukf
+          path: ukf
+
+      - name: Install system Eigen
+        if: matrix.config.eigen == 'ON'
+        run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }}
+
+      - name: Build tests, benchmarks and examples with warnings as errors
+        run: cmake --build build --target unittest unittest_no_heap benchmark stop pendulum attitude --config ${{ matrix.build_type }} --parallel 2
+
+      - name: Test in float and double
+        working-directory: build
+        run: ctest --build-config ${{ matrix.build_type }} --output-on-failure
+
+      - name: Run the examples
+        run: |
+          build/examples/stop/stop
+          build/examples/pendulum/pendulum
+          build/examples/attitude/attitude
+
+      - name: Downstream consumer, alone
+        run: |
+          cmake -S test/cmake -B build-consumer -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }}
+          cmake --build build-consumer --config ${{ matrix.build_type }} --parallel 2
+          ctest --test-dir build-consumer --build-config ${{ matrix.build_type }} --output-on-failure
+
+      - name: Downstream consumer, beside UKF and sharing its Eigen
+        run: |
+          cmake -S test/cmake -B build-consumer-ukf -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNMPC_USE_SYSTEM_EIGEN=${{ matrix.config.eigen }} -DNMPC_TEST_UKF_DIR=${{ github.workspace }}/ukf
+          cmake --build build-consumer-ukf --config ${{ matrix.build_type }} --parallel 2
+          ctest --test-dir build-consumer-ukf --build-config ${{ matrix.build_type }} --output-on-failure
+
+  cortex-m7:
+    name: Cortex-M7 single precision under QEMU
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the Arm toolchain and QEMU
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi qemu-system-arm
+
+      - name: Fetch the patched Eigen 3.2.8
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target eigen3
+
+      - name: Instruction counts against the accepted baseline, and no double-precision routines
+        run: python3 benchmark/cortex-m7/check.py build/src/eigen3
