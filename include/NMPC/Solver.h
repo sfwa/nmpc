@@ -275,7 +275,11 @@ class Solver {
           result.line_search_trials++;
           const T expected = -(alpha * dV1 + alpha * alpha * dV2);
           const T trial_cost = forward(problem, x0, alpha, bound_stages);
-          if (std::isfinite(trial_cost) && expected > T(0) &&
+          if (!std::isfinite(trial_cost)) {
+            continue;
+          }
+          result.finite_line_search_trials++;
+          if (expected > T(0) &&
               (cost - trial_cost) > options.accept_ratio * expected) {
             accept();
             cost = trial_cost;
@@ -283,6 +287,17 @@ class Solver {
             accepted = true;
             break;
           }
+          const T tolerance = options.absolute_cost_tolerance;
+          if (tolerance > T(0) && std::isfinite(tolerance) &&
+              stage_qps_finished && cost >= T(0) && cost <= tolerance &&
+              trial_cost >= T(0) && trial_cost <= tolerance &&
+              predicted <= tolerance) {
+            converged = true;
+            break;
+          }
+        }
+        if (converged) {
+          break;
         }
         if (accepted) {
           regularisation =

@@ -16,8 +16,8 @@ namespace NMPC {
 enum class Status {
   /*
   The predicted decrease fell below the precision floor, or was zero (every
-  stage's step was zero, as at an exact optimum). The plan is the best this
-  precision can verify.
+  stage's step was zero, as at an exact optimum), or a finite trial confirmed
+  the optional absolute cost tolerance. All stage QPs reached their solutions.
   */
   Converged,
   /* The iteration budget was spent. With one iteration a solve this is the
@@ -82,6 +82,9 @@ struct Result {
   Options::out_of_time stopped the solve before its work budgets were spent.
   */
   bool out_of_time = false;
+
+  /* Line-search trials whose forward rollout reached a finite cost. */
+  int finite_line_search_trials = 0;
 
   bool usable() const { return status != Status::NumericalFailure; }
 };
