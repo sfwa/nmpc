@@ -574,6 +574,72 @@ TYPED_TEST(SolverTest, AnExactOptimumOfZeroCostStopsAtOnce) {
   }
 }
 
+TYPED_TEST(SolverTest, NearZeroCostNeedsFinishedStageQPsAndAFiniteTrial) {
+  typedef TypeParam T;
+  typedef Stop_Problem<T> Problem;
+  typedef NMPC::Solver<Problem> Solver;
+  static typename Solver::Workspace workspace;
+  Solver solver(workspace);
+  Problem problem;
+  NMPC::Options<T> options;
+  options.accept_ratio = T(1e6);  // Refuse improving steps in the line search.
+  options.max_regularisation_retries = 0;
+  const T eps = std::numeric_limits<T>::epsilon();
+  const typename Problem::State x0(eps / T(4), T(0));
+  auto solve = [&]() {
+    solver.reset(x0, Problem::Control::Zero());
+    return solver.solve(problem, x0, options);
+  };
+
+  const auto disabled = solve();
+  EXPECT_EQ(disabled.status, NMPC::Status::NoProgress);
+  EXPECT_EQ(disabled.finite_line_search_trials, options.max_line_search);
+
+  options.absolute_cost_tolerance = eps * eps;
+  const auto at_floor = solve();
+  EXPECT_EQ(at_floor.status, NMPC::Status::Converged);
+  EXPECT_EQ(at_floor.accepted_steps, 0);
+  EXPECT_GT(at_floor.predicted_decrease, T(0));
+  EXPECT_EQ(at_floor.cost_after, at_floor.cost_before);
+  EXPECT_EQ(at_floor.finite_line_search_trials, 1);
+  EXPECT_EQ(at_floor.line_search_trials, 1);
+
+  options.max_box_iterations = 1;
+  const auto unfinished = solve();
+  EXPECT_EQ(unfinished.status, NMPC::Status::NoProgress);
+  EXPECT_EQ(unfinished.finite_line_search_trials, options.max_line_search);
+
+  options.accept_ratio = NMPC::Options<T>().accept_ratio;
+  const auto improving = solve();
+  EXPECT_EQ(improving.accepted_steps, 1);
+  EXPECT_LT(improving.cost_after, improving.cost_before);
+}
+
+TYPED_TEST(SolverTest, NonfiniteTrialsCannotConfirmTheAbsoluteCostTolerance) {
+  typedef TypeParam T;
+  struct Problem : Stop_Problem<T> {
+    static bool finite(const typename Stop_Problem<T>::State& x) {
+      return x.allFinite() && x(1) == T(0);
+    }
+  };
+  typedef NMPC::Solver<Problem> Solver;
+  static typename Solver::Workspace workspace;
+  Solver solver(workspace);
+  const T eps = std::numeric_limits<T>::epsilon();
+  const typename Problem::State x0(eps / T(4), T(0));
+  solver.reset(x0, Problem::Control::Zero());
+  NMPC::Options<T> options;
+  options.absolute_cost_tolerance = eps * eps;
+  const auto result = solver.solve(Problem(), x0, options);
+  EXPECT_GT(result.cost_before, T(0));
+  EXPECT_LT(result.cost_before, options.absolute_cost_tolerance);
+  EXPECT_GT(result.predicted_decrease, T(0));
+  EXPECT_LT(result.predicted_decrease, options.absolute_cost_tolerance);
+  EXPECT_GT(result.line_search_trials, 0);
+  EXPECT_EQ(result.finite_line_search_trials, 0);
+  EXPECT_EQ(result.status, NMPC::Status::NoProgress);
+}
+
 TYPED_TEST(SolverTest, PolicyFeedbackIsWhatTheForwardPassApplies) {
   typedef TypeParam T;
   typedef Attitude_Problem<T> Problem;

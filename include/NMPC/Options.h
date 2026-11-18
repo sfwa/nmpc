@@ -96,6 +96,14 @@ struct Options {
   */
   bool (*out_of_time)(void* context) = nullptr;
   void* time_context = nullptr;
+
+  /*
+  For objectives with a known lower bound of zero, an absolute tolerance in
+  cost units. A refused finite trial can confirm convergence when its cost,
+  the nominal cost and the predicted decrease are all within this distance
+  of zero, and all stage QPs finished. Zero disables this test.
+  */
+  T absolute_cost_tolerance = T(0);
 };
 
 }  // namespace NMPC
