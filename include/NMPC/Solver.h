@@ -377,6 +377,60 @@ class Solver {
   }
 
   /*
+  The stage's expansion carried back through its step: Qx += A' Vx, Qu += B'
+  Vx, Qxx += A' Vxx A (one triangle), Qux += B' Vxx A and Quu += B' Vxx B, with
+  every coefficient an Eigen dot product of two contiguous columns.
+
+  It is a function of its own so that GCC inlines those dot products. Inside
+  backward(), which is large, GCC 13 at -O2 runs out of its inlining budget
+  and calls an out-of-line accessor for every term of some of them: on a
+  Cortex-M7 that was the two products with B at the quadrotor's dimensions (17
+  states, 5 commands), and most of the products at the octorotor's (21 and 9),
+  where it more than doubled the backward pass. The dot products and their order
+  are the same either way, so plans are bitwise the same wherever the compiler
+  does not fuse multiplications into additions; where it does, as GCC does on
+  the Cortex-M7, the inlined products are fused like the rest of the solver and
+  the plan moves by rounding.
+  */
+  static void expand_through_step(const MatA& A, const MatB& B,
+                                  const Tangent& Vx, const MatA& Vxx,
+                                  Tangent& Qx, Control& Qu, MatA& Qxx,
+                                  Gain& Qux, MatU& Quu) {
+    MatA VA;
+    MatB VB;
+    for (int j = 0; j < NX; j++) {
+      for (int i = 0; i < NX; i++) {
+        VA(i, j) = Vxx.col(i).dot(A.col(j));
+      }
+    }
+    for (int j = 0; j < NU; j++) {
+      for (int i = 0; i < NX; i++) {
+        VB(i, j) = Vxx.col(i).dot(B.col(j));
+      }
+    }
+    for (int i = 0; i < NX; i++) {
+      Qx(i) += A.col(i).dot(Vx);
+    }
+    for (int i = 0; i < NU; i++) {
+      Qu(i) += B.col(i).dot(Vx);
+    }
+    for (int j = 0; j < NX; j++) {
+      for (int i = 0; i <= j; i++) {
+        Qxx(i, j) += A.col(i).dot(VA.col(j));
+      }
+      for (int i = 0; i < NU; i++) {
+        Qux(i, j) += B.col(i).dot(VA.col(j));
+      }
+    }
+    for (int j = 0; j < NU; j++) {
+      for (int i = 0; i <= j; i++) {
+        Quu(i, j) += B.col(i).dot(VB.col(j));
+        Quu(j, i) = Quu(i, j);
+      }
+    }
+  }
+
+  /*
   The backward pass, with one triangle of each symmetric product. It stores each
   stage's step and gain in the workspace, and returns false if a stage QP could
   not be factored. The gains become the plan's only when solve() commits them
@@ -403,38 +457,7 @@ class Solver {
       MatU Quu;
       stage_expansion(problem, k, Qx, Qu, Qxx, Qux, Quu);
 
-      MatA VA;
-      MatB VB;
-      for (int j = 0; j < NX; j++) {
-        for (int i = 0; i < NX; i++) {
-          VA(i, j) = Vxx.col(i).dot(A.col(j));
-        }
-      }
-      for (int j = 0; j < NU; j++) {
-        for (int i = 0; i < NX; i++) {
-          VB(i, j) = Vxx.col(i).dot(B.col(j));
-        }
-      }
-      for (int i = 0; i < NX; i++) {
-        Qx(i) += A.col(i).dot(Vx);
-      }
-      for (int i = 0; i < NU; i++) {
-        Qu(i) += B.col(i).dot(Vx);
-      }
-      for (int j = 0; j < NX; j++) {
-        for (int i = 0; i <= j; i++) {
-          Qxx(i, j) += A.col(i).dot(VA.col(j));
-        }
-        for (int i = 0; i < NU; i++) {
-          Qux(i, j) += B.col(i).dot(VA.col(j));
-        }
-      }
-      for (int j = 0; j < NU; j++) {
-        for (int i = 0; i <= j; i++) {
-          Quu(i, j) += B.col(i).dot(VB.col(j));
-          Quu(j, i) = Quu(i, j);
-        }
-      }
+      expand_through_step(A, B, Vx, Vxx, Qx, Qu, Qxx, Qux, Quu);
 
       MatU H = Quu;
       H.diagonal().array() += regularisation;
