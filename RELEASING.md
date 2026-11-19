@@ -114,6 +114,7 @@ as UKF's, so that one program can use both libraries in any of them.
 | Embedded | Cortex-M7 in single precision with Ubuntu 24.04's `arm-none-eabi-gcc` and Eigen 3.2.8, built and instruction-counted under QEMU in CI |
 | Eigen | 3.2.8 with this repository's patches (the default download), 3.4.0 and 5.0.0, downloaded or installed |
 | CMake | 3.10 or newer to configure; 3.14 or newer to install the package version file as architecture-independent |
+| Generators | Unix Makefiles and Ninja |
 | Build types | Debug and Release |
 
 MSVC is not in CI. The maintainers also measure solves on an STM32H735 and

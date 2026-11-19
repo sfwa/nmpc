@@ -247,7 +247,9 @@ the same major version. A pre-release, such as master's `2.0.0-dev` or
 find it with `find_package(nmpc REQUIRED CONFIG)`. With the downloaded Eigen, its headers (patched, for
 3.2.8) are installed under `include/nmpc/eigen3`; with
 `NMPC_USE_SYSTEM_EIGEN`, the package finds Eigen again when it is loaded.
-Install rules are generated when NMPC is built on its own, or with
+NMPC's `LICENSE` is installed under `share/licenses/nmpc`, and with the
+downloaded Eigen its `COPYING.*` licence files under
+`share/licenses/nmpc/eigen3`. Install rules are generated when NMPC is built on its own, or with
 `NMPC_INSTALL=ON` as a subdirectory. A program that finds installed copies of
 both NMPC and UKF should have installed both with the same Eigen.
 
