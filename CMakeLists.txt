@@ -161,11 +161,28 @@ if(NMPC_INSTALL)
     set_target_properties(nmpc PROPERTIES EXPORT_NAME nmpc)
     install(TARGETS nmpc EXPORT nmpcTargets)
     install(DIRECTORY include/NMPC DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    # The licences go with the headers they cover.
+    set(nmpc_license_dir ${CMAKE_INSTALL_DATADIR}/licenses/nmpc)
+    install(FILES LICENSE DESTINATION ${nmpc_license_dir})
     if(NOT NMPC_USE_SYSTEM_EIGEN)
         # The downloaded (and, for 3.2.8, patched) Eigen headers. Build the
         # project before installing so that they have been downloaded.
         install(DIRECTORY ${source_dir}/Eigen ${source_dir}/unsupported
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nmpc/eigen3)
+        # Eigen's licences are the COPYING files at the top of its source
+        # tree, and which there are depends on the release. They exist only
+        # once Eigen has been downloaded, so they are found when installing.
+        if(IS_ABSOLUTE "${nmpc_license_dir}")
+            set(nmpc_eigen_license_dir "${nmpc_license_dir}/eigen3")
+        else()
+            set(nmpc_eigen_license_dir "\${CMAKE_INSTALL_PREFIX}/${nmpc_license_dir}/eigen3")
+        endif()
+        install(CODE "
+            file(GLOB nmpc_eigen_licenses \"${source_dir}/COPYING.*\")
+            if(NOT nmpc_eigen_licenses)
+                message(FATAL_ERROR \"No Eigen licence files in ${source_dir}; build the project before installing it\")
+            endif()
+            file(INSTALL \${nmpc_eigen_licenses} DESTINATION \"${nmpc_eigen_license_dir}\")")
     endif()
     set(nmpc_cmake_dir ${CMAKE_INSTALL_LIBDIR}/cmake/nmpc)
     install(EXPORT nmpcTargets NAMESPACE nmpc:: DESTINATION ${nmpc_cmake_dir})
@@ -226,6 +243,7 @@ if(NMPC_BUILD_TESTS)
 endif()
 if(NMPC_BUILD_BENCHMARKS)
     add_subdirectory(benchmark EXCLUDE_FROM_ALL)
+    add_custom_target(benchmark DEPENDS nmpc_benchmark)
 endif()
 if(NMPC_BUILD_EXAMPLES)
     add_subdirectory(examples EXCLUDE_FROM_ALL)

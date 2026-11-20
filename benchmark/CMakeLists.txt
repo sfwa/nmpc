@@ -10,6 +10,11 @@ if(TARGET benchmark::benchmark)
 else()
     include(ExternalProject)
     set_directory_properties(PROPERTIES EP_PREFIX .)
+    # The static library is named as the external project's byproduct, for
+    # generators such as Ninja (see test/CMakeLists.txt).
+    set(googlebenchmark_binary_dir ${CMAKE_CURRENT_BINARY_DIR}/src/googlebenchmark-build)
+    set(nmpc_benchmark_libraries
+        ${googlebenchmark_binary_dir}/src/${CMAKE_FIND_LIBRARY_PREFIXES}benchmark.a)
     ExternalProject_Add(
         googlebenchmark
         URL https://github.com/google/benchmark/archive/v1.3.0.zip
@@ -23,22 +28,24 @@ else()
             # Keep strict warnings on our benchmark, not the vendored library (as UKF does).
             -DHAVE_CXX_FLAG_WERROR:BOOL=OFF
             -DHAVE_CXX_FLAG_PEDANTIC_ERRORS:BOOL=OFF
+        BINARY_DIR ${googlebenchmark_binary_dir}
+        BUILD_BYPRODUCTS ${nmpc_benchmark_libraries}
         INSTALL_COMMAND ""
         LOG_DOWNLOAD ON
         LOG_CONFIGURE ON
         LOG_BUILD ON)
     ExternalProject_Get_Property(googlebenchmark source_dir)
-    ExternalProject_Get_Property(googlebenchmark binary_dir)
     set(nmpc_benchmark_include ${source_dir}/include)
-    set(nmpc_benchmark_libraries ${binary_dir}/src/${CMAKE_FIND_LIBRARY_PREFIXES}benchmark.a)
 endif()
 
-# The target is named benchmark, as UKF's is; the imported library is benchmark::benchmark.
+# The program is named benchmark, as UKF's is; the imported library is
+# benchmark::benchmark. The target of that name is added by the parent
+# directory: declared here, Ninja would have two rules for benchmark/benchmark,
+# the target in this directory and the program it builds.
 add_executable(nmpc_benchmark
     SolverBenchmark.cpp
     BenchmarkMain.cpp)
 set_target_properties(nmpc_benchmark PROPERTIES OUTPUT_NAME benchmark)
-add_custom_target(benchmark DEPENDS nmpc_benchmark)
 target_compile_definitions(nmpc_benchmark PRIVATE EIGEN_NO_MALLOC)
 nmpc_project_warnings(nmpc_benchmark)
 if(nmpc_benchmark_include)

@@ -10,6 +10,13 @@ if(TARGET GTest::gtest_main)
 else()
     include(ExternalProject)
     set_directory_properties(PROPERTIES EP_PREFIX .)
+    # The static libraries that building googletest produces. They are named
+    # as its byproducts so that a generator which checks every input before
+    # it builds anything, as Ninja does, knows where they come from.
+    set(googletest_binary_dir ${CMAKE_CURRENT_BINARY_DIR}/src/googletest-build)
+    set(nmpc_gtest_libraries
+        ${googletest_binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}gtest.a
+        ${googletest_binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}gtest_main.a)
     ExternalProject_Add(
         googletest
         URL https://github.com/google/googletest/archive/release-1.7.0.zip
@@ -17,16 +24,14 @@ else()
         CMAKE_ARGS
             -DCMAKE_BUILD_TYPE:STRING=Release
             -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.10
+        BINARY_DIR ${googletest_binary_dir}
+        BUILD_BYPRODUCTS ${nmpc_gtest_libraries}
         INSTALL_COMMAND ""
         LOG_DOWNLOAD ON
         LOG_CONFIGURE ON
         LOG_BUILD ON)
     ExternalProject_Get_Property(googletest source_dir)
-    ExternalProject_Get_Property(googletest binary_dir)
     set(nmpc_gtest_include ${source_dir}/include)
-    set(nmpc_gtest_libraries
-        ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}gtest.a
-        ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}gtest_main.a)
 endif()
 
 # Every test runs in float and in double (typed tests), so one binary covers both precisions.
