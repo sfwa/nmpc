@@ -398,6 +398,27 @@ class Solver {
                                   Gain& Qux, MatU& Quu) {
     MatA VA;
     MatB VB;
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
+    // eigen-mcu provides zero-stack unpacked 4x4 (float) / 2x4 (double) GEMM
+    // and triangular product kernels that halve memory traffic compared to
+    // column-by-column dot products.
+    VA.noalias() = Vxx * A;
+    VB.noalias() = Vxx * B;
+    for (int i = 0; i < NX; i++) {
+      Qx(i) += A.col(i).dot(Vx);
+    }
+    for (int i = 0; i < NU; i++) {
+      Qu(i) += B.col(i).dot(Vx);
+    }
+    Qxx.template triangularView<Eigen::Upper>() += A.transpose() * VA;
+    Qux.noalias() += B.transpose() * VA;
+    Quu.template triangularView<Eigen::Upper>() += B.transpose() * VB;
+    for (int j = 0; j < NU; j++) {
+      for (int i = 0; i < j; i++) {
+        Quu(j, i) = Quu(i, j);
+      }
+    }
+#else
     for (int j = 0; j < NX; j++) {
       for (int i = 0; i < NX; i++) {
         VA(i, j) = Vxx.col(i).dot(A.col(j));
@@ -428,6 +449,7 @@ class Solver {
         Quu(j, i) = Quu(i, j);
       }
     }
+#endif
   }
 
   /*
@@ -539,6 +561,22 @@ class Solver {
       for (int i = 0; i < NX; i++) {
         Vx(i) = Qx(i) + K.col(i).dot(t) + Qux.col(i).dot(d);
       }
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
+      Gain M(Qux);
+      M.noalias() += Quu * K;
+      for (int j = 0; j < NX; j++) {
+        for (int i = 0; i <= j; i++) {
+          Vxx(i, j) = Qxx(i, j);
+        }
+      }
+      Vxx.template triangularView<Eigen::Upper>() += Qux.transpose() * K;
+      Vxx.template triangularView<Eigen::Upper>() += K.transpose() * M;
+      for (int j = 0; j < NX; j++) {
+        for (int i = 0; i < j; i++) {
+          Vxx(j, i) = Vxx(i, j);
+        }
+      }
+#else
       Gain M;
       for (int j = 0; j < NX; j++) {
         M.col(j) = Qux.col(j) + Quu * K.col(j);
@@ -551,6 +589,7 @@ class Solver {
           Vxx(j, i) = v;
         }
       }
+#endif
     }
     return true;
   }
@@ -701,6 +740,22 @@ class Solver {
       for (int j = 0; j < NU; j++) {
         Ju.col(j) *= Du(j);
       }
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
+      for (int j = 0; j < NX; j++) {
+        lx(j) = Jx.col(j).dot(r);
+      }
+      for (int j = 0; j < NU; j++) {
+        lu(j) = Ju.col(j).dot(r);
+      }
+      Lxx.template triangularView<Eigen::Upper>() = Jx.transpose() * Jx;
+      Lux.noalias() = Ju.transpose() * Jx;
+      Luu.template triangularView<Eigen::Upper>() = Ju.transpose() * Ju;
+      for (int j = 0; j < NU; j++) {
+        for (int i = 0; i < j; i++) {
+          Luu(j, i) = Luu(i, j);
+        }
+      }
+#else
       for (int j = 0; j < NX; j++) {
         lx(j) = Jx.col(j).dot(r);
         for (int i = 0; i <= j; i++) {
@@ -717,6 +772,7 @@ class Solver {
           Luu(j, i) = Luu(i, j);
         }
       }
+#endif
       if constexpr (detail::HasLinearCost<Problem>::value) {
         Tangent gx;
         Control gu;
@@ -749,6 +805,17 @@ class Solver {
       for (int j = 0; j < NX; j++) {
         J.col(j) *= Dx(j);
       }
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
+      for (int j = 0; j < NX; j++) {
+        Vx(j) = J.col(j).dot(r);
+      }
+      Vxx.template triangularView<Eigen::Upper>() = J.transpose() * J;
+      for (int j = 0; j < NX; j++) {
+        for (int i = 0; i < j; i++) {
+          Vxx(j, i) = Vxx(i, j);
+        }
+      }
+#else
       for (int j = 0; j < NX; j++) {
         Vx(j) = J.col(j).dot(r);
         for (int i = 0; i <= j; i++) {
@@ -756,6 +823,7 @@ class Solver {
           Vxx(j, i) = Vxx(i, j);
         }
       }
+#endif
     } else {
       (void)problem;
       Vx.setZero();
