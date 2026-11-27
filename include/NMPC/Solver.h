@@ -398,7 +398,7 @@ class Solver {
                                   Gain& Qux, MatU& Quu) {
     MatA VA;
     MatB VB;
-#if defined(EIGEN_MCU) && EIGEN_MCU
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
     /* eigen-mcu provides unpacked small-matrix GEMM, triangular product, and
        GEMV kernels without GotoBLAS packing overhead, so matrix products cut
        operand memory traffic substantially compared to column dot loops. */
@@ -510,7 +510,7 @@ class Solver {
       zero.
       */
       Gain K;
-#if defined(EIGEN_MCU) && EIGEN_MCU
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
       /* eigen-mcu's fused small-LLT solve shares one pre-inverted diagonal
          across L and L^T and blocks across RHS columns with zero extra
          stack. */
@@ -562,7 +562,7 @@ class Solver {
       dV1 += d.dot(Qu);
       dV2 += T(0.5) * d.dot(Quud);
       const Control t = Qu + Quud;
-#if defined(EIGEN_MCU) && EIGEN_MCU
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
       Vx = Qx;
       Vx.noalias() += K.transpose() * t;
       Vx.noalias() += Qux.transpose() * d;
@@ -743,7 +743,7 @@ class Solver {
       for (int j = 0; j < NU; j++) {
         Ju.col(j) *= Du(j);
       }
-#if defined(EIGEN_MCU) && EIGEN_MCU
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
       lx.noalias() = Jx.transpose() * r;
       lu.noalias() = Ju.transpose() * r;
       Lxx.template triangularView<Eigen::Upper>() = Jx.transpose() * Jx;
@@ -804,7 +804,7 @@ class Solver {
       for (int j = 0; j < NX; j++) {
         J.col(j) *= Dx(j);
       }
-#if defined(EIGEN_MCU) && EIGEN_MCU
+#if defined(EIGEN_MCU_SMALL_GEMM) && EIGEN_MCU_SMALL_GEMM
       Vx.noalias() = J.transpose() * r;
       Vxx.template triangularView<Eigen::Upper>() = J.transpose() * J;
       for (int j = 0; j < NX; j++) {
