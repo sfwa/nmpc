@@ -398,6 +398,23 @@ class Solver {
                                   Gain& Qux, MatU& Quu) {
     MatA VA;
     MatB VB;
+#if defined(EIGEN_MCU) && EIGEN_MCU
+    /* eigen-mcu provides unpacked small-matrix GEMM, triangular product, and
+       GEMV kernels without GotoBLAS packing overhead, so matrix products cut
+       operand memory traffic substantially compared to column dot loops. */
+    VA.noalias() = Vxx * A;
+    VB.noalias() = Vxx * B;
+    Qx.noalias() += A.transpose() * Vx;
+    Qu.noalias() += B.transpose() * Vx;
+    Qxx.template triangularView<Eigen::Upper>() += A.transpose() * VA;
+    Qux.noalias() += B.transpose() * VA;
+    Quu.template triangularView<Eigen::Upper>() += B.transpose() * VB;
+    for (int j = 0; j < NU; j++) {
+      for (int i = 0; i < j; i++) {
+        Quu(j, i) = Quu(i, j);
+      }
+    }
+#else
     for (int j = 0; j < NX; j++) {
       for (int i = 0; i < NX; i++) {
         VA(i, j) = Vxx.col(i).dot(A.col(j));
@@ -428,6 +445,7 @@ class Solver {
         Quu(j, i) = Quu(i, j);
       }
     }
+#endif
   }
 
   /*
@@ -492,6 +510,13 @@ class Solver {
       zero.
       */
       Gain K;
+#if defined(EIGEN_MCU) && EIGEN_MCU
+      /* eigen-mcu's fused small-LLT solve shares one pre-inverted diagonal
+         across L and L^T and blocks across RHS columns with zero extra
+         stack. */
+      K = rhs;
+      factor.solveInPlace(K);
+#else
       {
         const MatU& L = factor.matrixLLT();
         Control inverse_diagonal;
@@ -517,6 +542,7 @@ class Solver {
           K.col(j) = c;
         }
       }
+#endif
       for (int i = 0; i < NU; i++) {
         if (held(i)) {
           K.row(i).setZero();
@@ -536,6 +562,21 @@ class Solver {
       dV1 += d.dot(Qu);
       dV2 += T(0.5) * d.dot(Quud);
       const Control t = Qu + Quud;
+#if defined(EIGEN_MCU) && EIGEN_MCU
+      Vx = Qx;
+      Vx.noalias() += K.transpose() * t;
+      Vx.noalias() += Qux.transpose() * d;
+      Gain M(Qux);
+      M.noalias() += Quu * K;
+      Vxx.template triangularView<Eigen::Upper>() = Qxx;
+      Vxx.template triangularView<Eigen::Upper>() += Qux.transpose() * K;
+      Vxx.template triangularView<Eigen::Upper>() += K.transpose() * M;
+      for (int j = 0; j < NX; j++) {
+        for (int i = 0; i < j; i++) {
+          Vxx(j, i) = Vxx(i, j);
+        }
+      }
+#else
       for (int i = 0; i < NX; i++) {
         Vx(i) = Qx(i) + K.col(i).dot(t) + Qux.col(i).dot(d);
       }
@@ -551,6 +592,7 @@ class Solver {
           Vxx(j, i) = v;
         }
       }
+#endif
     }
     return true;
   }
@@ -701,6 +743,18 @@ class Solver {
       for (int j = 0; j < NU; j++) {
         Ju.col(j) *= Du(j);
       }
+#if defined(EIGEN_MCU) && EIGEN_MCU
+      lx.noalias() = Jx.transpose() * r;
+      lu.noalias() = Ju.transpose() * r;
+      Lxx.template triangularView<Eigen::Upper>() = Jx.transpose() * Jx;
+      Lux.noalias() = Ju.transpose() * Jx;
+      Luu.template triangularView<Eigen::Upper>() = Ju.transpose() * Ju;
+      for (int j = 0; j < NU; j++) {
+        for (int i = 0; i < j; i++) {
+          Luu(j, i) = Luu(i, j);
+        }
+      }
+#else
       for (int j = 0; j < NX; j++) {
         lx(j) = Jx.col(j).dot(r);
         for (int i = 0; i <= j; i++) {
@@ -717,6 +771,7 @@ class Solver {
           Luu(j, i) = Luu(i, j);
         }
       }
+#endif
       if constexpr (detail::HasLinearCost<Problem>::value) {
         Tangent gx;
         Control gu;
@@ -749,6 +804,15 @@ class Solver {
       for (int j = 0; j < NX; j++) {
         J.col(j) *= Dx(j);
       }
+#if defined(EIGEN_MCU) && EIGEN_MCU
+      Vx.noalias() = J.transpose() * r;
+      Vxx.template triangularView<Eigen::Upper>() = J.transpose() * J;
+      for (int j = 0; j < NX; j++) {
+        for (int i = 0; i < j; i++) {
+          Vxx(j, i) = Vxx(i, j);
+        }
+      }
+#else
       for (int j = 0; j < NX; j++) {
         Vx(j) = J.col(j).dot(r);
         for (int i = 0; i <= j; i++) {
@@ -756,6 +820,7 @@ class Solver {
           Vxx(j, i) = Vxx(i, j);
         }
       }
+#endif
     } else {
       (void)problem;
       Vx.setZero();
